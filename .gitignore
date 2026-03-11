@@ -11,3 +11,6 @@ workspace/*/
 blackboard/ideas/*/
 !blackboard/ideas/_template/
 .worktrees/
+.claude/settings.local.json
+.superpowers/
+blackboard/.activity.json

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ log.agent }} Log — {{ status.title }}{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-center gap-2 text-[0.76rem] text-[#8a8074] mb-3">
+        <a href="/ideas/{{ idea_id }}" class="hover:text-[#3b3530] transition-colors">&larr; {{ status.title }}</a>
+        <span class="text-[#ddd6ca]">/</span>
+        <a href="/ideas/{{ idea_id }}/logs" class="hover:text-[#3b3530] transition-colors">Logs</a>
+    </div>
+    <h1 class="text-[1.15rem] font-medium text-[#3b3530]">{{ log.agent }}</h1>
+    <div class="flex items-center gap-3 mt-1">
+        <span class="text-[0.72rem] text-[#8a8074] font-mono">{{ log.model }}</span>
+        <span class="text-[0.72rem] text-[#b0a898]">{{ log.timestamp[:19] }}</span>
+        <span class="text-[0.72rem] text-[#8a8074]">{{ log.transcript | length }} messages</span>
+    </div>
+</div>
+
+<!-- System Prompt -->
+<details class="mb-3">
+    <summary class="flex items-center gap-2 text-[0.8rem] font-medium text-[#8a8074] py-1.5">
+        <span class="chevron">&#x25B6;</span>
+        System Prompt
+    </summary>
+    <div class="card p-4 mt-1">
+        <pre class="text-[0.76rem] text-[#544d43] whitespace-pre-wrap leading-relaxed font-mono">{{ log.system_prompt }}</pre>
+    </div>
+</details>
+
+<!-- User Prompt -->
+<details class="mb-3">
+    <summary class="flex items-center gap-2 text-[0.8rem] font-medium text-[#8a8074] py-1.5">
+        <span class="chevron">&#x25B6;</span>
+        User Prompt
+    </summary>
+    <div class="card p-4 mt-1">
+        <pre class="text-[0.76rem] text-[#544d43] whitespace-pre-wrap leading-relaxed font-mono">{{ log.user_prompt }}</pre>
+    </div>
+</details>
+
+<!-- Transcript -->
+<div class="space-y-2 mt-6">
+    {% for entry in log.transcript %}
+    <div class="card px-5 py-4 border-l-[3px]
+        {% if entry.role == 'assistant' %}border-l-[#a690cc]
+        {% elif entry.role == 'result' %}border-l-[#6b9e78]
+        {% elif entry.role == 'system' %}border-l-[#ddd6ca]
+        {% else %}border-l-[#eae6df]{% endif %}">
+
+        <div class="flex items-center gap-2 mb-2">
+            <span class="text-[0.65rem] font-medium uppercase tracking-wider
+                {% if entry.role == 'assistant' %}text-[#7b5ea8]
+                {% elif entry.role == 'result' %}text-[#4a7a55]
+                {% elif entry.role == 'system' %}text-[#b0a898]
+                {% else %}text-[#8a8074]{% endif %}">
+                {{ entry.role }}
+            </span>
+            {% if entry.get('stop_reason') %}
+            <span class="text-[0.62rem] text-[#b0a898] font-mono">{{ entry.stop_reason }}</span>
+            {% endif %}
+            {% if entry.get('cost_usd') %}
+            <span class="text-[0.62rem] text-[#8a8074] font-mono">${{ "%.2f" | format(entry.cost_usd) }}</span>
+            {% endif %}
+            <span class="text-[0.6rem] text-[#c5bfb4] font-mono ml-auto">{{ entry.timestamp[11:19] if entry.timestamp else '' }}</span>
+        </div>
+
+        {% if entry.role == 'assistant' and entry.get('blocks') %}
+            {% for block in entry.blocks %}
+                {% if block.type == 'text' %}
+                <div class="text-[0.82rem] text-[#3b3530] leading-relaxed whitespace-pre-wrap mb-2">{{ block.text }}</div>
+                {% elif block.type == 'tool_use' %}
+                <div class="bg-[#f7f5f0] border border-[#eae6df] rounded-lg p-3 mb-2">
+                    <span class="text-[0.68rem] font-mono font-medium text-[#7b5ea8]">{{ block.name }}</span>
+                    {% if block.input %}
+                    <pre class="text-[0.7rem] text-[#6d6354] font-mono whitespace-pre-wrap overflow-x-auto max-h-48 overflow-y-auto mt-1.5">{{ block.input | tojson_pretty if block.input is mapping else block.input }}</pre>
+                    {% endif %}
+                </div>
+                {% elif block.type == 'thinking' %}
+                <details class="mb-2">
+                    <summary class="text-[0.68rem] text-[#b0a898] cursor-pointer">Thinking…</summary>
+                    <pre class="text-[0.7rem] text-[#8a8074] whitespace-pre-wrap mt-1 max-h-48 overflow-y-auto">{{ block.thinking }}</pre>
+                </details>
+                {% endif %}
+            {% endfor %}
+        {% elif entry.role == 'result' %}
+            <div class="text-[0.82rem] text-[#3b3530] leading-relaxed whitespace-pre-wrap">{{ entry.result or '(no output)' }}</div>
+        {% elif entry.role == 'system' %}
+            <div class="text-[0.78rem] text-[#8a8074]">{{ entry.get('subtype', 'system message') }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

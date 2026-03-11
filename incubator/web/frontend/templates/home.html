@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}incubator{% endblock %}
+{% block content %}
+
+{% if ideas %}
+<div class="space-y-3">
+    {% for idea in ideas %}
+    <a href="/ideas/{{ idea.idea_id }}" class="card p-5 block group">
+        <div class="flex items-start justify-between gap-4 mb-2">
+            <h2 class="text-[0.92rem] font-medium text-[#3b3530] group-hover:text-[#1a1714] transition-colors leading-snug">
+                {{ idea.title }}
+            </h2>
+            <span class="badge badge-{{ idea.phase.replace('_review', '') }} flex-shrink-0 mt-0.5">
+                {% if idea.get('running') %}<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1"></span>{% endif %}
+                {{ idea.phase | phase_label }}
+            </span>
+        </div>
+        {% if idea.get('description', '') %}
+        <p class="text-[0.8rem] text-[#8a8074] leading-relaxed line-clamp-2 mb-3">
+            {{ idea.get('description', '')[:160] }}{% if idea.get('description', '')|length > 160 %}…{% endif %}
+        </p>
+        {% endif %}
+        <div class="flex items-center gap-4 text-[0.7rem] text-[#b0a898]">
+            {% if idea.get('priority_score') %}
+            <span class="font-mono font-medium
+                {% if idea.priority_score >= 7 %}text-emerald-600
+                {% elif idea.priority_score >= 4 %}text-amber-600
+                {% else %}text-stone-400{% endif %}">
+                {{ "%.1f"|format(idea.priority_score) }}
+            </span>
+            {% endif %}
+            <span class="font-mono">${{ "%.2f"|format(idea.get('total_cost_usd', 0)) }}</span>
+            <span>{{ idea.get('iteration_count', 0) }} iter</span>
+            {% if idea.get('updated_at') %}
+            <span class="ml-auto font-mono">{{ idea.updated_at[:10] }}</span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card p-16 text-center">
+    <div class="text-4xl mb-5 opacity-30">&#x1f331;</div>
+    <h2 class="text-[1rem] font-medium text-[#3b3530] mb-2">No ideas yet</h2>
+    <p class="text-[0.84rem] text-[#8a8074] mb-6 max-w-xs mx-auto">Submit your first idea and watch the agents get to work.</p>
+    <a href="/ideas/new" class="btn btn-primary">+ New Idea</a>
+</div>
+{% endif %}
+
+<!-- Live activity feed -->
+<div id="live-feed" class="mt-10 hidden">
+    <h3 class="text-[0.72rem] font-medium text-[#b0a898] uppercase tracking-wider mb-3">Live</h3>
+    <div id="feed-entries" class="space-y-2"></div>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Agents — incubator{% endblock %}
+{% block content %}
+<div class="flex items-end justify-between mb-6">
+    <div>
+        <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Agents</h1>
+        <p class="text-[0.8rem] text-[#8a8074]">The team that incubates your ideas.</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for agent in agents %}
+    <a href="/agents/{{ agent.name }}" class="card p-5 block group" id="agent-card-{{ agent.name }}">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="agent-ring idle" id="ring-{{ agent.name }}">
+                {% if agent.name == 'ideation' %}&#x1f9e0;
+                {% elif agent.name == 'implementation' %}&#x1f6e0;
+                {% elif agent.name == 'validation' %}&#x2705;
+                {% elif agent.name == 'release' %}&#x1f680;
+                {% elif 'competitive' in agent.name %}&#x1f50d;
+                {% elif 'research' in agent.name %}&#x1f4da;
+                {% elif 'prioritizer' in agent.name %}&#x2696;
+                {% else %}&#x1f916;{% endif %}
+            </div>
+            <div>
+                <h3 class="text-[0.85rem] font-medium text-[#3b3530] group-hover:text-[#1a1714] transition-colors">{{ agent.name }}</h3>
+                <p class="text-[0.7rem] text-[#b0a898] leading-snug mt-0.5">{{ agent.description[:60] }}{% if agent.description|length > 60 %}…{% endif %}</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 text-[0.7rem] mt-auto pt-2 border-t border-[#f2efe8]">
+            <span class="text-[#8a8074]"><span class="text-[#b0a898]">model</span> <span class="font-mono">{{ agent.model.split('-')[-2:] | join('-') }}</span></span>
+            <span class="text-[#8a8074]"><span class="text-[#b0a898]">turns</span> {{ agent.max_turns }}</span>
+            {% if agent.get('cadence') %}
+            <span class="text-[#8a8074]"><span class="text-[#b0a898]">runs</span> {{ agent.cadence | cadence_label }}</span>
+            {% endif %}
+            {% if agent.get('knowledge_size', 0) > 0 %}
+            <span class="text-[#7b5ea8]">{{ (agent.knowledge_size / 1024) | round(1) }} KB</span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<script>
+window.addEventListener('incubator:event', function(e) {
+    const data = e.detail;
+    if (data.type !== 'agent_status') return;
+    const ring = document.getElementById('ring-' + data.agent);
+    if (ring) ring.className = 'agent-ring ' + data.status;
+});
+</script>
+{% endblock %}
