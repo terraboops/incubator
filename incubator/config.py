@@ -5,14 +5,54 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def find_project_root(start: Path = None) -> Path:
+    """Walk up from start (default cwd) looking for .incubator marker."""
+    current = (start or Path.cwd()).resolve()
+    while True:
+        if (current / ".incubator").exists():
+            return current
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    raise FileNotFoundError(
+        "Not an incubator project. Run 'incubator init' first."
+    )
+
+
+def _discover_project_root() -> Path:
+    """Try marker-based discovery, fall back to repo root for development."""
+    try:
+        return find_project_root()
+    except FileNotFoundError:
+        return Path(__file__).resolve().parent.parent
+
+
+def _find_env_file() -> str:
+    """Resolve .env from project root. Evaluated once at import time."""
+    try:
+        return str(find_project_root() / ".env")
+    except FileNotFoundError:
+        return ".env"
+
+
+_PROJECT_ROOT = _discover_project_root()
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_find_env_file(), env_file_encoding="utf-8", extra="ignore"
+    )
 
     # Paths
-    project_root: Path = Path(__file__).resolve().parent.parent
-    blackboard_dir: Path = Path(__file__).resolve().parent.parent / "blackboard" / "ideas"
-    workspace_dir: Path = Path(__file__).resolve().parent.parent / "workspace"
-    registry_path: Path = Path(__file__).resolve().parent.parent / "registry.yaml"
+    project_root: Path = _PROJECT_ROOT
+    blackboard_dir: Path = _PROJECT_ROOT / "blackboard" / "ideas"
+    workspace_dir: Path = _PROJECT_ROOT / "workspace"
+    registry_path: Path = _PROJECT_ROOT / "registry.yaml"
+
+    # Package paths (not configurable)
+    package_root: Path = Path(__file__).resolve().parent
+    defaults_dir: Path = Path(__file__).resolve().parent / "defaults"
 
     # Telegram
     telegram_bot_token: str = ""
