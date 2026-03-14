@@ -96,9 +96,11 @@ class Worker:
         5. If hurry-up fires -> interrupt, send follow-up, wait for deadline
         6. If deadline fires -> force-terminate -> DEADLINE
         """
-        if not self.lock_manager.acquire("pool", idea_id, executor=f"worker-{self.worker_id}"):
-            logger.warning("Worker %d: lock unavailable for %s", self.worker_id, idea_id)
-            return None
+        # Global agents (phase="*") don't lock a specific idea
+        if idea_id != "__all__":
+            if not self.lock_manager.acquire("pool", idea_id, executor=f"worker-{self.worker_id}"):
+                logger.warning("Worker %d: lock unavailable for %s", self.worker_id, idea_id)
+                return None
 
         self.current_role = role
         self.current_idea = idea_id
@@ -156,7 +158,8 @@ class Worker:
                 error=str(e),
             )
         finally:
-            self.lock_manager.release("pool", idea_id)
+            if idea_id != "__all__":
+                self.lock_manager.release("pool", idea_id)
             self.current_role = None
             self.current_idea = None
             self.started_at = None

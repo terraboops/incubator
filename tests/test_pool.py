@@ -7,7 +7,16 @@ from unittest.mock import MagicMock, AsyncMock, patch
 
 import pytest
 
+from incubator.core.registry import AgentConfig, Registry
 from incubator.orchestrator.pool import PoolManager, PoolState, WindowState
+
+
+def _make_registry(roles: list[str]) -> Registry:
+    """Build a Registry with AgentConfigs for the given role names."""
+    reg = Registry()
+    for role in roles:
+        reg.agents[role] = AgentConfig(name=role, description=f"{role} agent", phase=role)
+    return reg
 
 
 @pytest.fixture
@@ -30,6 +39,7 @@ def test_build_work_queue_basic():
     pm.settings = MagicMock(pool_size=3, cycle_time_minutes=30)
     pm.blackboard = MagicMock()
     pm.roles = ["ideation", "implementation", "validation"]
+    pm.registry = _make_registry(pm.roles)
 
     # Two ideas: both need ideation, one needs implementation
     ideas = [
@@ -78,6 +88,7 @@ def test_build_work_queue_respects_serviced():
     pm.settings = MagicMock(pool_size=3, cycle_time_minutes=30)
     pm.blackboard = MagicMock()
     pm.roles = ["ideation"]
+    pm.registry = _make_registry(pm.roles)
 
     ideas = [
         {
@@ -104,6 +115,7 @@ def test_build_work_queue_skips_locked_ideas():
     pm.settings = MagicMock(pool_size=3, cycle_time_minutes=30)
     pm.blackboard = MagicMock()
     pm.roles = ["ideation"]
+    pm.registry = _make_registry(pm.roles)
 
     ideas = [
         {
@@ -130,6 +142,7 @@ def test_build_work_queue_enforces_pipeline_order_for_not_ready():
     pm.settings = MagicMock(pool_size=3, cycle_time_minutes=30)
     pm.blackboard = MagicMock()
     pm.roles = ["ideation", "implementation"]
+    pm.registry = _make_registry(pm.roles)
 
     ideas = [
         {
@@ -163,6 +176,7 @@ def test_build_work_queue_any_order_for_ready_ideas():
     pm.settings = MagicMock(pool_size=3, cycle_time_minutes=30)
     pm.blackboard = MagicMock()
     pm.roles = ["ideation", "competitive", "research"]
+    pm.registry = _make_registry(pm.roles)
 
     ideas = [
         {

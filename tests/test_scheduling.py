@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from incubator.core.registry import AgentConfig, Registry
 from incubator.orchestrator.pool import PoolManager, WindowState, RoleHealth
 
 
@@ -26,6 +27,13 @@ def pool_with_ideas(tmp_path):
     pm.window = None
     pm.pool_dir = tmp_path / "pool"
     pm.pool_dir.mkdir(exist_ok=True)
+
+    # Build a registry matching the default roles
+    registry = Registry()
+    for role in pm.roles:
+        registry.agents[role] = AgentConfig(name=role, description=f"{role} agent", phase=role)
+    pm.registry = registry
+
     return pm
 
 
@@ -156,6 +164,62 @@ def test_priority_ordering(pool_with_ideas):
     # The first assignment for "ideation" role should be the high-priority idea
     ideation_assignments = [(r, i) for r, i in queue if r == "ideation"]
     assert ideation_assignments[0] == ("ideation", "high")
+
+
+def test_star_phase_schedules_global_agent(pool_with_ideas):
+    """Agent with phase='*' should be scheduled with __all__ sentinel."""
+    pm = pool_with_ideas
+    from incubator.core.registry import AgentConfig
+    ac = AgentConfig(name="artifact-check", description="QA", phase="*", status="active")
+    ac.cadence = "*/5 * * * *"
+    pm.registry.agents["artifact-check"] = ac
+    pm.roles = list(pm.registry.agents.keys())
+
+    ideas = [{
+        "id": "test", "phase": "submitted", "priority_score": 7.0,
+        "_effective_priority": 8.0,
+    }]
+    pm.blackboard.pipeline_has_role.return_value = True
+    pm.blackboard.next_stage.return_value = "ideation"
+    pm.blackboard.is_ready.return_value = False
+
+    queue = pm._build_work_queue(ideas, set(), set())
+    star_items = [(r, i) for r, i in queue if r == "artifact-check"]
+    assert len(star_items) == 1
+    assert star_items[0][1] == "__all__"
+
+
+def test_star_phase_not_scheduled_when_no_ideas(pool_with_ideas):
+    """Agent with phase='*' should NOT be scheduled when there are no ideas."""
+    pm = pool_with_ideas
+    from incubator.core.registry import AgentConfig
+    ac = AgentConfig(name="artifact-check", description="QA", phase="*", status="active")
+    pm.registry.agents["artifact-check"] = ac
+    pm.roles = list(pm.registry.agents.keys())
+
+    queue = pm._build_work_queue([], set(), set())
+    star_items = [(r, i) for r, i in queue if r == "artifact-check"]
+    assert len(star_items) == 0
+
+
+def test_star_phase_not_scheduled_when_already_serviced(pool_with_ideas):
+    """Agent with phase='*' should NOT be scheduled if already serviced this window."""
+    pm = pool_with_ideas
+    from incubator.core.registry import AgentConfig
+    ac = AgentConfig(name="artifact-check", description="QA", phase="*", status="active")
+    pm.registry.agents["artifact-check"] = ac
+    pm.roles = list(pm.registry.agents.keys())
+
+    ideas = [{"id": "test", "phase": "submitted", "priority_score": 7.0, "_effective_priority": 8.0}]
+    serviced = {("artifact-check", "__all__")}
+
+    pm.blackboard.pipeline_has_role.return_value = True
+    pm.blackboard.next_stage.return_value = "ideation"
+    pm.blackboard.is_ready.return_value = False
+
+    queue = pm._build_work_queue(ideas, serviced, set())
+    star_items = [(r, i) for r, i in queue if r == "artifact-check"]
+    assert len(star_items) == 0
 
 
 def test_early_stage_boost(pool_with_ideas):

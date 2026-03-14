@@ -184,6 +184,10 @@ class BaseAgent(ABC):
         """Run this agent against an idea."""
         logger.info("Running agent '%s' on idea '%s'", self.config.name, idea_id)
 
+        # Global agents skip activity tracking (no specific idea to track)
+        if idea_id == "__all__":
+            return await self._run_inner(idea_id, max_turns_override=max_turns_override, deadline=deadline)
+
         # Register with activity tracker
         tracker = ActivityTracker(self.blackboard.base_dir.parent / ".activity.json")
         try:
@@ -248,8 +252,85 @@ class BaseAgent(ABC):
             f"Think like a devil's advocate. Challenge everything. Make it bulletproof.\n"
         )
 
+    async def _run_global(self, max_turns_override: int | None = None, deadline: datetime | None = None) -> AgentResult:
+        """Run in global mode (phase='*') — iterate over all ideas, no idea-specific context."""
+        bb_server = create_blackboard_mcp_server(self.blackboard, "__all__")
+        tg_server = create_telegram_mcp_server(self.dispatcher, "__all__")
+        ev_server = create_evolution_mcp_server(self.get_knowledge_dir())
+        mcp_servers = {"blackboard": bb_server, "telegram": tg_server, "evolution": ev_server}
+
+        system_prompt = self.config.system_prompt_override or self.get_system_prompt("__all__")
+        if deadline:
+            system_prompt += self._build_deadline_context(deadline)
+
+        # List all ideas for the agent to iterate over
+        all_ideas = self.blackboard.list_ideas()
+        prompt = (
+            f"## Active Ideas\n"
+            f"The following ideas are in the incubator: {', '.join(sorted(all_ideas))}\n\n"
+            f"Use the blackboard tools to read and inspect artifacts for each idea. "
+            f"When done, summarize your findings."
+        )
+
+        env = {"CLAUDECODE": ""}
+        if self.config.env:
+            env.update(self.config.env)
+
+        options = ClaudeAgentOptions(
+            cwd=self.get_working_dir("__all__"),
+            system_prompt=system_prompt,
+            allowed_tools=self.config.tools,
+            max_turns=max_turns_override or self.config.max_turns,
+            model=self.config.model,
+            mcp_servers=mcp_servers,
+            permission_mode=self.config.permission_mode,
+            env=env,
+        )
+        if self.config.max_budget_usd > 0:
+            options.max_budget_usd = self.config.max_budget_usd
+        if self.config.thinking:
+            options.thinking = self.config.thinking
+        if self.config.setting_sources:
+            options.setting_sources = self.config.setting_sources
+
+        subagents = self.get_subagents()
+        if subagents:
+            options.agents = subagents
+
+        output_parts = []
+        transcript = []
+        try:
+            async with ClaudeSDKClient(options=options) as client:
+                await client.query(prompt)
+                async for message in client.receive_response():
+                    entry = self._message_to_dict(message)
+                    if entry:
+                        transcript.append(entry)
+                    if isinstance(message, ResultMessage):
+                        output_parts.append(message.result or "")
+                        cost = message.total_cost_usd or 0.0
+                        logger.info(
+                            "Agent '%s' completed global run (stop: %s, cost: $%.2f)",
+                            self.config.name, message.stop_reason, cost,
+                        )
+                        return AgentResult(
+                            success=True,
+                            output="\n".join(output_parts),
+                            cost_usd=cost,
+                            transcript=transcript,
+                        )
+        except Exception as e:
+            logger.exception("Agent '%s' failed in global mode", self.config.name)
+            return AgentResult(success=False, error=str(e), transcript=transcript)
+
+        return AgentResult(success=True, output="\n".join(output_parts), transcript=transcript)
+
     async def _run_inner(self, idea_id: str, max_turns_override: int | None = None, deadline: datetime | None = None) -> AgentResult:
         """Inner run logic, wrapped by activity tracking."""
+
+        # Global agent mode: no idea-specific context
+        if idea_id == "__all__":
+            return await self._run_global(max_turns_override=max_turns_override, deadline=deadline)
 
         # Ensure per-idea knowledge directory exists
         idea_knowledge_dir = self._get_idea_knowledge_dir(idea_id)

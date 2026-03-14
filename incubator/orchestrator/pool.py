@@ -146,10 +146,17 @@ class PoolManager:
         """Build ordered list of (role, idea_id) assignments.
 
         For each role, find the highest-priority eligible idea.
+        Pass 2 schedules global agents (phase="*") with the __all__ sentinel.
         """
         queue: list[tuple[str, str]] = []
 
+        # Pass 1: normal per-idea agents
         for role in self.roles:
+            config = self.registry.get_agent(role)
+            # Skip star-phase agents in the normal pass
+            if config and config.phase == "*":
+                continue
+
             for idea in ideas:
                 idea_id = idea["id"]
 
@@ -174,6 +181,16 @@ class PoolManager:
                 # This is the highest-priority eligible idea for this role
                 queue.append((role, idea_id))
                 break  # move to next role
+
+        # Pass 2: global agents (phase="*") run against all ideas at once
+        for role in self.roles:
+            config = self.registry.get_agent(role)
+            if not config or config.phase != "*":
+                continue
+            if config.status != "active":
+                continue
+            if (role, "__all__") not in serviced and ideas:
+                queue.append((role, "__all__"))
 
         return queue
 
@@ -213,6 +230,12 @@ class PoolManager:
 
     async def _handle_result(self, result: RunResult) -> None:
         """Process a completed worker run -- update tracking, apply gating."""
+        if result.idea_id == "__all__":
+            # Global agents: only update role health, skip idea-specific tracking
+            if result.status in (RunStatus.OK, RunStatus.DEADLINE):
+                self.role_health[result.role].actual += 1
+            return
+
         if result.status == RunStatus.DEADLINE:
             self.deadline_counts[result.role] = self.deadline_counts.get(result.role, 0) + 1
             # Log deadline hit to idea status

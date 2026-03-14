@@ -117,9 +117,17 @@
             </div>
             <div>
                 <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Phase</label>
-                <input type="text" name="phase" value="{{ agent.phase or '' }}" placeholder="e.g. ideation"
+                <input type="text" name="phase" value="{{ agent.phase or '' }}"
+                       list="phase-options" placeholder="e.g. ideation"
                        class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
-                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Pipeline phase this agent handles</p>
+                <datalist id="phase-options">
+                    <option value="ideation">
+                    <option value="implementation">
+                    <option value="validation">
+                    <option value="release">
+                    <option value="*">
+                </datalist>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Pipeline phase. Use * for maintenance agents that run against all ideas.</p>
             </div>
             <div>
                 <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Cadence</label>
