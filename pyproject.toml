@@ -1,6 +1,6 @@
 [project]
 name = "incubator"
-version = "0.1.0"
+version = "0.2.0"
 description = "Multi-agent idea incubation pipeline"
 requires-python = ">=3.12"
 dependencies = [
@@ -38,6 +38,14 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["incubator*"]
+
+[tool.setuptools.package-data]
+incubator = [
+    "defaults/**/*",
+    "defaults/**/.*",
+    "web/frontend/templates/**/*",
+    "web/frontend/static/**/*",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

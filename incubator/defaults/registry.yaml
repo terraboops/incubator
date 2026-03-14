@@ -1,0 +1,99 @@
+agents:
+  - name: ideation
+    description: Research analyst that validates ideas through competitive analysis and feasibility assessment
+    model: claude-sonnet-4-6
+    max_turns: 50
+    max_budget_usd: 0
+    status: active
+    tools: [Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, Agent]
+    phase: ideation
+    permission_mode: bypassPermissions
+    thinking:
+      type: adaptive
+    setting_sources: [project]
+    claude_home: agents/ideation/.claude
+
+  - name: implementation
+    description: Software engineer that builds MVPs from validated specs
+    model: claude-sonnet-4-6
+    max_turns: 200
+    max_budget_usd: 0
+    status: active
+    tools: [Read, Write, Edit, Bash, Glob, Grep, Agent]
+    phase: implementation
+    permission_mode: bypassPermissions
+    thinking:
+      type: adaptive
+    setting_sources: [project]
+    claude_home: agents/implementation/.claude
+
+  - name: validation
+    description: QA engineer that tests implementations against specs
+    model: claude-sonnet-4-6
+    max_turns: 30
+    max_budget_usd: 0
+    status: active
+    tools: [Read, Bash, Glob, Grep, WebFetch]
+    phase: validation
+    permission_mode: bypassPermissions
+    thinking:
+      type: adaptive
+    setting_sources: [project]
+    claude_home: agents/validation/.claude
+
+  - name: release
+    description: Release engineer that deploys software and creates launch materials
+    model: claude-sonnet-4-6
+    max_turns: 50
+    max_budget_usd: 0
+    status: active
+    tools: [Read, Write, Edit, Bash, WebSearch]
+    phase: release
+    permission_mode: bypassPermissions
+    thinking:
+      type: adaptive
+    setting_sources: [project]
+    claude_home: agents/release/.claude
+
+  - name: artifact-check
+    description: Reviews artifacts for accessibility, clarity, and mechanical issues
+    model: claude-haiku-4-5
+    max_turns: 20
+    max_budget_usd: 0.15
+    status: active
+    phase: "*"
+    cadence: "*/5 * * * *"
+    tools: [Read, Glob, Grep]
+    permission_mode: bypassPermissions
+    thinking:
+      type: adaptive
+    claude_home: agents/artifact-check/.claude
+
+  - name: competitive-watcher
+    description: Monitors competitive landscape for active ideas
+    model: claude-haiku-4-5
+    max_turns: 10
+    max_budget_usd: 0
+    status: active
+    tools: [Read, Write, WebSearch, WebFetch]
+    cadence: "0 */6 * * *"
+    permission_mode: bypassPermissions
+
+  - name: research-watcher
+    description: Monitors academic research for active ideas
+    model: claude-haiku-4-5
+    max_turns: 10
+    max_budget_usd: 0
+    status: active
+    tools: [Read, Write, WebSearch, WebFetch]
+    cadence: "0 8 * * *"
+    permission_mode: bypassPermissions
+
+  - name: prioritizer
+    description: Scores idea priority based on impact, values alignment, and probability of success
+    model: claude-sonnet-4-6
+    max_turns: 10
+    max_budget_usd: 0
+    status: active
+    tools: [Read, WebSearch]
+    permission_mode: bypassPermissions
