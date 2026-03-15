@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/icons.html" import icon, agent_icon, phase_icon %}
 {% block title %}incubator{% endblock %}
 {% block content %}
 
@@ -12,6 +13,7 @@
             </h2>
             <span class="badge badge-{{ idea.phase.replace('_review', '') }} flex-shrink-0 mt-0.5">
                 {% if idea.get('running') %}<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1"></span>{% endif %}
+                {{ phase_icon(idea.phase, 12) }}
                 {{ idea.phase | phase_label }}
             </span>
         </div>
@@ -19,6 +21,30 @@
         <p class="text-[0.8rem] text-[#8a8074] leading-relaxed line-clamp-2 mb-3">
             {{ idea.get('description', '')[:160] }}{% if idea.get('description', '')|length > 160 %}…{% endif %}
         </p>
+        {% endif %}
+        {% if idea.get('needs_human_review') %}
+        <div class="flex items-center gap-1.5 text-[0.72rem] text-[#b85f3e] mb-1">
+            {{ icon('alert-triangle', 13) }}
+            <span>Awaiting human review{% if idea.get('review_reason') %}: {{ idea.review_reason[:80] }}{% endif %}</span>
+        </div>
+        {% endif %}
+        {% if idea.get('_scheduling') %}
+        <div class="flex items-center gap-1.5 flex-wrap mb-2">
+            <span class="text-[0.6rem] text-[#b0a898] mr-0.5">next</span>
+            {% for slot in idea._scheduling %}
+            <span class="inline-flex items-center gap-1 px-1.5 py-[3px] rounded-md text-[0.62rem] font-medium tracking-tight
+                {% if slot.serviced %}bg-[#f0ede6] text-[#b0a898] line-through
+                {% elif slot.reason == 'feedback' %}bg-[#fef3eb] text-[#9b6a3e] border border-[#f0dcc8]
+                {% elif slot.reason == 'post-ready' %}bg-[#eef1f8] text-[#5167a0] border border-[#dde3f0]
+                {% else %}bg-[#eef6ee] text-[#4a7c59] border border-[#d6e8d6]{% endif %}">
+                {{ agent_icon(slot.role, 10) }}
+                {{ slot.role | role_label }}
+                {% if slot.reason == 'feedback' %}
+                <span class="text-[0.52rem] opacity-60">✎</span>
+                {% endif %}
+            </span>
+            {% endfor %}
+        </div>
         {% endif %}
         <div class="flex items-center gap-4 text-[0.7rem] text-[#b0a898]">
             {% if idea.get('priority_score') %}
@@ -40,10 +66,10 @@
 </div>
 {% else %}
 <div class="card p-16 text-center">
-    <div class="text-4xl mb-5 opacity-30">&#x1f331;</div>
+    <div class="w-14 h-14 rounded-full bg-[#f2efe8] mx-auto mb-5 flex items-center justify-center text-[#bdb4a4]">{{ icon('lightbulb', 26) }}</div>
     <h2 class="text-[1rem] font-medium text-[#3b3530] mb-2">No ideas yet</h2>
     <p class="text-[0.84rem] text-[#8a8074] mb-6 max-w-xs mx-auto">Submit your first idea and watch the agents get to work.</p>
-    <a href="/ideas/new" class="btn btn-primary">+ New Idea</a>
+    <a href="/ideas/new" class="btn btn-primary">{{ icon('plus', 14) }} New Idea</a>
 </div>
 {% endif %}
 

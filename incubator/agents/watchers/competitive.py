@@ -52,6 +52,6 @@ async def run_competitive_watcher(orchestrator) -> None:
             update = f"\n\n---\n_Watcher update {datetime.now(timezone.utc).isoformat()}_\n\n{result_text}\n"
             orchestrator.blackboard.append_file(idea_id, "competitive-analysis.md", update)
             await orchestrator.dispatcher.notify(
-                f"🔍 *{idea_id}* competitive update:\n{result_text[:300]}"
+                f"[Competitive] *{idea_id}* competitive update:\n{result_text[:300]}"
             )
             logger.info("Competitive update for %s", idea_id)

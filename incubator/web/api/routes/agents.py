@@ -12,6 +12,7 @@ from incubator.config import get_settings
 from incubator.core.blackboard import Blackboard
 from incubator.core.registry import AgentConfig, load_registry
 from incubator.web.api.paths import TEMPLATES_DIR
+from incubator.web.api.routes.settings import _read_agent_prompt, _write_agent_prompt
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -48,11 +49,23 @@ def _agent_view_data(agent: AgentConfig, settings) -> dict:
         if claude_md_path.exists():
             claude_md = claude_md_path.read_text()
     data["claude_md"] = claude_md
+
+    # Load prompt.py content
+    prompt_py = _read_agent_prompt(agent.phase or agent.name)
+    if prompt_py is None:
+        prompt_py = _read_agent_prompt(agent.name)
+    data["prompt_py"] = prompt_py or ""
+    prompt_path = (
+        settings.project_root / "incubator" / "agents"
+        / (agent.phase or agent.name) / "prompt.py"
+    )
+    data["prompt_path"] = str(prompt_path.relative_to(settings.project_root)) if prompt_path.exists() else ""
     return data
 
 
 def _apply_form_to_config(config: AgentConfig, *, description: str, model: str,
-                           max_turns: int, max_budget_usd: float, permission_mode: str,
+                           max_turns: int, max_budget_usd: float, max_concurrent: int,
+                           permission_mode: str,
                            tools: str, thinking_type: str, status: str,
                            phase: str, cadence: str, setting_sources: str,
                            system_prompt_override: str, env_text: str) -> None:
@@ -60,6 +73,7 @@ def _apply_form_to_config(config: AgentConfig, *, description: str, model: str,
     config.model = model
     config.max_turns = max_turns
     config.max_budget_usd = max_budget_usd
+    config.max_concurrent = max_concurrent
     config.permission_mode = permission_mode
     config.status = status
     config.phase = phase.strip() or None
@@ -134,6 +148,7 @@ async def create_agent(
     model: str = Form("claude-sonnet-4-6"),
     max_turns: int = Form(50),
     max_budget_usd: float = Form(1.0),
+    max_concurrent: int = Form(1),
     permission_mode: str = Form("bypassPermissions"),
     tools: str = Form("Read, Write, Edit, Bash, Glob, Grep"),
     thinking_type: str = Form("adaptive"),
@@ -159,7 +174,8 @@ async def create_agent(
 
     _apply_form_to_config(
         config, description=description, model=model, max_turns=max_turns,
-        max_budget_usd=max_budget_usd, permission_mode=permission_mode,
+        max_budget_usd=max_budget_usd, max_concurrent=max_concurrent,
+        permission_mode=permission_mode,
         tools=tools, thinking_type=thinking_type, status=status,
         phase=phase, cadence=cadence, setting_sources=setting_sources,
         system_prompt_override=system_prompt_override, env_text=env_text,
@@ -239,6 +255,7 @@ async def agent_update(
     model: str = Form(...),
     max_turns: int = Form(...),
     max_budget_usd: float = Form(...),
+    max_concurrent: int = Form(1),
     permission_mode: str = Form(...),
     tools: str = Form(""),
     thinking_type: str = Form(""),
@@ -249,6 +266,7 @@ async def agent_update(
     system_prompt_override: str = Form(""),
     env_text: str = Form(""),
     claude_md: str = Form(""),
+    prompt_py: str = Form(""),
 ):
     settings = get_settings()
     registry = load_registry(settings.registry_path)
@@ -258,13 +276,19 @@ async def agent_update(
 
     _apply_form_to_config(
         config, description=description, model=model, max_turns=max_turns,
-        max_budget_usd=max_budget_usd, permission_mode=permission_mode,
+        max_budget_usd=max_budget_usd, max_concurrent=max_concurrent,
+        permission_mode=permission_mode,
         tools=tools, thinking_type=thinking_type, status=status,
         phase=phase, cadence=cadence, setting_sources=setting_sources,
         system_prompt_override=system_prompt_override, env_text=env_text,
     )
     registry.save(settings.registry_path)
     _save_claude_md(config, claude_md, settings)
+
+    # Save system prompt
+    if prompt_py.strip():
+        agent_dir_name = config.phase or config.name
+        _write_agent_prompt(agent_dir_name, prompt_py)
 
     return RedirectResponse(url=f"/agents/{agent_name}", status_code=303)
 

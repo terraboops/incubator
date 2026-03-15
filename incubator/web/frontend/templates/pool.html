@@ -1,17 +1,21 @@
 {% extends "base.html" %}
+{% from "macros/icons.html" import icon, agent_icon, phase_icon %}
 
 {% block title %}Worker Pool – incubator{% endblock %}
 
 {% block content %}
 <!-- Header -->
 <div class="flex items-baseline justify-between mb-8">
-    <div>
+    <div class="flex items-center gap-3">
+        <span class="text-[#a690cc]">{{ icon('users', 22) }}</span>
+        <div>
         <h1 class="text-xl font-medium tracking-tight">Worker Pool</h1>
         <p class="text-[0.82rem] text-[#8a8074] mt-1">
             <span class="font-mono text-[#3b3530] font-medium">{{ state.pool_size }}</span> workers
             &middot;
             <span class="font-mono text-[#3b3530] font-medium">{{ state.cycle_time_minutes }}</span> min cycles
         </p>
+        </div>
     </div>
     {% if state.current_window.started_at %}
     <div class="text-right">
@@ -34,7 +38,7 @@
     {% for s in starved_roles %}
     <div class="card-flat px-5 py-4" style="background: #fdf6ee; border-color: #e8d5b8;">
         <div class="flex items-start gap-3">
-            <span class="text-base mt-0.5">&#x26a0;&#xfe0f;</span>
+            <span class="text-[#8b6914] mt-0.5">{{ icon('alert-triangle', 18) }}</span>
             <div>
                 <div class="text-[0.84rem] font-medium text-[#8b6914]">
                     Role starvation: <span class="font-mono">{{ s.role }}</span>
@@ -49,16 +53,16 @@
     {% endfor %}
 
     {% for d in deadline_warnings %}
-    <div class="card-flat px-5 py-4" style="background: #fdf6ee; border-color: #e8d5b8;">
+    <div class="card-flat px-5 py-4" style="background: #f5f0ea; border-color: #e0d8cc;">
         <div class="flex items-start gap-3">
-            <span class="text-base mt-0.5">&#x23f1;&#xfe0f;</span>
+            <span class="text-[#8a8074] mt-0.5">{{ icon('clock', 18) }}</span>
             <div>
-                <div class="text-[0.84rem] font-medium text-[#8b6914]">
-                    Deadline pressure: <span class="font-mono">{{ d.role }}</span>
+                <div class="text-[0.84rem] font-medium text-[#544d43]">
+                    <span class="font-mono">{{ d.role }}</span> is taking longer than usual
                 </div>
-                <div class="text-[0.78rem] text-[#a68a3e] mt-0.5">
-                    {{ d.count }} ideas approaching deadline.
-                    Consider prioritising this role or extending cycle time.
+                <div class="text-[0.78rem] text-[#8a8074] mt-0.5">
+                    {{ d.count }} run{{ "s" if d.count != 1 }} didn't finish within the cycle window.
+                    This is normal for complex ideas. If it happens often, you can extend the cycle time.
                 </div>
             </div>
         </div>
@@ -107,14 +111,15 @@
                 </div>
                 {% endif %}
             </div>
-            {% else %}
-            <div class="card-flat px-3 py-2.5 text-[0.78rem] text-[#bdb4a4] text-center">
-                Waiting for work
+            {% elif w.idle_reason %}
+            <div class="text-[0.72rem] text-[#b0a898] leading-relaxed">
+                {{ w.idle_reason }}
             </div>
             {% endif %}
         </div>
         {% endfor %}
     </div>
+
     {% else %}
     <div class="card-flat px-5 py-8 text-center">
         <div class="text-[0.88rem] text-[#bdb4a4]">No workers registered</div>
@@ -135,7 +140,7 @@
         {% set expected = health.expected|default(0) %}
         {% set actual = health.actual|default(0) %}
         {% set ratio = (actual / expected * 100)|int if expected > 0 else 0 %}
-        {% set is_starved = expected > 0 and (actual / expected) < 0.5 %}
+        {% set is_starved = expected >= 3 and (actual / expected) < 0.5 %}
         <div class="px-5 py-4 flex items-center gap-4">
             <div class="w-28">
                 <span class="badge badge-{{ role }}">{{ role }}</span>
@@ -183,8 +188,11 @@
 
         {% if state.current_window.serviced %}
         <div class="flex flex-wrap gap-2">
-            {% for role in state.current_window.serviced %}
-            <span class="badge badge-{{ role }}">{{ role }}</span>
+            {% for pair in state.current_window.serviced %}
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[0.72rem] font-medium bg-[#f2efe8] text-[#544d43]">
+                <span class="badge badge-{{ pair.role }} text-[0.62rem]">{{ pair.role }}</span>
+                <span class="text-[#8a8074] truncate max-w-[120px]">{{ pair.idea_id }}</span>
+            </span>
             {% endfor %}
         </div>
         {% else %}

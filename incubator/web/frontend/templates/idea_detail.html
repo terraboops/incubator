@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/icons.html" import icon, agent_icon, phase_icon %}
 {% block title %}{{ status.title }} — incubator{% endblock %}
 {% block content %}
 
@@ -9,6 +10,7 @@
             <h1 class="text-[1.3rem] font-medium text-[#3b3530] leading-snug">{{ status.title }}</h1>
             <div class="flex items-center gap-3 mt-2.5">
                 <span class="badge badge-{{ status.phase.replace('_review', '') }}">
+                    {{ phase_icon(status.phase, 12) }}
                     {{ status.phase | phase_label }}
                 </span>
                 <span class="text-[0.78rem] text-[#8a8074] font-mono cursor-default"
@@ -22,7 +24,7 @@
                 {% if release_count > 0 %}
                 <span class="text-[0.78rem] text-[#92400e] font-medium cursor-default"
                       title="This idea has reached ready {{ release_count }} time{{ 's' if release_count != 1 else '' }}. Each cycle runs all agents in refinement mode to critically analyze and improve outputs.">
-                    &#x1f504; {{ release_count }} release{{ 's' if release_count != 1 else '' }}
+                    {{ release_count }} release{{ 's' if release_count != 1 else '' }}
                 </span>
                 {% endif %}
             </div>
@@ -31,6 +33,11 @@
             {% if status.phase == 'killed' %}
             <button type="button" onclick="document.getElementById('revive-panel').classList.toggle('hidden')"
                     class="btn btn-primary text-[0.8rem]">Revive</button>
+            <button type="button" onclick="if(confirm('Permanently delete this idea and all its artifacts?')){document.getElementById('delete-form').submit()}"
+                    class="btn btn-danger text-[0.8rem]">Delete</button>
+            <form id="delete-form" method="post" action="/ideas/{{ idea_id }}/action" class="hidden">
+                <input type="hidden" name="action" value="delete">
+            </form>
             {% endif %}
             {% if status.phase == 'released' %}
             <button type="button" onclick="document.getElementById('refine-panel').classList.toggle('hidden')"
@@ -52,11 +59,31 @@
 <div class="flex flex-wrap gap-2 mb-6">
     {% for agent_name, info in nonempty_knowledge %}
     <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#f2efe8] border border-[#eae6df]">
+        <span class="text-[#8a8074]">{{ agent_icon(agent_name, 14) }}</span>
         <span class="text-[0.72rem] font-medium text-[#544d43]">{{ agent_name }}</span>
         <span class="text-[0.65rem] font-mono text-[#8a8074]">~{{ "{:,}".format(info.tokens) }} tok</span>
         <span class="text-[0.6rem] text-[#b0a898]">{{ info.files }} file{{ 's' if info.files != 1 else '' }}</span>
     </div>
     {% endfor %}
+</div>
+{% endif %}
+
+<!-- Human review needed banner -->
+{% if status.get('needs_human_review') %}
+<div class="card-flat p-4 mb-6 border-l-4" style="border-left-color: #dda088; background: #fdf8f5;">
+    <div class="flex items-start gap-3">
+        <span class="text-[#b85f3e] mt-0.5">{{ icon('alert-triangle', 18) }}</span>
+        <div class="flex-1">
+            <div class="text-[0.78rem] font-medium text-[#b85f3e] mb-0.5">Awaiting human review</div>
+            {% if status.get('review_reason') %}
+            <p class="text-[0.8rem] text-[#8a7060] leading-relaxed">{{ status.review_reason }}</p>
+            {% endif %}
+        </div>
+        <form method="post" action="/ideas/{{ idea_id }}/action">
+            <input type="hidden" name="action" value="dismiss_review">
+            <button type="submit" class="btn btn-soft text-[0.75rem]">Dismiss</button>
+        </form>
+    </div>
 </div>
 {% endif %}
 
@@ -122,7 +149,7 @@
     <div class="card-flat p-4">
         <div class="flex items-center gap-3 mb-3">
             <div id="agent-ring" class="agent-ring idle">
-                <span id="agent-icon">&#x1f916;</span>
+                <span id="agent-icon" class="text-[0.7rem] font-mono font-medium text-[#8a8074]">AG</span>
             </div>
             <div>
                 <div id="agent-name" class="text-[0.85rem] font-medium text-[#3b3530]">Agent</div>
@@ -292,9 +319,9 @@
         <div class="space-y-2">
             {% for entry in status.phase_history %}
             <div class="flex items-center gap-2 text-[0.78rem]">
-                <span class="badge badge-{{ entry['from'].replace('_review', '') }}">{{ entry['from'] | phase_label }}</span>
+                <span class="badge badge-{{ entry['from'].replace('_review', '') }}">{{ phase_icon(entry['from'], 11) }} {{ entry['from'] | phase_label }}</span>
                 <span class="text-[#b0a898]">&rarr;</span>
-                <span class="badge badge-{{ entry['to'].replace('_review', '') }}">{{ entry['to'] | phase_label }}</span>
+                <span class="badge badge-{{ entry['to'].replace('_review', '') }}">{{ phase_icon(entry['to'], 11) }} {{ entry['to'] | phase_label }}</span>
                 <span class="text-[0.7rem] text-[#b0a898] ml-auto font-mono">{{ entry['at'][:16] }}</span>
             </div>
             {% endfor %}
@@ -303,27 +330,113 @@
 </details>
 {% endif %}
 
+<!-- Ask a question -->
+<div class="mb-8">
+    <div class="card p-5">
+        <form id="question-form" onsubmit="submitQuestion(event)">
+            <label class="block text-[0.82rem] font-medium text-[#3b3530] mb-2">Ask about this idea</label>
+            <p class="text-[0.72rem] text-[#8a8074] mb-3">All agent perspectives (research, technical, quality, strategy) will weigh in with an integrated answer.</p>
+            <div class="flex gap-2">
+                <input type="text" id="question-input" name="question" required
+                       placeholder="e.g. What's the biggest risk? How should we price this?"
+                       class="flex-1 px-3.5 py-2.5 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                <button type="submit" id="question-submit" class="btn btn-primary text-[0.8rem]">Ask</button>
+            </div>
+        </form>
+        <div id="question-loading" class="hidden mt-4">
+            <div class="flex items-center gap-3">
+                <div class="w-5 h-5 rounded-full border-2 border-[#a690cc] border-t-transparent animate-spin"></div>
+                <span class="text-[0.8rem] text-[#8a8074]">Consulting all perspectives...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Previous questions & answers -->
+{% if question_entries %}
+<div class="mb-8">
+    <h3 class="text-[0.78rem] font-medium text-[#8a8074] uppercase tracking-wider mb-3">Questions & Answers</h3>
+    <div id="qa-list" class="space-y-4">
+        {% for qa in question_entries | reverse %}
+        <details class="group">
+            <summary class="flex items-start gap-2.5 py-2 cursor-pointer select-none">
+                <span class="chevron mt-0.5">&#x25B6;</span>
+                <div class="flex-1 min-w-0">
+                    <span class="text-[0.85rem] font-medium text-[#3b3530]">{{ qa.question }}</span>
+                    <span class="text-[0.68rem] text-[#b0a898] font-mono ml-2">{{ qa.created_at[:10] }}</span>
+                </div>
+            </summary>
+            <div class="ml-5 mt-2 prose text-[0.84rem]">{{ qa.answer | markdown | safe }}</div>
+        </details>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Feedback entries -->
+{% if feedback_entries %}
+<div class="mb-8">
+    <h3 class="text-[0.78rem] font-medium text-[#8a8074] uppercase tracking-wider mb-3">Feedback</h3>
+    <div id="feedback-list">
+        {% for fb in feedback_entries | reverse %}
+        <div class="feedback-chip">
+            <div class="flex items-center gap-2 mb-1">
+                {% if fb.artifact %}
+                <span class="text-[0.68rem] font-mono text-[#8a8074] bg-[#eae6df] px-1.5 py-0.5 rounded">{{ fb.artifact }}</span>
+                {% endif %}
+                <span class="text-[0.65rem] text-[#b0a898] font-mono">{{ fb.created_at[:10] }}</span>
+            </div>
+            {% if fb.selected_text %}
+            <blockquote>{{ fb.selected_text[:200] }}{% if fb.selected_text|length > 200 %}...{% endif %}</blockquote>
+            {% endif %}
+            <p class="text-[#544d43]">{{ fb.comment }}</p>
+            {% if fb.get('pending_agents') %}
+            <div class="flex items-center gap-1.5 flex-wrap mt-2">
+                {% for agent in fb.pending_agents %}
+                {% if agent in fb.get('acknowledged_by', []) %}
+                <span class="inline-flex items-center gap-1 px-1.5 py-[2px] rounded text-[0.6rem] font-medium bg-[#eef6ee] text-[#6a9a6a]">
+                    {{ agent_icon(agent, 9) }} {{ agent | role_label }} ✓
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1 px-1.5 py-[2px] rounded text-[0.6rem] font-medium bg-[#f5f2ec] text-[#b0a898]">
+                    {{ agent_icon(agent, 9) }} {{ agent | role_label }}
+                </span>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Blackboard artifacts -->
-<div class="space-y-4">
+<div class="space-y-4" id="artifacts-container">
     {% for filename, info in artifacts.items() %}
     {% if info.is_empty %}
     {# skip empty template files #}
     {% else %}
     <details {% if filename in ('idea.md',) or filename.endswith('.html') %}open{% endif %}>
-        <summary class="flex items-center gap-2.5 text-[0.88rem] font-medium text-[#3b3530] py-2">
+        <summary class="flex items-center gap-2.5 text-[0.88rem] font-medium text-[#3b3530] py-2 group/art">
             <span class="chevron">&#x25B6;</span>
             {{ info.title }}
             <span class="text-[0.62rem] text-[#c5bfb4] font-normal font-mono tracking-wide">{{ filename }}</span>
+            <button type="button"
+                    onclick="event.stopPropagation(); feedbackState.artifact='{{ filename }}'; feedbackState.selectedText=''; openFeedbackModal();"
+                    class="ml-auto text-[0.68rem] text-[#b0a898] hover:text-[#544d43] opacity-0 group-hover/art:opacity-100 transition-opacity cursor-pointer">
+                feedback
+            </button>
         </summary>
-        <div class="card p-5">
+        <div class="card p-5 artifact-card" data-artifact="{{ filename }}">
             {% if filename.endswith('.html') %}
-            <iframe srcdoc="{{ info.content | e }}" class="w-full rounded-xl border border-[#eae6df] bg-white" style="min-height: 500px; max-height: 80vh;" onload="this.style.height = Math.min(this.contentWindow.document.body.scrollHeight + 40, window.innerHeight * 0.8) + 'px'"></iframe>
+            <iframe srcdoc="{{ info.content | e }}" class="artifact-iframe w-full rounded-xl border border-[#eae6df] bg-white" data-artifact="{{ filename }}" style="min-height: 500px; max-height: 80vh;" onload="initIframeFeedback(this)"></iframe>
             {% elif filename.endswith('.json') %}
             <pre class="text-[0.8rem] font-mono text-[#6d6354] bg-[#f7f5f0] rounded-xl p-4 overflow-x-auto border border-[#eae6df]"><code>{{ info.content | tojson_pretty if filename == 'status.json' else info.content }}</code></pre>
             {% elif info.is_markdown %}
-            <div class="prose">{{ info.content | markdown | safe }}</div>
+            <div class="prose artifact-text" data-artifact="{{ filename }}">{{ info.content | markdown | safe }}</div>
             {% else %}
-            <pre class="text-[0.82rem] text-[#544d43] whitespace-pre-wrap leading-relaxed">{{ info.content }}</pre>
+            <pre class="text-[0.82rem] text-[#544d43] whitespace-pre-wrap leading-relaxed artifact-text" data-artifact="{{ filename }}">{{ info.content }}</pre>
             {% endif %}
         </div>
     </details>
@@ -331,9 +444,192 @@
     {% endfor %}
 </div>
 
+<!-- Feedback toolbar (floating, appears on text selection) -->
+<div id="feedback-toolbar" class="feedback-toolbar" onclick="openFeedbackModal()">Give feedback</div>
+
+<!-- Feedback modal -->
+<div id="feedback-modal" class="modal-overlay" onclick="if(event.target===this)closeFeedbackModal()">
+    <div class="modal-box">
+        <h3 class="text-[0.95rem] font-medium text-[#3b3530] mb-4">Give feedback</h3>
+        <div id="feedback-quote" class="hidden mb-4">
+            <div class="text-[0.68rem] text-[#8a8074] uppercase tracking-wider font-medium mb-1">Selected text</div>
+            <blockquote class="border-l-2 border-[#ddd6ca] pl-3 text-[0.82rem] text-[#8a8074] italic leading-relaxed" id="feedback-quote-text"></blockquote>
+        </div>
+        <div id="feedback-artifact-label" class="text-[0.7rem] font-mono text-[#b0a898] mb-2"></div>
+        <textarea id="feedback-comment" rows="3" placeholder="What's your feedback on this?"
+                  class="w-full px-3.5 py-2.5 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] resize-y mb-4"></textarea>
+        <div class="flex gap-2 justify-end">
+            <button type="button" onclick="closeFeedbackModal()"
+                    class="text-[0.82rem] text-[#8a8074] hover:text-[#3b3530] cursor-pointer px-3 py-2">Cancel</button>
+            <button type="button" onclick="submitFeedback()" id="feedback-submit-btn"
+                    class="btn btn-primary text-[0.8rem]">Submit</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function() {
     const ideaId = "{{ idea_id }}";
+
+    // ── Feedback: text selection handling ───────────────────────────
+    window.feedbackState = { artifact: '', selectedText: '' };
+    const feedbackState = window.feedbackState;
+    const toolbar = document.getElementById('feedback-toolbar');
+
+    function showToolbar(clientX, clientY) {
+        toolbar.style.left = clientX + 'px';
+        toolbar.style.top = (clientY - 40) + 'px';
+        toolbar.style.display = 'block';
+    }
+
+    function hideToolbar() {
+        toolbar.style.display = 'none';
+    }
+
+    function handleSelection(text, artifact, clientX, clientY) {
+        const trimmed = text.trim();
+        if (trimmed.length > 2) {
+            feedbackState.artifact = artifact;
+            feedbackState.selectedText = trimmed;
+            showToolbar(clientX, clientY);
+        } else {
+            hideToolbar();
+        }
+    }
+
+    // Listen for selections in regular text content
+    document.querySelectorAll('.artifact-text').forEach(function(el) {
+        el.addEventListener('mouseup', function(e) {
+            const sel = window.getSelection();
+            handleSelection(sel.toString(), el.dataset.artifact, e.clientX, e.clientY);
+        });
+    });
+
+    // Listen for selections in iframes (same-origin via srcdoc)
+    window.initIframeFeedback = function(iframe) {
+        // Resize iframe
+        try {
+            iframe.style.height = Math.min(
+                iframe.contentWindow.document.body.scrollHeight + 40,
+                window.innerHeight * 0.8
+            ) + 'px';
+        } catch(e) {}
+
+        try {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.addEventListener('mouseup', function(e) {
+                const sel = doc.getSelection ? doc.getSelection() : iframe.contentWindow.getSelection();
+                const text = sel ? sel.toString() : '';
+                // Convert iframe-relative coords to viewport (client) coords
+                const rect = iframe.getBoundingClientRect();
+                const clientX = rect.left + e.clientX;
+                const clientY = rect.top + e.clientY;
+                handleSelection(text, iframe.dataset.artifact, clientX, clientY);
+            });
+        } catch(e) {
+            // Cross-origin or security error — skip
+        }
+    };
+
+    // Hide toolbar on click elsewhere
+    document.addEventListener('mousedown', function(e) {
+        if (!toolbar.contains(e.target)) {
+            hideToolbar();
+        }
+    });
+
+    // Feedback modal
+    window.openFeedbackModal = function() {
+        hideToolbar();
+        const modal = document.getElementById('feedback-modal');
+        const quoteBlock = document.getElementById('feedback-quote');
+        const quoteText = document.getElementById('feedback-quote-text');
+        const artifactLabel = document.getElementById('feedback-artifact-label');
+        const comment = document.getElementById('feedback-comment');
+
+        if (feedbackState.selectedText) {
+            quoteText.textContent = feedbackState.selectedText.substring(0, 300)
+                + (feedbackState.selectedText.length > 300 ? '...' : '');
+            quoteBlock.classList.remove('hidden');
+        } else {
+            quoteBlock.classList.add('hidden');
+        }
+
+        artifactLabel.textContent = feedbackState.artifact || '';
+        comment.value = '';
+        modal.classList.add('active');
+        setTimeout(function() { comment.focus(); }, 100);
+    };
+
+    window.closeFeedbackModal = function() {
+        document.getElementById('feedback-modal').classList.remove('active');
+    };
+
+    window.submitFeedback = async function() {
+        const comment = document.getElementById('feedback-comment').value.trim();
+        if (!comment) return;
+
+        const btn = document.getElementById('feedback-submit-btn');
+        btn.textContent = 'Saving...';
+        btn.disabled = true;
+
+        const form = new FormData();
+        form.append('artifact', feedbackState.artifact);
+        form.append('selected_text', feedbackState.selectedText);
+        form.append('comment', comment);
+
+        try {
+            const resp = await fetch(`/api/ideas/${ideaId}/feedback`, { method: 'POST', body: form });
+            if (resp.ok) {
+                window.location.reload();
+            }
+        } catch(e) {}
+
+        btn.textContent = 'Submit';
+        btn.disabled = false;
+        closeFeedbackModal();
+    };
+
+    // Keyboard shortcut: Escape closes modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeFeedbackModal();
+            hideToolbar();
+        }
+    });
+
+    // ── Question submission ─────────────────────────────────────────
+    window.submitQuestion = async function(e) {
+        e.preventDefault();
+        const input = document.getElementById('question-input');
+        const btn = document.getElementById('question-submit');
+        const loading = document.getElementById('question-loading');
+        const question = input.value.trim();
+        if (!question) return;
+
+        btn.disabled = true;
+        btn.textContent = 'Asking...';
+        loading.classList.remove('hidden');
+
+        const form = new FormData();
+        form.append('question', question);
+
+        try {
+            const resp = await fetch(`/api/ideas/${ideaId}/question`, { method: 'POST', body: form });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                const data = await resp.json();
+                alert(data.error || 'Failed to get answer');
+            }
+        } catch(e) {
+            alert('Network error');
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Ask';
+        loading.classList.add('hidden');
+    };
 
     // ── Pipeline editor logic ──────────────────────────────────────
     let submitTimer = null;

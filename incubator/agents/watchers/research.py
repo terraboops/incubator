@@ -48,6 +48,6 @@ async def run_research_watcher(orchestrator) -> None:
             update = f"\n\n---\n_Research update {datetime.now(timezone.utc).isoformat()}_\n\n{result_text}\n"
             orchestrator.blackboard.append_file(idea_id, "research.md", update)
             await orchestrator.dispatcher.notify(
-                f"📚 *{idea_id}* research update:\n{result_text[:300]}"
+                f"[Research] *{idea_id}* research update:\n{result_text[:300]}"
             )
             logger.info("Research update for %s", idea_id)

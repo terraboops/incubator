@@ -1,10 +1,14 @@
 {% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
 {% block title %}Costs — incubator{% endblock %}
 {% block content %}
 <div class="flex items-end justify-between mb-8">
-    <div>
-        <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Costs</h1>
-        <p class="text-[0.8rem] text-[#8a8074]">Total spend across all ideas.</p>
+    <div class="flex items-center gap-3">
+        <span class="text-[#a690cc]">{{ icon('dollar-sign', 22) }}</span>
+        <div>
+            <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Costs</h1>
+            <p class="text-[0.8rem] text-[#8a8074]">Total spend across all ideas.</p>
+        </div>
     </div>
     <div class="text-right">
         <span class="text-[1.8rem] font-light text-[#3b3530] font-mono leading-none">${{ "%.2f"|format(total_cost) }}</span>

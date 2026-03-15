@@ -93,8 +93,19 @@ class Orchestrator:
                     break
 
                 if phase == Phase.RELEASED:
-                    # Loop back for refinement
-                    logger.info("Starting refinement cycle for %s", idea_id)
+                    history = status.get("phase_history", [])
+                    prior_releases = sum(1 for e in history if e.get("to") == "released")
+                    max_refinement_cycles = status.get("max_refinement_cycles", 1)
+                    if max_refinement_cycles != 0 and prior_releases >= max_refinement_cycles:
+                        logger.info(
+                            "%s reached max refinement cycles (%d), ending continuous run",
+                            idea_id, max_refinement_cycles,
+                        )
+                        break
+                    logger.info(
+                        "Starting refinement cycle for %s (release %d/%d)",
+                        idea_id, prior_releases, max_refinement_cycles if max_refinement_cycles != 0 else "unlimited",
+                    )
                     await self._transition(idea_id, Phase.IDEATION)
                 else:
                     # Pipeline stopped mid-way (e.g. review pending), don't auto-loop
@@ -212,10 +223,10 @@ class Orchestrator:
                 await self._transition(idea_id, Phase.RELEASED)
                 release_count = self._count_releases(idea_id)
                 if release_count <= 1:
-                    await self.dispatcher.notify(f"🚀 *{idea_id}* has been released!")
+                    await self.dispatcher.notify(f"[Released] *{idea_id}* has been released!")
                 else:
                     await self.dispatcher.notify(
-                        f"🔄 *{idea_id}* refinement cycle #{release_count} complete"
+                        f"[Cycle] *{idea_id}* refinement cycle #{release_count} complete"
                     )
                 return Phase.RELEASED
 
@@ -402,6 +413,7 @@ class Orchestrator:
                         model="claude-haiku-4-5",
                         max_turns=1,
                         allowed_tools=[],
+                        env={"CLAUDECODE": ""},
                     ),
                 ):
                     if isinstance(message, ResultMessage) and message.result:

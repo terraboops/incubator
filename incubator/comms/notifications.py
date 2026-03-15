@@ -28,7 +28,7 @@ class NotificationDispatcher:
         self, idea_id: str, from_phase: str, to_phase: str
     ) -> None:
         await self.notify(
-            f"🔄 *{idea_id}*: `{from_phase}` → `{to_phase}`"
+            f"[Phase] *{idea_id}*: `{from_phase}` → `{to_phase}`"
         )
 
     async def notify_error(self, idea_id: str, error: str) -> None:

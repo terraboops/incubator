@@ -48,10 +48,10 @@ class EvolutionManager:
             )
 
         if not proposals:
-            await self.dispatcher.notify("📊 Evolution: No learnings accumulated yet.")
+            await self.dispatcher.notify("[Evolution] Evolution: No learnings accumulated yet.")
             return
 
-        summary = "📊 *Evolution Retrospective*\n\n"
+        summary = "[Evolution] *Evolution Retrospective*\n\n"
         for p in proposals:
             summary += (
                 f"• *{p['agent']}*: {p['learnings_size']} chars of learnings\n"

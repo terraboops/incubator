@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/icons.html" import icon, agent_icon %}
 {% block title %}{% if is_new %}New Agent{% else %}{{ agent.name }}{% endif %} — incubator{% endblock %}
 {% block content %}
 
@@ -6,8 +7,10 @@
     <a href="/agents" class="text-[0.82rem] text-[#8a8074] hover:text-[#3b3530] transition-colors">Agents</a>
     <span class="text-[#b0a898]">/</span>
     {% if is_new %}
+    <span class="text-[#a690cc]">{{ icon('sparkles', 20) }}</span>
     <h1 class="text-[1.2rem] font-medium text-[#3b3530]">New Agent</h1>
     {% else %}
+    <span class="text-[#a690cc]">{{ agent_icon(agent.name, 20) }}</span>
     <h1 class="text-[1.2rem] font-medium text-[#3b3530]">{{ agent.name }}</h1>
     <span class="badge {% if agent.status == 'active' %}badge-release{% else %}badge-killed{% endif %} ml-1">
         {{ agent.status }}
@@ -15,16 +18,17 @@
     {% endif %}
 </div>
 
-<!-- Deadline pressure warning -->
+<!-- Time budget notice -->
 {% if deadline_count is defined and deadline_count > 2 %}
-<div class="rounded-xl mb-5" style="background: #fffbeb; border: 1px solid #fcd34d;">
+<div class="rounded-xl mb-5" style="background: #f5f0ea; border: 1px solid #e0d8cc;">
     <div class="flex items-start gap-3 px-4 py-3">
-        <span class="text-[1rem] flex-shrink-0 mt-0.5">&#x26a0;</span>
+        <span class="flex-shrink-0 mt-0.5 text-[#8a8074]">{{ icon('clock', 18) }}</span>
         <div>
-            <div class="text-[0.8rem] font-semibold" style="color: #92400e;">Deadline pressure</div>
-            <div class="text-[0.75rem] mt-0.5" style="color: #a16207;">
-                This agent hit the cycle deadline <b>{{ deadline_count }}</b> times recently.
-                Consider increasing <code class="text-[0.7rem]">cycle_time_minutes</code> or reducing <code class="text-[0.7rem]">max_turns</code>.
+            <div class="text-[0.8rem] font-semibold text-[#544d43]">Taking longer than usual</div>
+            <div class="text-[0.75rem] mt-0.5 text-[#8a8074]">
+                This agent ran out of time <b>{{ deadline_count }}</b> times recently.
+                This is fine for complex ideas — work is saved and continued next cycle.
+                If you'd like to give it more time, increase <code class="text-[0.7rem]">cycle_time_minutes</code>.
             </div>
         </div>
     </div>
@@ -63,7 +67,7 @@
     <!-- Core config -->
     <div class="card p-5">
         <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-4">Core</h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div>
                 <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Model</label>
                 <select name="model"
@@ -88,8 +92,14 @@
             </div>
             <div>
                 <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Budget (USD)</label>
-                <input type="number" name="max_budget_usd" value="{{ agent.max_budget_usd }}" min="0.01" max="100" step="0.01"
+                <input type="number" name="max_budget_usd" value="{{ agent.max_budget_usd }}" min="0" max="100" step="0.01"
                        class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Parallelism</label>
+                <input type="number" name="max_concurrent" value="{{ agent.max_concurrent }}" min="1" max="10"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Max copies running at once per cycle</p>
             </div>
         </div>
     </div>
@@ -153,6 +163,27 @@
         </div>
     </div>
 
+    <!-- System Prompt -->
+    <div class="card p-5">
+        <div class="flex items-start justify-between mb-3">
+            <div>
+                <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-0.5">System Prompt</h2>
+                <p class="text-[0.7rem] text-[#b0a898]">
+                    The agent-specific system prompt. The global prompt (editable in <a href="/settings" class="underline">Settings</a>) is prepended automatically.
+                </p>
+            </div>
+            {% if agent.prompt_path %}
+            <span class="text-[0.65rem] font-mono text-[#b0a898] bg-[#f7f5f0] px-2 py-0.5 rounded-md mt-0.5 shrink-0">
+                {{ agent.prompt_path }}
+            </span>
+            {% endif %}
+        </div>
+        <textarea name="prompt_py" rows="16"
+                  class="w-full font-mono text-[0.78rem] leading-relaxed bg-[#faf9f6] border border-[#eae6df] rounded-xl p-4 resize-y text-[#544d43]"
+                  spellcheck="false"
+                  placeholder="Enter the system prompt for this agent...">{{ agent.prompt_py or '' }}</textarea>
+    </div>
+
     <!-- Advanced -->
     <details>
         <summary class="flex items-center gap-2 text-[0.85rem] font-medium text-[#3b3530] py-1 mb-1 cursor-pointer">
@@ -173,12 +204,6 @@
                 <textarea name="env_text" rows="3" placeholder="KEY=value&#10;ANOTHER_KEY=value"
                           class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono resize-y">{% if agent.env %}{% for k, v in agent.env.items() %}{{ k }}={{ v }}{% if not loop.last %}
 {% endif %}{% endfor %}{% endif %}</textarea>
-            </div>
-            <div class="card p-5">
-                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">System Prompt Override</label>
-                <textarea name="system_prompt_override" rows="4" placeholder="Leave blank to use the default prompt.py"
-                          class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] resize-y">{{ agent.system_prompt_override or '' }}</textarea>
-                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Replaces the built-in system prompt entirely. Leave blank for default.</p>
             </div>
         </div>
     </details>

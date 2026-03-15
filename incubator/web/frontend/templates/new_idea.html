@@ -1,9 +1,13 @@
 {% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
 {% block title %}New Idea — incubator{% endblock %}
 {% block content %}
 <div class="max-w-xl mx-auto pt-4">
-    <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-1">New Idea</h1>
-    <p class="text-[0.8rem] text-[#8a8074] mb-6">Describe your idea and the agents will take it from here.</p>
+    <div class="flex items-center gap-3 mb-1">
+        <span class="text-[#a690cc]">{{ icon('lightbulb', 22) }}</span>
+        <h1 class="text-[1.15rem] font-medium text-[#3b3530]">New Idea</h1>
+    </div>
+    <p class="text-[0.8rem] text-[#8a8074] mb-6 ml-[35px]">Describe your idea and the agents will take it from here.</p>
 
     {% if presets %}
     <!-- Preset selector -->

@@ -31,9 +31,9 @@ def test_build_deadline_context(agent):
     """Deadline context includes time info in structured XML."""
     deadline = datetime.now(timezone.utc) + timedelta(minutes=25)
     ctx = agent._build_deadline_context(deadline)
-    assert "<deadline>" in ctx
+    assert "<time-budget>" in ctx
     assert "25 minutes" in ctx or "24 minutes" in ctx  # allow 1min rounding
-    assert "</deadline>" in ctx
+    assert "</time-budget>" in ctx
 
 
 def test_build_deadline_context_zero_minutes(agent):

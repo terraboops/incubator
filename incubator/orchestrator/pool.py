@@ -66,7 +66,7 @@ class RoleHealth:
 
     @property
     def is_starved(self) -> bool:
-        return self.expected > 0 and self.ratio < STARVATION_THRESHOLD
+        return self.expected >= 3 and self.ratio < STARVATION_THRESHOLD
 
 
 @dataclass
@@ -120,13 +120,28 @@ class PoolManager:
         self.pool_dir = settings.project_root / "pool"
         self.pool_dir.mkdir(exist_ok=True)
 
+    # Phases where the pool should not schedule work
+    _TERMINAL_PHASES = {"killed", "released", "paused"}
+
     def _get_active_ideas(self) -> list[dict]:
         """Get all non-terminal ideas sorted by priority."""
         ideas = []
         for idea_id in self.blackboard.list_ideas():
             status = self.blackboard.get_status(idea_id)
             phase = status.get("phase", "submitted")
-            if phase in ("killed",):
+            if phase in self._TERMINAL_PHASES:
+                # Allow released ideas that still have post_ready work
+                if phase != "released" or not self.blackboard.pending_post_ready(idea_id):
+                    continue
+            # Skip review phases — these need human/gating decisions, not agent runs
+            if phase.endswith("_review"):
+                continue
+            # Skip ideas awaiting human review when Telegram isn't configured
+            # (no way to resolve the review without a human channel)
+            if status.get("needs_human_review") and not self.settings.telegram_bot_token:
+                continue
+            # Skip ideas without pipeline config (pre-pool legacy ideas)
+            if "pipeline" not in status:
                 continue
             # Apply early-stage boost
             score = status.get("priority_score", PRIORITY_DEFAULT)
@@ -137,6 +152,11 @@ class PoolManager:
         ideas.sort(key=lambda s: s.get("_effective_priority", 0), reverse=True)
         return ideas
 
+    def _max_concurrent(self, role: str) -> int:
+        """Get the max concurrent instances for a role from registry."""
+        agent_config = self.registry.get_agent(role)
+        return agent_config.max_concurrent if agent_config else 1
+
     def _build_work_queue(
         self,
         ideas: list[dict],
@@ -145,42 +165,78 @@ class PoolManager:
     ) -> list[tuple[str, str]]:
         """Build ordered list of (role, idea_id) assignments.
 
-        For each role, find the highest-priority eligible idea.
-        Pass 2 schedules global agents (phase="*") with the __all__ sentinel.
+        Idea-first scheduling: iterate ideas in priority order and assign
+        each idea's next pipeline stage. This ensures the highest-priority
+        ideas always get scheduled first regardless of which role they need.
+
+        Constraints:
+        - Each idea can be processed by at most 1 agent at a time.
+        - Each role has a max_concurrent limit (how many copies can run).
+        - Each (role, idea_id) pair is only scheduled once per window.
+
+        Three passes:
+        1. Pipeline work — assign each idea's next stage in priority order.
+        2. Feedback work — assign feedback-pending roles for remaining capacity.
+        3. Global agents (phase="*") — run against all ideas with __all__ sentinel.
         """
         queue: list[tuple[str, str]] = []
+        queued_ideas: set[str] = set()  # 1 agent per idea at a time
+        role_counts: dict[str, int] = defaultdict(int)
 
-        # Pass 1: normal per-idea agents
-        for role in self.roles:
-            config = self.registry.get_agent(role)
-            # Skip star-phase agents in the normal pass
-            if config and config.phase == "*":
+        # Pass 1: pipeline stage work (idea-first)
+        for idea in ideas:
+            idea_id = idea["id"]
+
+            if idea_id in locked or idea_id in queued_ideas:
                 continue
 
-            for idea in ideas:
-                idea_id = idea["id"]
+            if self.blackboard.is_ready(idea_id):
+                # Main stages done — schedule first pending post_ready role
+                for post_role in self.blackboard.pending_post_ready(idea_id):
+                    if (post_role, idea_id) in serviced:
+                        continue
+                    if post_role not in self.roles:
+                        continue
+                    if role_counts[post_role] >= self._max_concurrent(post_role):
+                        continue
+                    queue.append((post_role, idea_id))
+                    queued_ideas.add(idea_id)
+                    role_counts[post_role] += 1
+                    break  # 1 agent per idea at a time
+                continue
 
-                # Skip if already serviced this window
+            next_role = self.blackboard.next_stage(idea_id)
+            if not next_role:
+                continue
+
+            if (next_role, idea_id) in serviced:
+                continue
+
+            if role_counts[next_role] >= self._max_concurrent(next_role):
+                continue
+
+            queue.append((next_role, idea_id))
+            queued_ideas.add(idea_id)
+            role_counts[next_role] += 1
+
+        # Pass 2: feedback-driven work (idea-first, cross-cutting)
+        for idea in ideas:
+            idea_id = idea["id"]
+
+            if idea_id in locked or idea_id in queued_ideas:
+                continue
+
+            # Find first role with pending feedback that has capacity
+            for role in self.roles:
                 if (role, idea_id) in serviced:
                     continue
-
-                # Skip if locked by another worker
-                if idea_id in locked:
+                if role_counts[role] >= self._max_concurrent(role):
                     continue
-
-                # Skip if role not in this idea's pipeline
-                if not self.blackboard.pipeline_has_role(idea_id, role):
-                    continue
-
-                # Pipeline order enforcement for not-ready ideas
-                if not self.blackboard.is_ready(idea_id):
-                    next_stage = self.blackboard.next_stage(idea_id)
-                    if next_stage != role:
-                        continue
-
-                # This is the highest-priority eligible idea for this role
-                queue.append((role, idea_id))
-                break  # move to next role
+                if self.blackboard.has_pending_feedback(idea_id, role):
+                    queue.append((role, idea_id))
+                    queued_ideas.add(idea_id)
+                    role_counts[role] += 1
+                    break  # 1 agent per idea at a time
 
         # Pass 2: global agents (phase="*") run against all ideas at once
         for role in self.roles:
@@ -199,13 +255,16 @@ class PoolManager:
         worker_data = []
         for w in self.workers:
             if w.is_idle:
-                worker_data.append({"id": w.worker_id, "idle": True})
+                worker_data.append({"id": w.worker_id, "status": "idle"})
             else:
+                elapsed = (datetime.now(timezone.utc) - w.started_at).total_seconds() if w.started_at else 0
                 worker_data.append({
                     "id": w.worker_id,
+                    "status": "active",
                     "role": w.current_role,
-                    "idea_id": w.current_idea,
+                    "idea": w.current_idea,
                     "started_at": w.started_at.isoformat() if w.started_at else None,
+                    "elapsed_seconds": elapsed,
                 })
 
         state = PoolState(
@@ -259,6 +318,72 @@ class PoolManager:
                 iteration_count=status.get("iteration_count", 0) + 1,
             )
 
+            # Bridge: copy agent's phase_recommendation into stage_results[role]
+            # so the pool's next_stage() logic can detect completion.
+            status = self.blackboard.get_status(result.idea_id)
+            recommendation = status.get("phase_recommendation", "")
+            if recommendation in ("proceed", "iterate", "kill"):
+                stage_results = status.get("stage_results", {})
+                stage_results[result.role] = recommendation
+                self.blackboard.update_status(result.idea_id, stage_results=stage_results)
+
+                # Advance the phase field to match the current/next pipeline stage
+                # so the pool's _get_active_ideas() doesn't filter it out.
+                if recommendation == "proceed":
+                    next_stage = self.blackboard.next_stage(result.idea_id)
+                    if next_stage:
+                        old_phase = status.get("phase", "submitted")
+                        if old_phase != next_stage:
+                            history = status.get("phase_history", [])
+                            history.append({
+                                "from": old_phase,
+                                "to": next_stage,
+                                "at": datetime.now(timezone.utc).isoformat(),
+                            })
+                            self.blackboard.update_status(
+                                result.idea_id,
+                                phase=next_stage,
+                                phase_history=history,
+                            )
+                            logger.info("Idea '%s' advanced: %s -> %s", result.idea_id, old_phase, next_stage)
+                    elif self.blackboard.is_ready(result.idea_id):
+                        # All stages done — mark as released
+                        old_phase = status.get("phase", "submitted")
+                        history = status.get("phase_history", [])
+                        prior_releases = sum(1 for e in history if e.get("to") == "released")
+                        history.append({
+                            "from": old_phase,
+                            "to": "released",
+                            "at": datetime.now(timezone.utc).isoformat(),
+                        })
+                        max_refinement_cycles = status.get("max_refinement_cycles", 1)
+                        if max_refinement_cycles == 0 or prior_releases < max_refinement_cycles:
+                            # Loop back for another refinement cycle
+                            self.blackboard.update_status(
+                                result.idea_id,
+                                phase="submitted",
+                                phase_history=history,
+                                stage_results={},
+                            )
+                            logger.info(
+                                "Idea '%s' completed pipeline (release %d/%d), looping for refinement",
+                                result.idea_id, prior_releases + 1, max_refinement_cycles,
+                            )
+                        else:
+                            # Hit the refinement cap — mark terminal
+                            self.blackboard.update_status(
+                                result.idea_id,
+                                phase="released",
+                                phase_history=history,
+                            )
+                            logger.info(
+                                "Idea '%s' reached max refinement cycles (%d), marking terminal",
+                                result.idea_id, max_refinement_cycles,
+                            )
+                elif recommendation == "kill":
+                    self.blackboard.update_status(result.idea_id, phase="killed")
+                    logger.info("Idea '%s' killed by %s", result.idea_id, result.role)
+
             # Apply gating
             await self._apply_gating(result)
 
@@ -279,7 +404,7 @@ class PoolManager:
         gating_mode = self.blackboard.get_gating_mode(result.idea_id, result.role)
         status = self.blackboard.get_status(result.idea_id)
         stage_results = status.get("stage_results", {})
-        recommendation = stage_results.get(result.role, "proceed")
+        recommendation = stage_results.get(result.role) or status.get("phase_recommendation", "proceed")
 
         if gating_mode == "auto":
             if recommendation == "iterate":
@@ -409,11 +534,7 @@ class PoolManager:
                 # Re-score priorities at the start of each new window
                 await self._rescore_priorities()
 
-            # Update expected role health counts
-            for role in self.roles:
-                self.role_health[role].expected += 1
-
-            # Run window
+            # Run window (role health expected/actual updated inside)
             await self._run_window()
 
             # Snapshot after window
@@ -462,8 +583,9 @@ class PoolManager:
                 if pending_tasks:
                     done_set, _ = await asyncio.wait(
                         pending_tasks.keys(), return_when=asyncio.FIRST_COMPLETED,
-                        timeout=2.0,
+                        timeout=30.0,
                     )
+                    self._snapshot()  # Periodic state update for dashboard
                     # Results will be processed at top of loop
                 else:
                     await asyncio.sleep(1)
@@ -483,6 +605,8 @@ class PoolManager:
 
             # Dispatch work to idle workers as async tasks
             for worker, (role, idea_id) in zip(idle_workers, queue):
+                # Track that this role had eligible work this window
+                self.role_health[role].expected += 1
                 self.window.mark_serviced(role, idea_id)
                 task = asyncio.create_task(
                     self._run_worker(worker, role, idea_id),
@@ -490,6 +614,8 @@ class PoolManager:
                 )
                 pending_tasks[task] = worker
 
+            # Yield to event loop so tasks can start and update worker state
+            await asyncio.sleep(0)
             self._snapshot()
 
         # Wait for any remaining tasks at window end

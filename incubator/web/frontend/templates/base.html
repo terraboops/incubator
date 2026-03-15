@@ -130,6 +130,96 @@
             box-shadow: 0 0 0 3px rgba(189,180,164,0.12);
         }
 
+        /* ── Feedback toolbar ── */
+        .feedback-toolbar {
+            position: fixed;
+            z-index: 100;
+            display: none;
+            background: #3b3530;
+            color: #faf9f6;
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+            transition: opacity 0.15s, transform 0.15s;
+            transform: translateX(-50%);
+            letter-spacing: 0.02em;
+            user-select: none;
+        }
+        .feedback-toolbar:hover { background: #2a2420; }
+        .feedback-toolbar::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #3b3530;
+        }
+
+        /* ── Modal overlay ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            background: rgba(59,53,48,0.3);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: white;
+            border-radius: 20px;
+            padding: 28px;
+            width: 90%;
+            max-width: 520px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.12);
+            animation: modal-in 0.2s ease-out;
+        }
+        @keyframes modal-in {
+            from { opacity: 0; transform: translateY(12px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ── Question/answer cards ── */
+        .qa-card {
+            border-left: 3px solid #ddd6ca;
+            padding-left: 16px;
+            margin-bottom: 16px;
+        }
+        .qa-card .perspective-label {
+            font-size: 0.68rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+
+        /* ── Feedback chips ── */
+        .feedback-chip {
+            background: #f7f5f0;
+            border: 1px solid #eae6df;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.8rem;
+            margin-bottom: 8px;
+        }
+        .feedback-chip blockquote {
+            border-left: 2px solid #ddd6ca;
+            padding-left: 10px;
+            margin: 6px 0;
+            color: #8a8074;
+            font-size: 0.78rem;
+            font-style: italic;
+        }
+
         /* ── Utilities ── */
         .line-clamp-2 {
             display: -webkit-box;
@@ -147,23 +237,25 @@
     </style>
 </head>
 <body class="min-h-screen font-sans antialiased">
+    {% from "macros/icons.html" import icon, agent_icon, phase_icon %}
     <nav class="sticky top-0 z-50 bg-[#faf9f6]/80 backdrop-blur-xl border-b border-[#eae6df]/60">
         <div class="max-w-4xl mx-auto px-6 h-14 flex items-center gap-8">
-            <a href="/" class="flex items-center gap-2 group">
-                <span class="text-base opacity-70 group-hover:opacity-100 transition-opacity">&#x1f331;</span>
+            <a href="/" class="flex items-center gap-2.5 group">
+                <span class="text-[#a690cc]">{{ icon('sparkles', 18) }}</span>
                 <span class="text-[0.88rem] font-medium tracking-tight text-[#3b3530]">incubator</span>
             </a>
             <div class="flex items-center gap-5 text-[0.78rem] text-[#8a8074]">
-                <a href="/" class="nav-link{% if request.url.path == '/' %} active{% endif %}">Ideas</a>
-                <a href="/activity" class="nav-link{% if '/activity' in request.url.path %} active{% endif %}">Activity</a>
-                <a href="/pool" class="nav-link{% if '/pool' in request.url.path %} active{% endif %}">Pool</a>
-                <a href="/agents" class="nav-link{% if '/agents' in request.url.path %} active{% endif %}">Agents</a>
-                <a href="/costs" class="nav-link{% if '/costs' in request.url.path %} active{% endif %}">Costs</a>
-                <a href="/evolution" class="nav-link{% if '/evolution' in request.url.path %} active{% endif %}">Evolution</a>
+                <a href="/" class="nav-link flex items-center gap-1.5{% if request.url.path == '/' %} active{% endif %}">{{ icon('layers', 14) }} Ideas</a>
+                <a href="/activity" class="nav-link flex items-center gap-1.5{% if '/activity' in request.url.path %} active{% endif %}">{{ icon('activity', 14) }} Activity</a>
+                <a href="/pool" class="nav-link flex items-center gap-1.5{% if '/pool' in request.url.path %} active{% endif %}">{{ icon('users', 14) }} Pool</a>
+                <a href="/agents" class="nav-link flex items-center gap-1.5{% if '/agents' in request.url.path %} active{% endif %}">{{ icon('brain', 14) }} Agents</a>
+                <a href="/costs" class="nav-link flex items-center gap-1.5{% if '/costs' in request.url.path %} active{% endif %}">{{ icon('dollar-sign', 14) }} Costs</a>
+                <a href="/evolution" class="nav-link flex items-center gap-1.5{% if '/evolution' in request.url.path %} active{% endif %}">{{ icon('dna', 14) }} Evolution</a>
+                <a href="/settings" class="nav-link flex items-center gap-1.5{% if '/settings' in request.url.path %} active{% endif %}">{{ icon('settings', 14) }} Settings</a>
             </div>
             <div class="ml-auto">
                 <a href="/ideas/new" class="btn btn-primary text-[0.76rem] py-1.5 px-3.5">
-                    + New Idea
+                    {{ icon('plus', 14) }} New Idea
                 </a>
             </div>
         </div>

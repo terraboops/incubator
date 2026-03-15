@@ -10,19 +10,8 @@ from claude_agent_sdk import tool, create_sdk_mcp_server
 
 from incubator.core.blackboard import Blackboard
 
-# Artifact files that MUST be written as .html, not .md
-# Maps the markdown name to the required HTML name
-REQUIRED_HTML_ARTIFACTS = {
-    "research.md": "research.html",
-    "competitive-analysis.md": "competitive-analysis.html",
-    "feasibility.md": "feasibility.html",
-    "mvp-spec.md": "mvp-spec.html",
-    "implementation-log.md": "implementation-log.html",
-    "validation-report.md": "validation-report.html",
-    "release-plan.md": "release-plan.html",
-}
-
-ARTIFACT_REJECTION_MSG = """REJECTED: You wrote '{filename}' as markdown, but artifacts MUST be beautiful, self-contained HTML files.
+ARTIFACT_REJECTION_MSG = """REJECTED: '{filename}' is a markdown file. All artifacts MUST be \
+self-contained .html files.
 
 Write '{html_name}' instead — a single HTML file with:
 - Inline CSS with modern design (gradients, backdrop-blur, subtle animations)
@@ -32,10 +21,11 @@ Write '{html_name}' instead — a single HTML file with:
 - Professional consulting-quality presentation
 - NO external dependencies (no CDN links, no external CSS/JS)
 
-This is displayed as a rich embedded artifact in the dashboard. Make it gorgeous."""
+Choose a descriptive filename that reflects the content (e.g., market-landscape.html, \
+risk-analysis.html, architecture-overview.html). You decide which artifacts to create."""
 
 
-def create_blackboard_mcp_server(blackboard: Blackboard, idea_id: str):
+def create_blackboard_mcp_server(blackboard: Blackboard, idea_id: str, agent_role: str = ""):
     """Create an MCP server with blackboard tools scoped to a specific idea."""
 
     @tool(
@@ -58,19 +48,18 @@ def create_blackboard_mcp_server(blackboard: Blackboard, idea_id: str):
         "write_blackboard",
         (
             "Write content to a file on the idea's blackboard. "
-            "IMPORTANT: All artifact files (research, competitive-analysis, feasibility, "
-            "mvp-spec, implementation-log, validation-report, release-plan) MUST be written "
-            "as .html files, NOT .md. Write gorgeous, self-contained HTML with inline CSS/JS "
-            "and SVG visualizations. The only allowed .md files are idea.md and feedback.md."
+            "All artifacts MUST be .html files — gorgeous, self-contained HTML with inline "
+            "CSS/JS and SVG visualizations. You choose which artifacts to create based on "
+            "what's most valuable for this specific idea."
         ),
         {"filename": str, "content": str},
     )
     async def write_blackboard(args):
         filename = args["filename"]
 
-        # Reject markdown writes for files that should be HTML artifacts
-        if filename in REQUIRED_HTML_ARTIFACTS:
-            html_name = REQUIRED_HTML_ARTIFACTS[filename]
+        # Agents can only write .html artifacts — system files are read-only
+        if filename.endswith(".md") or filename == "status.json":
+            html_name = filename.rsplit(".", 1)[0] + ".html"
             return {
                 "content": [{
                     "type": "text",
@@ -92,9 +81,8 @@ def create_blackboard_mcp_server(blackboard: Blackboard, idea_id: str):
     async def append_blackboard(args):
         filename = args["filename"]
 
-        # Also reject appending to markdown artifact files
-        if filename in REQUIRED_HTML_ARTIFACTS:
-            html_name = REQUIRED_HTML_ARTIFACTS[filename]
+        if filename.endswith(".md") or filename == "status.json":
+            html_name = filename.rsplit(".", 1)[0] + ".html"
             return {
                 "content": [{
                     "type": "text",
@@ -146,6 +134,100 @@ def create_blackboard_mcp_server(blackboard: Blackboard, idea_id: str):
         files = [f.name for f in idea_dir.iterdir() if f.is_file()]
         return {"content": [{"type": "text", "text": "\n".join(sorted(files))}]}
 
+    @tool(
+        "declare_artifacts",
+        (
+            "Register the artifacts you created and why. Call this BEFORE "
+            "set_phase_recommendation. This creates a structured manifest that "
+            "helps downstream agents understand your outputs."
+        ),
+        {"artifacts": list},
+    )
+    async def declare_artifacts(args):
+        """Each artifact should be: {"file": "name.html", "purpose": "...", "confidence": 0.0-1.0}"""
+        import json as _json
+
+        artifacts = args.get("artifacts", [])
+        if not artifacts:
+            return {
+                "content": [{"type": "text", "text": "No artifacts declared."}],
+                "isError": True,
+            }
+
+        # Validate each artifact entry
+        manifest = []
+        for art in artifacts:
+            if not isinstance(art, dict) or "file" not in art:
+                continue
+            entry = {
+                "file": art["file"],
+                "purpose": art.get("purpose", ""),
+                "confidence": art.get("confidence", 1.0),
+            }
+            # Verify the file actually exists on the blackboard
+            if not blackboard.file_exists(idea_id, entry["file"]):
+                entry["warning"] = "file not found on blackboard"
+            manifest.append(entry)
+
+        # Persist the manifest to the blackboard
+        manifest_data = {
+            "declared_by": blackboard.get_status(idea_id).get("phase", "unknown"),
+            "artifacts": manifest,
+        }
+
+        # Read existing manifest and append (multiple agents contribute)
+        manifest_file = "artifact-manifest.json"
+        existing = []
+        try:
+            raw = blackboard.read_file(idea_id, manifest_file)
+            existing = _json.loads(raw)
+            if not isinstance(existing, list):
+                existing = [existing]
+        except (FileNotFoundError, _json.JSONDecodeError):
+            existing = []
+
+        existing.append(manifest_data)
+        blackboard.write_file(idea_id, manifest_file, _json.dumps(existing, indent=2))
+
+        summary = "\n".join(
+            f"  - {a['file']}: {a['purpose']}" + (f" (confidence: {a['confidence']})" if a.get('confidence', 1.0) < 1.0 else "")
+            for a in manifest
+        )
+        return {
+            "content": [{"type": "text", "text": f"Declared {len(manifest)} artifact(s):\n{summary}"}]
+        }
+
+    @tool(
+        "acknowledge_feedback",
+        (
+            "Acknowledge that you have reviewed a feedback entry. Call this for EACH "
+            "feedback item after you have considered it. You do not need to modify "
+            "any artifact — just indicate you reviewed the feedback. If the feedback "
+            "is outside your area of expertise, acknowledge it anyway with a note."
+        ),
+        {"feedback_id": str, "action_taken": str},
+    )
+    async def acknowledge_feedback(args):
+        feedback_id = args["feedback_id"]
+        action_taken = args.get("action_taken", "reviewed")
+        role = agent_role
+
+        if not role:
+            return {
+                "content": [{"type": "text", "text": "Cannot acknowledge: agent role not set"}],
+                "isError": True,
+            }
+
+        found = blackboard.acknowledge_feedback(idea_id, feedback_id, role)
+        if not found:
+            return {
+                "content": [{"type": "text", "text": f"Feedback '{feedback_id}' not found"}],
+                "isError": True,
+            }
+        return {
+            "content": [{"type": "text", "text": f"Acknowledged feedback '{feedback_id}': {action_taken}"}]
+        }
+
     return create_sdk_mcp_server(
         "blackboard-tools",
         tools=[
@@ -155,5 +237,7 @@ def create_blackboard_mcp_server(blackboard: Blackboard, idea_id: str):
             get_idea_status,
             set_phase_recommendation,
             list_blackboard_files,
+            declare_artifacts,
+            acknowledge_feedback,
         ],
     )

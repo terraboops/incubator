@@ -76,3 +76,65 @@ def test_update_status(bb: Blackboard):
     status = bb.get_status(slug)
     assert status["total_cost_usd"] == 0.25
     assert status["phase_recommendation"] == "proceed"
+
+
+# ── Feedback helpers ───────────────────────────────────────────────
+
+
+def test_feedback_pending_and_acknowledge(bb: Blackboard):
+    slug = bb.create_idea("Feedback Test", "desc")
+
+    # Write feedback with pending_agents
+    feedback = [
+        {
+            "id": "fb-001",
+            "artifact": "plan.html",
+            "comment": "Fix the numbers",
+            "pending_agents": ["ideation", "implementation"],
+            "acknowledged_by": [],
+        },
+        {
+            "id": "fb-002",
+            "artifact": "spec.html",
+            "comment": "Add more detail",
+            "pending_agents": ["implementation"],
+            "acknowledged_by": [],
+        },
+    ]
+    bb.write_file(slug, "feedback.json", json.dumps(feedback))
+
+    # ideation has 1 pending, implementation has 2
+    assert len(bb.get_pending_feedback(slug, "ideation")) == 1
+    assert len(bb.get_pending_feedback(slug, "implementation")) == 2
+    assert bb.has_pending_feedback(slug, "ideation")
+    assert not bb.has_pending_feedback(slug, "validation")
+
+    # Acknowledge fb-001 as ideation
+    assert bb.acknowledge_feedback(slug, "fb-001", "ideation")
+
+    # ideation now has 0 pending
+    assert not bb.has_pending_feedback(slug, "ideation")
+    # implementation still has 2 (fb-001 not yet ack'd by implementation)
+    assert len(bb.get_pending_feedback(slug, "implementation")) == 2
+
+    # Acknowledge fb-001 as implementation
+    bb.acknowledge_feedback(slug, "fb-001", "implementation")
+    assert len(bb.get_pending_feedback(slug, "implementation")) == 1
+
+    # Non-existent feedback returns False
+    assert not bb.acknowledge_feedback(slug, "nonexistent", "ideation")
+
+
+def test_feedback_no_file_returns_empty(bb: Blackboard):
+    slug = bb.create_idea("No Feedback", "desc")
+    assert bb.get_pending_feedback(slug, "ideation") == []
+    assert not bb.has_pending_feedback(slug, "ideation")
+
+
+def test_feedback_legacy_entries_ignored(bb: Blackboard):
+    """Old feedback entries without pending_agents are not matched."""
+    slug = bb.create_idea("Legacy Feedback", "desc")
+    feedback = [{"id": "old-001", "comment": "old feedback"}]
+    bb.write_file(slug, "feedback.json", json.dumps(feedback))
+
+    assert not bb.has_pending_feedback(slug, "ideation")

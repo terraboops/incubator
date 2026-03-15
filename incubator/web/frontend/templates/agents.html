@@ -1,10 +1,14 @@
 {% extends "base.html" %}
+{% from "macros/icons.html" import icon, agent_icon, phase_icon %}
 {% block title %}Agents — incubator{% endblock %}
 {% block content %}
 <div class="flex items-end justify-between mb-6">
-    <div>
-        <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Agents</h1>
-        <p class="text-[0.8rem] text-[#8a8074]">The team that incubates your ideas.</p>
+    <div class="flex items-center gap-3">
+        <span class="text-[#a690cc]">{{ icon('brain', 22) }}</span>
+        <div>
+            <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Agents</h1>
+            <p class="text-[0.8rem] text-[#8a8074]">The team that incubates your ideas.</p>
+        </div>
     </div>
 </div>
 
@@ -13,14 +17,7 @@
     <a href="/agents/{{ agent.name }}" class="card p-5 block group" id="agent-card-{{ agent.name }}">
         <div class="flex items-center gap-3 mb-3">
             <div class="agent-ring idle" id="ring-{{ agent.name }}">
-                {% if agent.name == 'ideation' %}&#x1f9e0;
-                {% elif agent.name == 'implementation' %}&#x1f6e0;
-                {% elif agent.name == 'validation' %}&#x2705;
-                {% elif agent.name == 'release' %}&#x1f680;
-                {% elif 'competitive' in agent.name %}&#x1f50d;
-                {% elif 'research' in agent.name %}&#x1f4da;
-                {% elif 'prioritizer' in agent.name %}&#x2696;
-                {% else %}&#x1f916;{% endif %}
+                <span class="text-[#8a8074]">{{ agent_icon(agent.name, 18) }}</span>
             </div>
             <div>
                 <h3 class="text-[0.85rem] font-medium text-[#3b3530] group-hover:text-[#1a1714] transition-colors">{{ agent.name }}</h3>

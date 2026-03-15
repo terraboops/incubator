@@ -9,7 +9,7 @@ def find_project_root(start: Path = None) -> Path:
     """Walk up from start (default cwd) looking for .incubator marker."""
     current = (start or Path.cwd()).resolve()
     while True:
-        if (current / ".incubator").exists():
+        if (current / ".incubator").is_file():
             return current
         parent = current.parent
         if parent == current:

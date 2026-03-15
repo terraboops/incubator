@@ -18,6 +18,9 @@ class AgentConfig:
     phase: str | None = None
     cadence: str | None = None  # cron expression for watchers
 
+    # Pool scheduling
+    max_concurrent: int = 1  # max parallel instances of this agent role
+
     # Extended config (maps to ClaudeAgentOptions)
     permission_mode: str = "bypassPermissions"
     thinking: dict | None = None  # e.g. {"type": "adaptive"}

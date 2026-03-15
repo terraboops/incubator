@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from incubator.config import get_settings
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger(__name__)
 
 WEB_DIR = Path(__file__).resolve().parent.parent
@@ -68,6 +69,7 @@ def create_app() -> FastAPI:
     from incubator.web.api.routes.activity import router as activity_router
     from incubator.web.api.routes.evolution import router as evolution_router
     from incubator.web.api.routes.pool import router as pool_router
+    from incubator.web.api.routes.settings import router as settings_router
     from incubator.web.api.websocket import router as ws_router
 
     app.include_router(activity_router, tags=["activity"])
@@ -77,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(costs_router, prefix="/costs", tags=["costs"])
     app.include_router(evolution_router, prefix="/evolution", tags=["evolution"])
     app.include_router(pool_router, prefix="/pool", tags=["pool"])
+    app.include_router(settings_router, prefix="/settings", tags=["settings"])
     app.include_router(ws_router)
 
     return app

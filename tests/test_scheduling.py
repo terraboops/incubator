@@ -10,6 +10,16 @@ import pytest
 from incubator.core.registry import AgentConfig, Registry
 from incubator.orchestrator.pool import PoolManager, WindowState, RoleHealth
 
+_MOCK_PIPELINE = {"stages": ["ideation", "implementation", "validation", "release"], "post_ready": [], "gating": {"default": "auto"}}
+
+
+def _mock_registry(max_concurrent=1):
+    reg = MagicMock()
+    agent_mock = MagicMock()
+    agent_mock.max_concurrent = max_concurrent
+    reg.get_agent.return_value = agent_mock
+    return reg
+
 
 @pytest.fixture
 def pool_with_ideas(tmp_path):
@@ -20,6 +30,8 @@ def pool_with_ideas(tmp_path):
         project_root=tmp_path,
     )
     pm.blackboard = MagicMock()
+    pm.blackboard.has_pending_feedback.return_value = False
+    pm.registry = _mock_registry()
     pm.lock_manager = MagicMock()
     pm.roles = ["ideation", "implementation", "validation"]
     pm.role_health = defaultdict(RoleHealth)
@@ -68,7 +80,7 @@ def test_killed_ideas_excluded(pool_with_ideas):
     pm.blackboard.list_ideas.return_value = ["alive", "dead"]
     pm.blackboard.get_status.side_effect = lambda id: (
         {"id": id, "phase": "killed", "priority_score": 9.0} if id == "dead"
-        else {"id": id, "phase": "ideation", "priority_score": 5.0}
+        else {"id": id, "phase": "ideation", "priority_score": 5.0, "pipeline": _MOCK_PIPELINE}
     )
     ideas = pm._get_active_ideas()
     assert len(ideas) == 1
@@ -87,7 +99,7 @@ def test_mid_window_idea_creation(pool_with_ideas):
     # Second call: idea appeared
     pm.blackboard.list_ideas.return_value = ["new-idea"]
     pm.blackboard.get_status.return_value = {
-        "id": "new-idea", "phase": "submitted", "priority_score": 7.0,
+        "id": "new-idea", "phase": "submitted", "priority_score": 7.0, "pipeline": _MOCK_PIPELINE,
     }
     ideas2 = pm._get_active_ideas()
     assert len(ideas2) == 1
@@ -227,8 +239,8 @@ def test_early_stage_boost(pool_with_ideas):
     pm = pool_with_ideas
     pm.blackboard.list_ideas.return_value = ["new", "mature"]
     pm.blackboard.get_status.side_effect = lambda id: (
-        {"id": id, "phase": "submitted", "priority_score": 5.0} if id == "new"
-        else {"id": id, "phase": "implementation", "priority_score": 5.0}
+        {"id": id, "phase": "submitted", "priority_score": 5.0, "pipeline": _MOCK_PIPELINE} if id == "new"
+        else {"id": id, "phase": "implementation", "priority_score": 5.0, "pipeline": _MOCK_PIPELINE}
     )
     ideas = pm._get_active_ideas()
     new_idea = next(i for i in ideas if i["id"] == "new")

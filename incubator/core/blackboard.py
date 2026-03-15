@@ -106,6 +106,13 @@ class Blackboard:
     def idea_dir(self, idea_id: str) -> Path:
         return self.base_dir / idea_id
 
+    def delete_idea(self, idea_id: str) -> None:
+        """Permanently delete an idea and all its artifacts."""
+        import shutil
+        idea_path = self.base_dir / idea_id
+        if idea_path.exists() and idea_path.is_dir() and idea_id != "_template":
+            shutil.rmtree(idea_path)
+
     def file_exists(self, idea_id: str, filename: str) -> bool:
         return (self.base_dir / idea_id / filename).exists()
 
@@ -151,6 +158,13 @@ class Blackboard:
         """Check if all pipeline stages have been completed."""
         return self.next_stage(idea_id) is None
 
+    def pending_post_ready(self, idea_id: str) -> list[str]:
+        """Return post_ready roles that haven't been serviced yet."""
+        pipeline = self.get_pipeline(idea_id)
+        status = self.get_status(idea_id)
+        serviced = status.get("last_serviced_by", {})
+        return [r for r in pipeline.get("post_ready", []) if r not in serviced]
+
     def get_gating_mode(self, idea_id: str, role: str) -> str:
         """Get the gating mode for a specific agent role on this idea."""
         pipeline = self.get_pipeline(idea_id)
@@ -161,3 +175,41 @@ class Blackboard:
         """Check if a role is in this idea's pipeline (stages or post_ready)."""
         pipeline = self.get_pipeline(idea_id)
         return role in pipeline.get("stages", []) or role in pipeline.get("post_ready", [])
+
+    # ── Feedback helpers ────────────────────────────────────────────
+
+    def _load_feedback(self, idea_id: str) -> list[dict]:
+        try:
+            raw = self.read_file(idea_id, "feedback.json")
+            data = json.loads(raw)
+            return data if isinstance(data, list) else []
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+    def _save_feedback(self, idea_id: str, entries: list[dict]) -> None:
+        self.write_file(idea_id, "feedback.json", json.dumps(entries, indent=2))
+
+    def get_pending_feedback(self, idea_id: str, role: str) -> list[dict]:
+        """Return feedback entries where role is pending but hasn't acknowledged."""
+        entries = self._load_feedback(idea_id)
+        return [
+            e for e in entries
+            if role in e.get("pending_agents", [])
+            and role not in e.get("acknowledged_by", [])
+        ]
+
+    def has_pending_feedback(self, idea_id: str, role: str) -> bool:
+        """Quick check: does this role have unacknowledged feedback on this idea?"""
+        return len(self.get_pending_feedback(idea_id, role)) > 0
+
+    def acknowledge_feedback(self, idea_id: str, feedback_id: str, role: str) -> bool:
+        """Mark a feedback entry as acknowledged by a role. Returns True if found."""
+        entries = self._load_feedback(idea_id)
+        for entry in entries:
+            if entry.get("id") == feedback_id:
+                ack = entry.setdefault("acknowledged_by", [])
+                if role not in ack:
+                    ack.append(role)
+                self._save_feedback(idea_id, entries)
+                return True
+        return False

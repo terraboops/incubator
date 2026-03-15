@@ -324,16 +324,15 @@ def serve(
 
     import uvicorn
 
+    from incubator.web.api.app import set_pool_enabled, create_app
+
     if not no_pool:
-        from incubator.web.api.app import set_pool_enabled
         set_pool_enabled(True)
 
     uvicorn.run(
-        "incubator.web.api.app:create_app",
+        create_app(),
         host=host or settings.web_host,
         port=port or settings.web_port,
-        factory=True,
-        reload=False,
     )
 
 

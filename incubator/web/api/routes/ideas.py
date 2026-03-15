@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
+from datetime import datetime, timezone
 
 import re
 
 import markdown
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from incubator.config import get_settings
@@ -68,6 +70,19 @@ def _cadence_label(cron: str) -> str:
 
 templates.env.filters["cadence_label"] = _cadence_label
 
+_ROLE_LABELS = {
+    "ideation": "ideation",
+    "implementation": "build",
+    "validation": "validate",
+    "release": "release",
+    "competitive-watcher": "competitive",
+    "research-watcher": "research",
+    "prioritizer": "prioritize",
+}
+
+
+templates.env.filters["role_label"] = lambda r: _ROLE_LABELS.get(r, r.replace("-watcher", "").replace("-", " "))
+
 
 def _get_blackboard() -> Blackboard:
     return Blackboard(get_settings().blackboard_dir)
@@ -85,13 +100,91 @@ def _get_registered_roles() -> set[str]:
     return {a.name for a in registry.agents.values()}
 
 
+def _load_pool_serviced() -> set[tuple[str, str]]:
+    """Read pool/state.json and return the set of (role, idea_id) serviced this window."""
+    state_path = get_settings().project_root / "pool" / "state.json"
+    if not state_path.exists():
+        return set()
+    try:
+        state = json.loads(state_path.read_text())
+        window = state.get("current_window", {})
+        return {
+            (p["role"], p["idea_id"])
+            for p in window.get("serviced", [])
+            if "role" in p and "idea_id" in p
+        }
+    except (json.JSONDecodeError, OSError):
+        return set()
+
+
+def _compute_scheduling(bb: Blackboard, idea: dict, roles: list[str],
+                        serviced: set[tuple[str, str]]) -> list[dict]:
+    """Compute which roles an idea is eligible for in the current cycle.
+
+    Shows all potential assignments (pipeline + feedback) for display purposes.
+    The pool enforces "1 agent per idea at a time" at dispatch time.
+
+    Returns a list of dicts: {role, reason, serviced}
+    """
+    idea_id = idea.get("id", idea.get("idea_id", ""))
+    phase = idea.get("phase", "submitted")
+    terminal = {"killed", "paused"}
+    if phase in terminal or phase.endswith("_review"):
+        return []
+    if phase == "released" and not bb.pending_post_ready(idea_id):
+        return []
+
+    eligible = []
+    is_ready = bb.is_ready(idea_id)
+
+    # Pipeline eligibility: next stage or post_ready roles
+    if not is_ready:
+        next_role = bb.next_stage(idea_id)
+        if next_role and next_role in roles:
+            already = (next_role, idea_id) in serviced
+            eligible.append({
+                "role": next_role,
+                "reason": "next stage",
+                "serviced": already,
+            })
+    else:
+        # Ready — show pending post_ready roles
+        for post_role in bb.pending_post_ready(idea_id):
+            if post_role in roles:
+                already = (post_role, idea_id) in serviced
+                eligible.append({
+                    "role": post_role,
+                    "reason": "post-ready",
+                    "serviced": already,
+                })
+
+    # Feedback eligibility: any role with pending feedback
+    for role in roles:
+        if any(e["role"] == role for e in eligible):
+            continue
+        if bb.has_pending_feedback(idea_id, role):
+            already = (role, idea_id) in serviced
+            eligible.append({
+                "role": role,
+                "reason": "feedback",
+                "serviced": already,
+            })
+
+    return eligible
+
+
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     bb = _get_blackboard()
+    registry = load_registry(get_settings().registry_path)
+    roles = [a.name for a in registry.agents.values() if a.status == "active"]
+    serviced = _load_pool_serviced()
+
     ideas = []
     for idea_id in bb.list_ideas():
         status = bb.get_status(idea_id)
         status["idea_id"] = idea_id
+        status["_scheduling"] = _compute_scheduling(bb, status, roles, serviced)
         ideas.append(status)
     ideas.sort(key=lambda x: x.get("priority_score", 0), reverse=True)
     return templates.TemplateResponse("home.html", {"request": request, "ideas": ideas})
@@ -115,7 +208,12 @@ async def create_idea(
     preset: str = Form("full-pipeline"),
 ):
     bb = _get_blackboard()
-    idea_id = bb.create_idea(title, description)
+    try:
+        idea_id = bb.create_idea(title, description)
+    except FileExistsError:
+        # Idea with this slug already exists — redirect to it
+        from incubator.core.blackboard import slugify
+        return RedirectResponse(url=f"/ideas/{slugify(title)}", status_code=303)
     presets = _load_presets()
     preset_data = presets.get(preset, presets.get("full-pipeline", {}))
     if preset_data:
@@ -153,7 +251,7 @@ async def idea_detail(request: Request, idea_id: str):
     for f in sorted(idea_dir.iterdir()):
         if f.is_dir():
             continue  # skip agent-logs/ directory
-        if f.name == "status.json":
+        if f.name in ("status.json", "feedback.json", "questions.json", "artifact-manifest.json"):
             continue
         content = f.read_text()
         is_empty = len(content.strip().split("\n")) <= 1
@@ -210,6 +308,10 @@ async def idea_detail(request: Request, idea_id: str):
     pipeline = bb.get_pipeline(idea_id)
     registered_roles = _get_registered_roles()
 
+    # Load feedback and questions
+    feedback_entries = _load_feedback(bb, idea_id)
+    question_entries = _load_questions(bb, idea_id)
+
     return templates.TemplateResponse(
         "idea_detail.html",
         {
@@ -223,6 +325,8 @@ async def idea_detail(request: Request, idea_id: str):
             "stop_requested": stop_requested,
             "pipeline": pipeline,
             "registered_roles": sorted(registered_roles),
+            "feedback_entries": feedback_entries,
+            "question_entries": question_entries,
         },
     )
 
@@ -267,6 +371,13 @@ async def idea_action(
             await orch.run_continuous_for_idea(idea_id)
 
         asyncio.create_task(_run())
+    elif action == "dismiss_review":
+        bb.update_status(idea_id, needs_human_review=False, review_reason=None)
+    elif action == "delete":
+        status = bb.get_status(idea_id)
+        if status.get("phase") == "killed":
+            bb.delete_idea(idea_id)
+            return RedirectResponse(url="/", status_code=303)
     elif action == "resurrect":
         from incubator.core.phase import Phase
         bb.set_phase(idea_id, Phase.SUBMITTED)
@@ -362,3 +473,188 @@ async def api_list_ideas():
 async def api_get_idea(idea_id: str):
     bb = _get_blackboard()
     return bb.get_status(idea_id)
+
+
+# ── Feedback ────────────────────────────────────────────────────────
+
+
+def _load_feedback(bb: Blackboard, idea_id: str) -> list[dict]:
+    try:
+        raw = bb.read_file(idea_id, "feedback.json")
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _save_feedback(bb: Blackboard, idea_id: str, entries: list[dict]) -> None:
+    bb.write_file(idea_id, "feedback.json", json.dumps(entries, indent=2))
+
+
+@router.post("/api/ideas/{idea_id}/feedback")
+async def submit_feedback(
+    idea_id: str,
+    artifact: str = Form(""),
+    selected_text: str = Form(""),
+    comment: str = Form(""),
+):
+    if not comment.strip():
+        return JSONResponse({"error": "Comment is required"}, status_code=400)
+
+    bb = _get_blackboard()
+    entries = _load_feedback(bb, idea_id)
+
+    # Determine which agents should process this feedback:
+    # all roles that have previously serviced this idea.
+    status = bb.get_status(idea_id)
+    pending_agents = list(status.get("last_serviced_by", {}).keys())
+
+    entry = {
+        "id": str(uuid.uuid4())[:8],
+        "artifact": artifact,
+        "selected_text": selected_text.strip(),
+        "comment": comment.strip(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "pending_agents": pending_agents,
+        "acknowledged_by": [],
+    }
+    entries.append(entry)
+    _save_feedback(bb, idea_id, entries)
+    return JSONResponse({"ok": True, "entry": entry})
+
+
+@router.get("/api/ideas/{idea_id}/feedback")
+async def list_feedback(idea_id: str):
+    bb = _get_blackboard()
+    return _load_feedback(bb, idea_id)
+
+
+# ── Questions ───────────────────────────────────────────────────────
+
+
+def _load_questions(bb: Blackboard, idea_id: str) -> list[dict]:
+    try:
+        raw = bb.read_file(idea_id, "questions.json")
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _save_questions(bb: Blackboard, idea_id: str, entries: list[dict]) -> None:
+    bb.write_file(idea_id, "questions.json", json.dumps(entries, indent=2))
+
+
+def _build_artifact_context(bb: Blackboard, idea_id: str) -> str:
+    """Build a context string from all blackboard artifacts for the question agent."""
+    idea_dir = bb.idea_dir(idea_id)
+    parts = []
+    for f in sorted(idea_dir.iterdir()):
+        if f.is_dir() or f.name in ("status.json", "feedback.json", "questions.json"):
+            continue
+        content = f.read_text()
+        if not content.strip():
+            continue
+        # Truncate very large files
+        if len(content) > 20_000:
+            content = content[:20_000] + "\n\n[... truncated]"
+        parts.append(f"### {f.name}\n{content}")
+    return "\n\n---\n\n".join(parts)
+
+
+async def _generate_multi_perspective_answer(
+    question: str, artifact_context: str, feedback_context: str,
+) -> dict:
+    """Call Claude Agent SDK to generate a multi-perspective answer."""
+    from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage
+
+    system = (
+        "You are a panel of expert advisors analyzing an incubated idea. "
+        "You have access to all artifacts produced by the agents that worked on this idea. "
+        "Answer the user's question from four distinct expert perspectives, then provide "
+        "an integrated synthesis.\n\n"
+        "Format your response EXACTLY as follows (use these exact headings):\n\n"
+        "## Research & Market\n[Analysis from the market research perspective]\n\n"
+        "## Technical\n[Analysis from the engineering/architecture perspective]\n\n"
+        "## Quality & Risk\n[Analysis from the QA/validation perspective]\n\n"
+        "## Launch & Strategy\n[Analysis from the go-to-market perspective]\n\n"
+        "## Synthesis\n[Integrated answer that weighs all perspectives and gives a clear, "
+        "actionable conclusion]\n\n"
+        "Be concise and specific. Reference actual data from the artifacts. "
+        "Do not use emoji."
+    )
+
+    user_msg = f"## Artifacts\n\n{artifact_context}"
+    if feedback_context:
+        user_msg += f"\n\n## Human Feedback\n\n{feedback_context}"
+    user_msg += f"\n\n## Question\n\n{question}"
+
+    answer_text = ""
+    async for message in query(
+        prompt=user_msg,
+        options=ClaudeAgentOptions(
+            system_prompt=system,
+            model="claude-sonnet-4-6",
+            max_turns=1,
+            allowed_tools=[],
+        ),
+    ):
+        if isinstance(message, ResultMessage):
+            answer_text = message.result or ""
+
+    return {
+        "answer": answer_text,
+        "model": "claude-sonnet-4-6",
+    }
+
+
+@router.post("/api/ideas/{idea_id}/question")
+async def submit_question(idea_id: str, question: str = Form("")):
+    if not question.strip():
+        return JSONResponse({"error": "Question is required"}, status_code=400)
+
+    bb = _get_blackboard()
+    artifact_context = _build_artifact_context(bb, idea_id)
+
+    # Include any existing feedback as context
+    feedback_entries = _load_feedback(bb, idea_id)
+    feedback_context = ""
+    if feedback_entries:
+        feedback_parts = []
+        for fb in feedback_entries:
+            part = f"- On **{fb['artifact']}**"
+            if fb.get("selected_text"):
+                part += f' (re: "{fb["selected_text"][:100]}")'
+            part += f": {fb['comment']}"
+            feedback_parts.append(part)
+        feedback_context = "\n".join(feedback_parts)
+
+    try:
+        result = await _generate_multi_perspective_answer(
+            question.strip(), artifact_context, feedback_context,
+        )
+    except Exception as e:
+        return JSONResponse(
+            {"error": f"Failed to generate answer: {e}"},
+            status_code=500,
+        )
+
+    entries = _load_questions(bb, idea_id)
+    entry = {
+        "id": str(uuid.uuid4())[:8],
+        "question": question.strip(),
+        "answer": result["answer"],
+        "model": result["model"],
+        "tokens": result.get("input_tokens", 0) + result.get("output_tokens", 0),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    entries.append(entry)
+    _save_questions(bb, idea_id, entries)
+
+    return JSONResponse({"ok": True, "entry": entry})
+
+
+@router.get("/api/ideas/{idea_id}/questions")
+async def list_questions(idea_id: str):
+    bb = _get_blackboard()
+    return _load_questions(bb, idea_id)
