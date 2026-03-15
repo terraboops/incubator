@@ -9,19 +9,18 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from incubator.config import get_settings
+from incubator.web.api.paths import TEMPLATES_DIR
 
 router = APIRouter()
-templates = Jinja2Templates(
-    directory=str(get_settings().project_root / "incubator" / "web" / "frontend" / "templates")
-)
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 def _global_prompt_path() -> Path:
-    return get_settings().project_root / "incubator" / "agents" / "global-system-prompt.md"
+    return get_settings().project_root / "global-system-prompt.md"
 
 
 def _agent_prompt_path(agent_name: str) -> Path:
-    return get_settings().project_root / "incubator" / "agents" / agent_name / "prompt.py"
+    return get_settings().project_root / "agents" / agent_name / "prompt.py"
 
 
 def _read_global_prompt() -> str:
@@ -64,7 +63,7 @@ def _write_agent_prompt(agent_name: str, prompt_text: str) -> None:
 def _gather_agent_prompts() -> list[dict]:
     """Gather all agent prompts for display."""
     settings = get_settings()
-    agents_dir = settings.project_root / "incubator" / "agents"
+    agents_dir = settings.project_root / "agents"
     prompts = []
     for agent_dir in sorted(agents_dir.iterdir()):
         if not agent_dir.is_dir() or agent_dir.name.startswith(("_", ".")):
