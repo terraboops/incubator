@@ -52,7 +52,8 @@ class AgentFactory:
 
         agent_class = self._agent_classes.get(role)
         if not agent_class:
-            raise ValueError(f"No agent class registered for role: {role}")
+            from incubator.core.agent import BaseAgent
+            agent_class = BaseAgent
 
         return agent_class(
             config=config,

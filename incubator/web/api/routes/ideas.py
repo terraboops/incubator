@@ -180,11 +180,29 @@ async def home(request: Request):
     roles = [a.name for a in registry.agents.values() if a.status == "active"]
     serviced = _load_pool_serviced()
 
+    pipeline_stages = {"ideation", "implementation", "validation", "release"}
+    auxiliary_roles = [r for r in roles if r not in pipeline_stages]
+
     ideas = []
     for idea_id in bb.list_ideas():
         status = bb.get_status(idea_id)
         status["idea_id"] = idea_id
         status["_scheduling"] = _compute_scheduling(bb, status, roles, serviced)
+        # Compute auxiliary agent status
+        aux_status = []
+        idea_dir = bb.base_dir / idea_id
+        for role in auxiliary_roles:
+            # Check if this agent has written any files for this idea
+            role_file = idea_dir / f"{role}.md"
+            role_dir = idea_dir / role
+            has_run = role_file.exists() or (role_dir.exists() and any(role_dir.iterdir()))
+            in_sched = next((s for s in status["_scheduling"] if s["role"] == role), None)
+            aux_status.append({
+                "role": role,
+                "done": has_run or (in_sched and in_sched.get("serviced", False)),
+                "pending": bool(in_sched and not in_sched.get("serviced", False)),
+            })
+        status["_auxiliary"] = aux_status
         ideas.append(status)
     ideas.sort(key=lambda x: x.get("priority_score", 0), reverse=True)
     return templates.TemplateResponse("home.html", {"request": request, "ideas": ideas})
