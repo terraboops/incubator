@@ -8,10 +8,22 @@ human checkpoints between phases.
 
 ![Ideas pipeline](docs/screenshots/dashboard-ideas.png)
 
-## Quick start
+## Install
+
+```bash
+brew tap terraboops/tap
+brew install incubator
+```
+
+Or from source:
 
 ```bash
 pip install .
+```
+
+## Quick start
+
+```bash
 incubator init myproject && cd myproject
 incubator serve                      # dashboard + agents at localhost:8000
 ```
