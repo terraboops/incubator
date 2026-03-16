@@ -100,31 +100,27 @@ def _get_registered_roles() -> set[str]:
     return {a.name for a in registry.agents.values()}
 
 
-def _load_pool_serviced() -> set[tuple[str, str]]:
-    """Read pool/state.json and return the set of (role, idea_id) serviced this window."""
+def _load_pool_running() -> set[tuple[str, str]]:
+    """Read pool/state.json and return the set of (role, idea_id) currently running."""
     state_path = get_settings().project_root / "pool" / "state.json"
     if not state_path.exists():
         return set()
     try:
         state = json.loads(state_path.read_text())
-        window = state.get("current_window", {})
         return {
-            (p["role"], p["idea_id"])
-            for p in window.get("serviced", [])
-            if "role" in p and "idea_id" in p
+            (w["role"], w.get("idea", ""))
+            for w in state.get("workers", [])
+            if w.get("status") == "active" and "role" in w
         }
     except (json.JSONDecodeError, OSError):
         return set()
 
 
 def _compute_scheduling(bb: Blackboard, idea: dict, roles: list[str],
-                        serviced: set[tuple[str, str]]) -> list[dict]:
-    """Compute which roles an idea is eligible for in the current cycle.
+                        running: set[tuple[str, str]]) -> list[dict]:
+    """Compute which roles an idea is eligible for.
 
-    Shows all potential assignments (pipeline + feedback) for display purposes.
-    The pool enforces "1 agent per idea at a time" at dispatch time.
-
-    Returns a list of dicts: {role, reason, serviced}
+    Returns a list of dicts: {role, reason, running}
     """
     idea_id = idea.get("id", idea.get("idea_id", ""))
     phase = idea.get("phase", "submitted")
@@ -137,37 +133,31 @@ def _compute_scheduling(bb: Blackboard, idea: dict, roles: list[str],
     eligible = []
     is_ready = bb.is_ready(idea_id)
 
-    # Pipeline eligibility: next stage or post_ready roles
     if not is_ready:
-        next_role = bb.next_stage(idea_id)
+        next_role = bb.next_agent(idea_id)
         if next_role and next_role in roles:
-            already = (next_role, idea_id) in serviced
             eligible.append({
                 "role": next_role,
-                "reason": "next stage",
-                "serviced": already,
+                "reason": "next agent",
+                "running": (next_role, idea_id) in running,
             })
     else:
-        # Ready — show pending post_ready roles
         for post_role in bb.pending_post_ready(idea_id):
             if post_role in roles:
-                already = (post_role, idea_id) in serviced
                 eligible.append({
                     "role": post_role,
                     "reason": "post-ready",
-                    "serviced": already,
+                    "running": (post_role, idea_id) in running,
                 })
 
-    # Feedback eligibility: any role with pending feedback
     for role in roles:
         if any(e["role"] == role for e in eligible):
             continue
         if bb.has_pending_feedback(idea_id, role):
-            already = (role, idea_id) in serviced
             eligible.append({
                 "role": role,
                 "reason": "feedback",
-                "serviced": already,
+                "running": (role, idea_id) in running,
             })
 
     return eligible
@@ -178,7 +168,7 @@ async def home(request: Request):
     bb = _get_blackboard()
     registry = load_registry(get_settings().registry_path)
     roles = [a.name for a in registry.agents.values() if a.status == "active"]
-    serviced = _load_pool_serviced()
+    pool_running = _load_pool_running()
 
     pipeline_stages = {"ideation", "implementation", "validation", "release"}
     auxiliary_roles = [r for r in roles if r not in pipeline_stages]
@@ -187,20 +177,22 @@ async def home(request: Request):
     for idea_id in bb.list_ideas():
         status = bb.get_status(idea_id)
         status["idea_id"] = idea_id
-        status["_scheduling"] = _compute_scheduling(bb, status, roles, serviced)
+        status["_scheduling"] = _compute_scheduling(bb, status, roles, pool_running)
+        # Mark idea as running if any worker is active on it
+        if any(idea_id == rid for _, rid in pool_running):
+            status["running"] = True
         # Compute auxiliary agent status
         aux_status = []
         idea_dir = bb.base_dir / idea_id
         for role in auxiliary_roles:
-            # Check if this agent has written any files for this idea
             role_file = idea_dir / f"{role}.md"
             role_dir = idea_dir / role
             has_run = role_file.exists() or (role_dir.exists() and any(role_dir.iterdir()))
-            in_sched = next((s for s in status["_scheduling"] if s["role"] == role), None)
+            is_running = (role, idea_id) in pool_running
             aux_status.append({
                 "role": role,
-                "done": has_run or (in_sched and in_sched.get("serviced", False)),
-                "pending": bool(in_sched and not in_sched.get("serviced", False)),
+                "done": has_run and not is_running,
+                "pending": is_running,
             })
         status["_auxiliary"] = aux_status
         ideas.append(status)
@@ -436,8 +428,9 @@ async def update_pipeline(
         overrides = {}
 
     pipeline = {
-        "stages": stage_list,
+        "agents": stage_list,
         "post_ready": post_ready_list,
+        "parallel_groups": [stage_list] + ([post_ready_list] if post_ready_list else []),
         "gating": {"default": gating_default, "overrides": overrides},
     }
     bb.set_pipeline(idea_id, pipeline)

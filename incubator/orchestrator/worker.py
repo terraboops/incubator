@@ -1,10 +1,7 @@
-"""Worker: executes a single agent run with cooperative deadline cancellation.
+"""Worker: executes a single agent run with timeout-based cancellation.
 
-The deadline flow follows the spec:
-1. Agent runs with deadline context in system prompt
-2. At deadline - 2 minutes: interrupt agent, send "hurry up" follow-up
-3. At deadline: force-terminate if still running
-4. Tag run as DEADLINE or OK
+Timeout comes from job_timeout_minutes in config (default 60 min),
+replacing the old window-deadline approach.
 """
 
 from __future__ import annotations
@@ -24,8 +21,6 @@ logger = logging.getLogger(__name__)
 
 MIN_TURNS = 4
 TURNS_PER_MINUTE = 2
-HURRY_UP_BUFFER_SECONDS = 120  # 2 minutes before deadline
-HURRY_UP_MAX_TURNS = 3
 
 
 class RunStatus(enum.Enum):
@@ -50,13 +45,7 @@ class RunResult:
 
 
 class Worker:
-    """A single worker slot that executes agent runs with deadlines.
-
-    Uses cooperative cancellation via ClaudeSDKClient.interrupt():
-    - Primary run uses max_turns calculated from remaining time
-    - At deadline-2min: interrupt + "save progress" follow-up query
-    - At deadline: force-terminate
-    """
+    """A single worker slot that executes agent runs with timeouts."""
 
     def __init__(
         self,
@@ -77,29 +66,27 @@ class Worker:
     def is_idle(self) -> bool:
         return self.current_role is None
 
-    def _calculate_max_turns(self, remaining_minutes: int) -> int:
-        """Calculate max_turns from remaining window time."""
-        return max(MIN_TURNS, remaining_minutes * TURNS_PER_MINUTE)
+    def _calculate_max_turns(self, timeout_minutes: int) -> int:
+        """Calculate max_turns from timeout."""
+        return max(MIN_TURNS, timeout_minutes * TURNS_PER_MINUTE)
 
-    async def execute(
-        self, role: str, idea_id: str, deadline: datetime
-    ) -> RunResult | None:
-        """Execute an agent run with cooperative deadline cancellation.
+    async def execute(self, job, timeout_seconds: float) -> RunResult | None:
+        """Execute an agent run with timeout.
+
+        Args:
+            job: Job instance with role, idea_id, etc.
+            timeout_seconds: Maximum time for this job in seconds.
 
         Returns None if lock cannot be acquired.
-
-        Flow:
-        1. Acquire lock, create agent with deadline-aware prompt
-        2. Run agent via ClaudeSDKClient
-        3. Schedule hurry-up interrupt at deadline - 2min
-        4. If agent finishes before deadline -> OK
-        5. If hurry-up fires -> interrupt, send follow-up, wait for deadline
-        6. If deadline fires -> force-terminate -> DEADLINE
         """
-        # Global agents (phase="*") don't lock a specific idea
-        if idea_id != "__all__":
-            if not self.lock_manager.acquire("pool", idea_id, executor=f"worker-{self.worker_id}"):
-                logger.warning("Worker %d: lock unavailable for %s", self.worker_id, idea_id)
+        role = job.role
+        idea_id = job.idea_id
+
+        # Lock keyed by role:idea_id so different agents can run on the same idea
+        lock_id = f"{role}:{idea_id}" if idea_id != "__all__" else None
+        if lock_id:
+            if not self.lock_manager.acquire("pool", lock_id, executor=f"worker-{self.worker_id}"):
+                logger.warning("Worker %d: lock unavailable for %s on %s", self.worker_id, role, idea_id)
                 return None
 
         self.current_role = role
@@ -108,23 +95,22 @@ class Worker:
         start_time = time.monotonic()
 
         try:
-            remaining = (deadline - datetime.now(timezone.utc)).total_seconds()
-            remaining_minutes = max(0, int(remaining / 60))
-            max_turns = self._calculate_max_turns(remaining_minutes)
+            timeout_minutes = max(1, int(timeout_seconds / 60))
+            max_turns = self._calculate_max_turns(timeout_minutes)
+            from datetime import timedelta
+            deadline = datetime.now(timezone.utc) + timedelta(seconds=timeout_seconds)
 
             logger.info(
-                "Worker %d: starting %s on %s (max_turns=%d, deadline in %dm)",
-                self.worker_id, role, idea_id, max_turns, remaining_minutes,
+                "Worker %d: starting %s on %s (max_turns=%d, timeout=%dm)",
+                self.worker_id, role, idea_id, max_turns, timeout_minutes,
             )
 
             agent = self.factory.create_agent(role)
 
-            # Run agent -- BaseAgent.run() handles ClaudeSDKClient lifecycle,
-            # including deadline context in the system prompt and interrupt support
             try:
                 result = await asyncio.wait_for(
                     agent.run(idea_id, max_turns_override=max_turns, deadline=deadline),
-                    timeout=remaining,
+                    timeout=timeout_seconds,
                 )
                 elapsed = time.monotonic() - start_time
                 return RunResult(
@@ -137,7 +123,7 @@ class Worker:
             except asyncio.TimeoutError:
                 elapsed = time.monotonic() - start_time
                 logger.warning(
-                    "Worker %d: %s on %s hit deadline after %.0fs",
+                    "Worker %d: %s on %s hit timeout after %.0fs",
                     self.worker_id, role, idea_id, elapsed,
                 )
                 return RunResult(
@@ -158,8 +144,8 @@ class Worker:
                 error=str(e),
             )
         finally:
-            if idea_id != "__all__":
-                self.lock_manager.release("pool", idea_id)
+            if lock_id:
+                self.lock_manager.release("pool", lock_id)
             self.current_role = None
             self.current_idea = None
             self.started_at = None

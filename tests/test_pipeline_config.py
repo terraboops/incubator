@@ -8,8 +8,12 @@ import pytest
 from incubator.core.blackboard import Blackboard
 
 DEFAULT_PIPELINE = {
-    "stages": ["ideation", "implementation", "validation", "release"],
-    "post_ready": ["competitive", "research"],
+    "agents": ["ideation", "implementation", "validation", "release"],
+    "post_ready": ["competitive-watcher", "research-watcher"],
+    "parallel_groups": [
+        ["ideation", "implementation", "validation", "release"],
+        ["competitive-watcher", "research-watcher"],
+    ],
     "gating": {"default": "auto", "overrides": {}},
     "preset": "full-pipeline",
 }
@@ -32,7 +36,7 @@ def test_get_pipeline_returns_default_when_missing(bb):
     """Ideas without pipeline config get the default pipeline."""
     idea_id = bb.create_idea("Test Idea", "Description")
     pipeline = bb.get_pipeline(idea_id)
-    assert pipeline["stages"] == ["ideation", "implementation", "validation", "release"]
+    assert pipeline["agents"] == ["ideation", "implementation", "validation", "release"]
     assert pipeline["gating"]["default"] == "auto"
 
 
@@ -40,11 +44,11 @@ def test_get_pipeline_default_is_deep_copy(bb):
     """Modifying returned default doesn't corrupt the module-level DEFAULT_PIPELINE."""
     idea_id = bb.create_idea("Test Idea", "Description")
     pipeline = bb.get_pipeline(idea_id)
-    pipeline["stages"].append("custom-agent")
+    pipeline["agents"].append("custom-agent")
     pipeline["gating"]["overrides"]["release"] = "human-review"
     # Re-fetch — should be clean default again
     pipeline2 = bb.get_pipeline(idea_id)
-    assert "custom-agent" not in pipeline2["stages"]
+    assert "custom-agent" not in pipeline2["agents"]
     assert "release" not in pipeline2["gating"]["overrides"]
 
 
@@ -52,14 +56,15 @@ def test_set_pipeline(bb):
     """Setting pipeline config persists to status.json."""
     idea_id = bb.create_idea("Test Idea", "Description")
     custom = {
-        "stages": ["ideation", "validation"],
+        "agents": ["ideation", "validation"],
         "post_ready": [],
+        "parallel_groups": [["ideation", "validation"]],
         "gating": {"default": "llm-decides", "overrides": {}},
         "preset": "quick-validate",
     }
     bb.set_pipeline(idea_id, custom)
     pipeline = bb.get_pipeline(idea_id)
-    assert pipeline["stages"] == ["ideation", "validation"]
+    assert pipeline["agents"] == ["ideation", "validation"]
     assert pipeline["gating"]["default"] == "llm-decides"
 
 
@@ -164,9 +169,9 @@ def test_get_gating_mode_uses_override(bb):
 
 
 def test_pipeline_has_role(bb):
-    """pipeline_has_role() checks stages and post_ready."""
+    """pipeline_has_role() checks agents and post_ready."""
     idea_id = bb.create_idea("Test Idea", "Description")
     bb.set_pipeline(idea_id, DEFAULT_PIPELINE)
     assert bb.pipeline_has_role(idea_id, "ideation") is True
-    assert bb.pipeline_has_role(idea_id, "competitive") is True
+    assert bb.pipeline_has_role(idea_id, "competitive-watcher") is True
     assert bb.pipeline_has_role(idea_id, "nonexistent") is False

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import datetime, timezone
 
 from incubator.comms.notifications import NotificationDispatcher
 from incubator.config import Settings
@@ -62,12 +63,17 @@ class Orchestrator:
         )
 
     async def incubate(self, title: str, description: str) -> str:
-        """Create a new idea and run it through the pipeline."""
+        """Create a new idea and set up its pipeline. Pool handles execution."""
         idea_id = self.blackboard.create_idea(title, description)
+
+        # Set default pipeline config
+        from incubator.core.blackboard import DEFAULT_PIPELINE
+        import json
+        pipeline = json.loads(json.dumps(DEFAULT_PIPELINE))
+        self.blackboard.set_pipeline(idea_id, pipeline)
+
         await self.dispatcher.notify(f"🆕 New idea: *{idea_id}*\n\n{description[:200]}")
         await _broadcast("idea_created", idea_id=idea_id, title=title)
-
-        await self._run_pipeline(idea_id)
         return idea_id
 
     async def run_continuous_for_idea(self, idea_id: str) -> None:
@@ -186,17 +192,26 @@ class Orchestrator:
             )
 
             if not result.success:
-                await self.dispatcher.notify_error(
-                    idea_id, result.error or "Agent failed without error message"
+                error_msg = result.error or "Agent failed without error message"
+                self.blackboard.update_status(
+                    idea_id,
+                    last_error=error_msg,
+                    last_error_agent=agent_name,
+                    last_error_at=datetime.now(timezone.utc).isoformat(),
                 )
+                await self.dispatcher.notify_error(idea_id, error_msg)
                 await _broadcast(
                     "activity",
                     idea_id=idea_id,
-                    message=f"{agent_name} agent failed: {result.error or 'unknown error'}",
+                    message=f"{agent_name} agent failed: {error_msg}",
                     kind="error",
                 )
                 return None
 
+            # Clear any previous error state on success
+            self.blackboard.update_status(
+                idea_id, last_error=None, last_error_agent=None, last_error_at=None
+            )
             await _broadcast(
                 "activity",
                 idea_id=idea_id,
@@ -326,7 +341,7 @@ class Orchestrator:
         logger.info("Transitioned %s: %s -> %s", idea_id, from_phase.value, to_phase.value)
 
     async def resume(self, idea_id: str) -> None:
-        """Resume a paused idea from its current phase."""
+        """Resume a paused idea — sets phase so pool picks it up."""
         status = self.blackboard.get_status(idea_id)
         current = Phase(status["phase"])
         if current != Phase.PAUSED:
@@ -342,7 +357,6 @@ class Orchestrator:
 
         if last_agent_phase:
             await self._transition(idea_id, last_agent_phase)
-            await self._run_pipeline(idea_id)
 
     async def kill(self, idea_id: str) -> None:
         """Kill an idea."""

@@ -94,7 +94,7 @@ def incubate(
     title: str = typer.Argument(help="Idea title"),
     description: str = typer.Option("", "--desc", "-d", help="Idea description"),
 ) -> None:
-    """Submit a new idea and run it through the pipeline."""
+    """Submit a new idea and start the pool to process it."""
     if not description:
         description = typer.prompt("Describe your idea")
 
@@ -102,12 +102,21 @@ def incubate(
 
     async def _run():
         from incubator.orchestrator.orchestrator import Orchestrator
+        from incubator.orchestrator.pool import PoolManager
 
         orch = Orchestrator(settings)
         idea_id = await orch.incubate(title, description)
-        console.print(f"[green]Idea '{idea_id}' submitted and pipeline started.[/green]")
+        console.print(f"[green]Idea '{idea_id}' submitted.[/green]")
 
-    asyncio.run(_run())
+        pool = PoolManager(settings)
+        console.print("[dim]Starting pool to process idea...[/dim]")
+        console.print("[dim]Press Ctrl+C to stop.[/dim]")
+        await pool.run()
+
+    try:
+        asyncio.run(_run())
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Pool stopped.[/yellow]")
 
 
 @app.command()
@@ -158,7 +167,7 @@ def list_ideas() -> None:
 
 @app.command()
 def resume(idea_id: str = typer.Argument(help="Idea slug to resume")) -> None:
-    """Resume a paused idea."""
+    """Resume a paused idea (pool will pick it up)."""
     settings = get_settings()
 
     async def _run():
@@ -166,7 +175,7 @@ def resume(idea_id: str = typer.Argument(help="Idea slug to resume")) -> None:
 
         orch = Orchestrator(settings)
         await orch.resume(idea_id)
-        console.print(f"[green]Resumed '{idea_id}'.[/green]")
+        console.print(f"[green]Resumed '{idea_id}'. Pool will pick it up on next cycle.[/green]")
 
     asyncio.run(_run())
 
@@ -182,44 +191,6 @@ def kill(idea_id: str = typer.Argument(help="Idea slug to kill")) -> None:
         orch = Orchestrator(settings)
         await orch.kill(idea_id)
         console.print(f"[red]Killed '{idea_id}'.[/red]")
-
-    asyncio.run(_run())
-
-
-@app.command()
-def watch() -> None:
-    """Start background watchers (competitive + research)."""
-    settings = get_settings()
-
-    async def _run():
-        from incubator.orchestrator.orchestrator import Orchestrator
-        from incubator.orchestrator.scheduler import Scheduler
-        from incubator.agents.watchers.competitive import run_competitive_watcher
-        from incubator.agents.watchers.research import run_research_watcher
-
-        orch = Orchestrator(settings)
-        scheduler = Scheduler(settings)
-
-        watchers = [
-            {
-                "name": "competitive",
-                "cron": settings.watcher_competitive_cron,
-                "callback": lambda: run_competitive_watcher(orch),
-            },
-            {
-                "name": "research",
-                "cron": settings.watcher_research_cron,
-                "callback": lambda: run_research_watcher(orch),
-            },
-        ]
-
-        console.print("[green]Starting watchers...[/green]")
-        await scheduler.start(watchers)
-
-        try:
-            await asyncio.Event().wait()  # Run forever
-        except asyncio.CancelledError:
-            await scheduler.stop()
 
     asyncio.run(_run())
 
@@ -252,7 +223,7 @@ def run() -> None:
 
         pool = PoolManager(settings)
         console.print("[green]Starting worker pool...[/green]")
-        console.print(f"[dim]Pool size: {settings.pool_size}, cycle time: {settings.cycle_time_minutes}m[/dim]")
+        console.print(f"[dim]Pool size: {settings.pool_size}, job timeout: {settings.job_timeout_minutes}m[/dim]")
         console.print("[dim]Press Ctrl+C to stop.[/dim]")
         await pool.run()
 
