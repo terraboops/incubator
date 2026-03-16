@@ -1,104 +1,76 @@
-"""PoolManager: cycle clock, role rotation, scheduling, state snapshots."""
+"""PoolManager: continuous priority-queue scheduler for agent work.
+
+Design verified by TLA+ model checking (specs/pool_scheduler.tla).
+The pool is the single executor — no competing orchestrator pipeline.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import os
 import tempfile
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 
 from incubator.config import Settings
 from incubator.core.blackboard import Blackboard
 from incubator.core.lock import LockManager
 from incubator.core.registry import load_registry
+from incubator.orchestrator.job_queue import (
+    Job, JobQueue, CadenceTracker,
+    compute_priority,
+    PRIORITY_DEFAULT, PRIORITY_EARLY_BOOST, MAX_BACKGROUND_PRIORITY,
+)
 from incubator.orchestrator.worker import Worker, RunResult, RunStatus
 
 logger = logging.getLogger(__name__)
 
 SNAPSHOT_INTERVAL_SECONDS = 10
-PRIORITY_DEFAULT = 5.0
-PRIORITY_EARLY_BOOST = 1.0
-STARVATION_THRESHOLD = 0.5
-DEADLINE_WARNING_THRESHOLD = 2
 MAX_ITERATE_PER_STAGE = 3
+POOL_LOCK_FILE = ".pool.lock"
 
 
-@dataclass
-class WindowState:
-    """Tracks state within a single cycle window."""
-    started_at: datetime
-    cycle_time_minutes: int
-    serviced: set[tuple[str, str]] = field(default_factory=set)
+def can_schedule(
+    role: str,
+    idea_id: str,
+    running_jobs: set[tuple[str, str]],
+    pipeline: dict,
+) -> bool:
+    """Check if (role, idea_id) can run given what's already running.
 
-    @property
-    def deadline(self) -> datetime:
-        return self.started_at + timedelta(minutes=self.cycle_time_minutes)
+    Agents in the same parallel_group are serialized on the same idea.
+    Agents in different groups can overlap.
+    """
+    if idea_id == "__all__":
+        return True
 
-    @property
-    def is_expired(self) -> bool:
-        return datetime.now(timezone.utc) > self.deadline
+    groups = pipeline.get("parallel_groups", [pipeline.get("agents", pipeline.get("stages", []))])
 
-    @property
-    def remaining_seconds(self) -> float:
-        return max(0, (self.deadline - datetime.now(timezone.utc)).total_seconds())
+    # Find which group this role belongs to
+    my_group = None
+    for group in groups:
+        if role in group:
+            my_group = group
+            break
 
-    def mark_serviced(self, role: str, idea_id: str) -> None:
-        self.serviced.add((role, idea_id))
+    if my_group is None:
+        return True  # not in any group = can always run
 
-    def is_serviced(self, role: str, idea_id: str) -> bool:
-        return (role, idea_id) in self.serviced
+    # Check: is any agent from MY group already running on this idea?
+    for running_role, running_idea in running_jobs:
+        if running_idea == idea_id and running_role in my_group and running_role != role:
+            return False
 
-
-@dataclass
-class RoleHealth:
-    """Tracks expected vs actual runs for a role over 24h."""
-    expected: int = 0
-    actual: int = 0
-
-    @property
-    def ratio(self) -> float:
-        return self.actual / self.expected if self.expected > 0 else 1.0
-
-    @property
-    def is_starved(self) -> bool:
-        return self.expected >= 3 and self.ratio < STARVATION_THRESHOLD
-
-
-@dataclass
-class PoolState:
-    """Serializable snapshot of pool state for web UI and crash recovery."""
-    pool_size: int
-    cycle_time_minutes: int
-    window: WindowState | None
-    workers: list[dict]
-    role_health: dict[str, dict]
-    deadline_counts: dict[str, int]
-
-    def to_dict(self) -> dict:
-        return {
-            "pool_size": self.pool_size,
-            "cycle_time_minutes": self.cycle_time_minutes,
-            "current_window": {
-                "started_at": self.window.started_at.isoformat() if self.window else None,
-                "serviced": [
-                    {"role": r, "idea_id": i} for r, i in (self.window.serviced if self.window else [])
-                ],
-                "remaining_seconds": self.window.remaining_seconds if self.window else 0,
-            },
-            "workers": self.workers,
-            "role_health": self.role_health,
-            "deadline_counts": self.deadline_counts,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
+    return True
 
 
 class PoolManager:
-    """Manages the worker pool lifecycle and scheduling."""
+    """Manages the worker pool with priority-queue scheduling."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -110,10 +82,7 @@ class PoolManager:
         self.roles = [a.name for a in self.registry.agents.values() if a.status == "active"]
 
         # State
-        self.window: WindowState | None = None
         self.workers: list[Worker] = []
-        self.role_health: dict[str, RoleHealth] = defaultdict(RoleHealth)
-        self.deadline_counts: dict[str, int] = defaultdict(int)
         self._running = False
 
         # Pool dir for snapshots
@@ -130,128 +99,374 @@ class PoolManager:
             status = self.blackboard.get_status(idea_id)
             phase = status.get("phase", "submitted")
             if phase in self._TERMINAL_PHASES:
-                # Allow released ideas that still have post_ready work
                 if phase != "released" or not self.blackboard.pending_post_ready(idea_id):
                     continue
-            # Skip review phases — these need human/gating decisions, not agent runs
             if phase.endswith("_review"):
                 continue
-            # Skip ideas awaiting human review when Telegram isn't configured
-            # (no way to resolve the review without a human channel)
             if status.get("needs_human_review") and not self.settings.telegram_bot_token:
                 continue
-            # Skip ideas without pipeline config (pre-pool legacy ideas)
-            if "pipeline" not in status:
-                continue
-            # Apply early-stage boost
             score = status.get("priority_score", PRIORITY_DEFAULT)
-            if phase in ("submitted", "ideation"):
+            if phase in ("submitted",) or self._is_first_pipeline_agent(idea_id):
                 score += PRIORITY_EARLY_BOOST
             status["_effective_priority"] = score
             ideas.append(status)
         ideas.sort(key=lambda s: s.get("_effective_priority", 0), reverse=True)
         return ideas
 
+    def _is_first_pipeline_agent(self, idea_id: str) -> bool:
+        """Check if idea is at its first pipeline agent."""
+        pipeline = self.blackboard.get_pipeline(idea_id)
+        agents = pipeline.get("agents", pipeline.get("stages", []))
+        if not agents:
+            return False
+        next_agent = self.blackboard.next_agent(idea_id)
+        return next_agent == agents[0]
+
     def _max_concurrent(self, role: str) -> int:
         """Get the max concurrent instances for a role from registry."""
         agent_config = self.registry.get_agent(role)
         return agent_config.max_concurrent if agent_config else 1
 
-    def _build_work_queue(
-        self,
-        ideas: list[dict],
-        serviced: set[tuple[str, str]],
-        locked: set[str],
-    ) -> list[tuple[str, str]]:
-        """Build ordered list of (role, idea_id) assignments.
+    # ── Producers ────────────────────────────────────────────────────
 
-        Idea-first scheduling: iterate ideas in priority order and assign
-        each idea's next pipeline stage. This ensures the highest-priority
-        ideas always get scheduled first regardless of which role they need.
-
-        Constraints:
-        - Each idea can be processed by at most 1 agent at a time.
-        - Each role has a max_concurrent limit (how many copies can run).
-        - Each (role, idea_id) pair is only scheduled once per window.
-
-        Three passes:
-        1. Pipeline work — assign each idea's next stage in priority order.
-        2. Feedback work — assign feedback-pending roles for remaining capacity.
-        3. Global agents (phase="*") — run against all ideas with __all__ sentinel.
-        """
-        queue: list[tuple[str, str]] = []
-        queued_ideas: set[str] = set()  # 1 agent per idea at a time
-        role_counts: dict[str, int] = defaultdict(int)
-
-        # Pass 1: pipeline stage work (idea-first)
+    def _pipeline_producer(self, queue: JobQueue) -> None:
+        """Scan ideas and enqueue next pipeline agents."""
+        ideas = self._get_active_ideas()
         for idea in ideas:
             idea_id = idea["id"]
-
-            if idea_id in locked or idea_id in queued_ideas:
-                continue
+            priority = idea.get("_effective_priority", PRIORITY_DEFAULT)
 
             if self.blackboard.is_ready(idea_id):
-                # Main stages done — schedule first pending post_ready role
+                # Main agents done — enqueue post_ready work
                 for post_role in self.blackboard.pending_post_ready(idea_id):
-                    if (post_role, idea_id) in serviced:
-                        continue
                     if post_role not in self.roles:
                         continue
-                    if role_counts[post_role] >= self._max_concurrent(post_role):
-                        continue
-                    queue.append((post_role, idea_id))
-                    queued_ideas.add(idea_id)
-                    role_counts[post_role] += 1
-                    break  # 1 agent per idea at a time
+                    job = Job(
+                        priority=compute_priority("pipeline", priority, is_first_agent=False),
+                        kind="pipeline",
+                        role=post_role,
+                        idea_id=idea_id,
+                    )
+                    queue.enqueue(job)
                 continue
 
-            next_role = self.blackboard.next_stage(idea_id)
+            next_role = self.blackboard.next_agent(idea_id)
             if not next_role:
                 continue
 
-            if (next_role, idea_id) in serviced:
-                continue
+            is_first = self._is_first_pipeline_agent(idea_id)
+            job = Job(
+                priority=compute_priority("pipeline", priority, is_first_agent=is_first),
+                kind="pipeline",
+                role=next_role,
+                idea_id=idea_id,
+            )
+            queue.enqueue(job)
 
-            if role_counts[next_role] >= self._max_concurrent(next_role):
-                continue
-
-            queue.append((next_role, idea_id))
-            queued_ideas.add(idea_id)
-            role_counts[next_role] += 1
-
-        # Pass 2: feedback-driven work (idea-first, cross-cutting)
-        for idea in ideas:
-            idea_id = idea["id"]
-
-            if idea_id in locked or idea_id in queued_ideas:
-                continue
-
-            # Find first role with pending feedback that has capacity
+            # Also enqueue feedback-driven work
             for role in self.roles:
-                if (role, idea_id) in serviced:
-                    continue
-                if role_counts[role] >= self._max_concurrent(role):
+                if role == next_role:
                     continue
                 if self.blackboard.has_pending_feedback(idea_id, role):
-                    queue.append((role, idea_id))
-                    queued_ideas.add(idea_id)
-                    role_counts[role] += 1
-                    break  # 1 agent per idea at a time
+                    job = Job(
+                        priority=compute_priority("feedback", priority),
+                        kind="feedback",
+                        role=role,
+                        idea_id=idea_id,
+                    )
+                    queue.enqueue(job)
 
-        # Pass 2: global agents (phase="*") run against all ideas at once
+        # Global agents (phase="*") — one job per active idea
+        # Only enqueued by pipeline_producer if they have no cadence;
+        # cadence-tracked global agents are handled by _cadence_producer.
         for role in self.roles:
             config = self.registry.get_agent(role)
             if not config or config.phase != "*":
                 continue
             if config.status != "active":
                 continue
-            if (role, "__all__") not in serviced and ideas:
-                queue.append((role, "__all__"))
+            if config.cadence:
+                continue  # cadence_producer handles these
+            for idea in ideas:
+                job = Job(
+                    priority=PRIORITY_DEFAULT,
+                    kind="pipeline",
+                    role=role,
+                    idea_id=idea["id"],
+                )
+                queue.enqueue(job)
 
-        return queue
+    def _cadence_producer(
+        self, queue: JobQueue, cadence_trackers: dict[str, CadenceTracker]
+    ) -> None:
+        """Enqueue background jobs when their cadence is due."""
+        now = datetime.now(timezone.utc)
+        for role, tracker in cadence_trackers.items():
+            if not tracker.is_due(now):
+                continue
+            priority = tracker.priority(now)
+            if self._is_global_agent(role):
+                # Global agents (phase="*") run per-idea
+                ideas = self._get_active_ideas()
+                for idea in ideas:
+                    job = Job(
+                        priority=priority,
+                        kind="background",
+                        role=role,
+                        idea_id=idea["id"],
+                    )
+                    queue.enqueue(job)
+            else:
+                # Regular background agents run against all ideas
+                job = Job(
+                    priority=priority,
+                    kind="background",
+                    role=role,
+                    idea_id="__all__",
+                )
+                queue.enqueue(job)
 
-    def _snapshot(self) -> None:
-        """Write pool state to filesystem for web UI and crash recovery."""
+    # ── Dispatch ─────────────────────────────────────────────────────
+
+    def _pop_schedulable(
+        self, queue: JobQueue, running: set[tuple[str, str]]
+    ) -> Job | None:
+        """Pop highest-priority job that passes scheduling constraints.
+
+        TLA+ verified: MUST return highest-priority schedulable job.
+        Skipped jobs are re-enqueued to preserve them for later.
+        """
+        skipped: list[Job] = []
+        result = None
+
+        while True:
+            job = queue.pop()
+            if job is None:
+                break
+
+            # Check max_concurrent for this role across the pool
+            role_count = sum(1 for r, _ in running if r == job.role)
+            if role_count >= self._max_concurrent(job.role):
+                skipped.append(job)
+                continue
+
+            # Check parallel group constraints for same-idea scheduling
+            if job.idea_id != "__all__":
+                pipeline = self.blackboard.get_pipeline(job.idea_id)
+                if not can_schedule(job.role, job.idea_id, running, pipeline):
+                    skipped.append(job)
+                    continue
+
+            result = job
+            break
+
+        # Re-enqueue skipped jobs
+        for job in skipped:
+            queue.mark_done(job.role, job.idea_id)
+            queue.enqueue(job)
+
+        return result
+
+    # ── Result handling ──────────────────────────────────────────────
+
+    def _is_global_agent(self, role: str) -> bool:
+        """Check if a role is a global (phase='*') agent."""
+        config = self.registry.get_agent(role)
+        return config is not None and config.phase == "*"
+
+    async def _handle_result(self, result: RunResult, queue: JobQueue) -> None:
+        """Process a completed worker run — update tracking, apply gating."""
+        if result.idea_id == "__all__":
+            return
+
+        # Global agents (phase="*") run on ideas but don't affect pipeline state
+        if self._is_global_agent(result.role):
+            return
+
+        now = datetime.now(timezone.utc)
+
+        if result.status == RunStatus.ERROR:
+            self.blackboard.update_status(
+                result.idea_id,
+                last_error=result.error or "Unknown error",
+                last_error_agent=result.role,
+                last_error_at=now.isoformat(),
+            )
+            self._broadcast_sync("activity", {
+                "idea_id": result.idea_id,
+                "message": f"{result.role} failed: {result.error}",
+                "kind": "error",
+            })
+            # mark_done called by caller — pipeline_producer will re-enqueue on next scan
+            return
+
+        if result.status == RunStatus.DEADLINE:
+            status = self.blackboard.get_status(result.idea_id)
+            hits = status.get("deadline_hits", {})
+            hits[result.role] = hits.get(result.role, 0) + 1
+            self.blackboard.update_status(result.idea_id, deadline_hits=hits)
+
+        if result.status in (RunStatus.OK, RunStatus.DEADLINE):
+            # Read agent's recommendation
+            status = self.blackboard.get_status(result.idea_id)
+            recommendation = status.get("phase_recommendation", "proceed")
+
+            # Update tracking
+            serviced = status.get("last_serviced_by", {})
+            serviced[result.role] = now.isoformat()
+            stage_results = status.get("stage_results", {})
+            stage_results[result.role] = recommendation
+            self.blackboard.update_status(
+                result.idea_id,
+                last_serviced_by=serviced,
+                stage_results=stage_results,
+                total_cost_usd=status.get("total_cost_usd", 0) + result.cost_usd,
+                iteration_count=status.get("iteration_count", 0) + 1,
+            )
+
+            # Apply gating inline
+            gating_mode = self.blackboard.get_gating_mode(result.idea_id, result.role)
+
+            if gating_mode == "human-review":
+                self.blackboard.update_status(
+                    result.idea_id, needs_human_review=True,
+                    review_reason=f"Human review required after {result.role}",
+                )
+                return
+            if gating_mode == "llm-decides" and recommendation == "needs_review":
+                self.blackboard.update_status(
+                    result.idea_id, needs_human_review=True,
+                    review_reason=status.get("phase_reasoning", "Agent flagged uncertainty"),
+                )
+                return
+            if gating_mode == "auto" and recommendation == "iterate":
+                iteration_count = status.get("iteration_count", 0) + 1
+                if iteration_count >= MAX_ITERATE_PER_STAGE:
+                    self.blackboard.update_status(
+                        result.idea_id, needs_human_review=True,
+                        review_reason=f"{result.role} hit max iterations ({MAX_ITERATE_PER_STAGE})",
+                    )
+                    return
+                # pipeline_producer will see "iterate" and re-enqueue
+                return
+            if recommendation == "kill":
+                self.blackboard.update_status(result.idea_id, phase="killed")
+                return
+
+            # "proceed" — advance phase and check completion
+            # TLA+ verified: release MUST be atomic with last completion
+            next_agent = self.blackboard.next_agent(result.idea_id)
+            if next_agent:
+                old_phase = status.get("phase", "submitted")
+                if old_phase != next_agent:
+                    history = status.get("phase_history", [])
+                    history.append({
+                        "from": old_phase, "to": next_agent,
+                        "at": now.isoformat(),
+                    })
+                    self.blackboard.update_status(
+                        result.idea_id, phase=next_agent, phase_history=history,
+                    )
+                    logger.info("Idea '%s' advanced: %s -> %s", result.idea_id, old_phase, next_agent)
+            elif self.blackboard.is_ready(result.idea_id):
+                self._handle_release(result.idea_id)
+
+        # Broadcast completion
+        self._broadcast_sync("worker_done", {
+            "worker_id": result.role,
+            "idea_id": result.idea_id,
+            "status": result.status.value,
+            "duration": result.duration_seconds,
+        })
+
+    def _handle_release(self, idea_id: str) -> None:
+        """Release an idea atomically after last pipeline agent completes."""
+        status = self.blackboard.get_status(idea_id)
+        now = datetime.now(timezone.utc)
+        old_phase = status.get("phase", "submitted")
+        history = status.get("phase_history", [])
+        prior_releases = sum(1 for e in history if e.get("to") == "released")
+        history.append({
+            "from": old_phase, "to": "released", "at": now.isoformat(),
+        })
+        max_refinement_cycles = status.get("max_refinement_cycles", 1)
+        if max_refinement_cycles == 0 or prior_releases < max_refinement_cycles:
+            self.blackboard.update_status(
+                idea_id, phase="submitted", phase_history=history, stage_results={},
+            )
+            logger.info(
+                "Idea '%s' completed pipeline (release %d/%d), looping for refinement",
+                idea_id, prior_releases + 1, max_refinement_cycles,
+            )
+        else:
+            self.blackboard.update_status(
+                idea_id, phase="released", phase_history=history,
+            )
+            logger.info(
+                "Idea '%s' reached max refinement cycles (%d), marking terminal",
+                idea_id, max_refinement_cycles,
+            )
+
+    @staticmethod
+    def _broadcast_sync(event_type: str, data: dict) -> None:
+        """Best-effort broadcast — fire and forget."""
+        try:
+            from incubator.web.api.websocket import broadcast_event
+            asyncio.get_event_loop().create_task(broadcast_event(event_type, data))
+        except Exception:
+            pass
+
+    # ── Process locking ──────────────────────────────────────────────
+
+    def _acquire_pool_lock(self) -> bool:
+        """PID-file lock. Returns False if another pool is running."""
+        lock_path = self.settings.project_root / POOL_LOCK_FILE
+        if lock_path.exists():
+            try:
+                pid = int(lock_path.read_text().strip())
+                os.kill(pid, 0)  # check if process exists
+                logger.error(
+                    "Another pool is running (PID %d). Lock file: %s\n"
+                    "If this is stale, remove it: rm %s",
+                    pid, lock_path, lock_path,
+                )
+                return False
+            except ProcessLookupError:
+                logger.warning(
+                    "Stale pool lock found (PID %d is dead). Cleaning up: %s",
+                    pid, lock_path,
+                )
+                lock_path.unlink(missing_ok=True)
+            except (OSError, ValueError) as e:
+                logger.warning("Bad pool lock file (%s), removing: %s", e, lock_path)
+                lock_path.unlink(missing_ok=True)
+        lock_path.write_text(str(os.getpid()))
+        logger.info("Pool lock acquired (PID %d): %s", os.getpid(), lock_path)
+        return True
+
+    def _release_pool_lock(self) -> None:
+        """Release the PID-file lock."""
+        lock_path = self.settings.project_root / POOL_LOCK_FILE
+        if lock_path.exists():
+            try:
+                pid = int(lock_path.read_text().strip())
+                if pid == os.getpid():
+                    lock_path.unlink(missing_ok=True)
+                    logger.info("Pool lock released: %s", lock_path)
+                else:
+                    logger.warning(
+                        "Pool lock held by different PID %d (we are %d), not releasing: %s",
+                        pid, os.getpid(), lock_path,
+                    )
+            except (OSError, ValueError):
+                lock_path.unlink(missing_ok=True)
+                logger.info("Cleaned up bad pool lock: %s", lock_path)
+
+    # ── Snapshot ─────────────────────────────────────────────────────
+
+    def _snapshot(self, queue: JobQueue | None = None,
+                  cadence_trackers: dict[str, CadenceTracker] | None = None) -> None:
+        """Write pool state to filesystem for web UI."""
         worker_data = []
         for w in self.workers:
             if w.is_idle:
@@ -267,239 +482,54 @@ class PoolManager:
                     "elapsed_seconds": elapsed,
                 })
 
-        state = PoolState(
-            pool_size=self.settings.pool_size,
-            cycle_time_minutes=self.settings.cycle_time_minutes,
-            window=self.window,
-            workers=worker_data,
-            role_health={k: {"expected": v.expected, "actual": v.actual} for k, v in self.role_health.items()},
-            deadline_counts=dict(self.deadline_counts),
-        )
+        cadence_data = {}
+        if cadence_trackers:
+            now = datetime.now(timezone.utc)
+            for role, tracker in cadence_trackers.items():
+                cadence_data[role] = {
+                    "cron": tracker.cron_expr,
+                    "last_run_at": tracker.last_run_at.isoformat() if tracker.last_run_at else None,
+                    "elapsed_ratio": round(tracker.elapsed_ratio(now), 2),
+                    "is_due": tracker.is_due(now),
+                    "priority": round(tracker.priority(now), 1),
+                }
 
-        # Atomic write
+        state = {
+            "pool_size": self.settings.pool_size,
+            "queue_depth": queue.depth if queue else 0,
+            "workers": worker_data,
+            "cadence_trackers": cadence_data,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
         state_path = self.pool_dir / "state.json"
         tmp_fd, tmp_path = tempfile.mkstemp(dir=self.pool_dir, suffix=".tmp")
         try:
             with open(tmp_fd, "w") as f:
-                json.dump(state.to_dict(), f, indent=2)
+                json.dump(state, f, indent=2)
             Path(tmp_path).replace(state_path)
         except Exception:
             Path(tmp_path).unlink(missing_ok=True)
             raise
 
-    async def _handle_result(self, result: RunResult) -> None:
-        """Process a completed worker run -- update tracking, apply gating."""
-        if result.idea_id == "__all__":
-            # Global agents: only update role health, skip idea-specific tracking
-            if result.status in (RunStatus.OK, RunStatus.DEADLINE):
-                self.role_health[result.role].actual += 1
-            return
-
-        if result.status == RunStatus.DEADLINE:
-            self.deadline_counts[result.role] = self.deadline_counts.get(result.role, 0) + 1
-            # Log deadline hit to idea status
-            status = self.blackboard.get_status(result.idea_id)
-            hits = status.get("deadline_hits", {})
-            hits[result.role] = hits.get(result.role, 0) + 1
-            self.blackboard.update_status(result.idea_id, deadline_hits=hits)
-
-        if result.status in (RunStatus.OK, RunStatus.DEADLINE):
-            # Update role health
-            self.role_health[result.role].actual += 1
-
-            # Update last_serviced_by
-            status = self.blackboard.get_status(result.idea_id)
-            serviced = status.get("last_serviced_by", {})
-            serviced[result.role] = datetime.now(timezone.utc).isoformat()
-            self.blackboard.update_status(
-                result.idea_id,
-                last_serviced_by=serviced,
-                total_cost_usd=status.get("total_cost_usd", 0) + result.cost_usd,
-                iteration_count=status.get("iteration_count", 0) + 1,
-            )
-
-            # Bridge: copy agent's phase_recommendation into stage_results[role]
-            # so the pool's next_stage() logic can detect completion.
-            status = self.blackboard.get_status(result.idea_id)
-            recommendation = status.get("phase_recommendation", "")
-            if recommendation in ("proceed", "iterate", "kill"):
-                stage_results = status.get("stage_results", {})
-                stage_results[result.role] = recommendation
-                self.blackboard.update_status(result.idea_id, stage_results=stage_results)
-
-                # Advance the phase field to match the current/next pipeline stage
-                # so the pool's _get_active_ideas() doesn't filter it out.
-                if recommendation == "proceed":
-                    next_stage = self.blackboard.next_stage(result.idea_id)
-                    if next_stage:
-                        old_phase = status.get("phase", "submitted")
-                        if old_phase != next_stage:
-                            history = status.get("phase_history", [])
-                            history.append({
-                                "from": old_phase,
-                                "to": next_stage,
-                                "at": datetime.now(timezone.utc).isoformat(),
-                            })
-                            self.blackboard.update_status(
-                                result.idea_id,
-                                phase=next_stage,
-                                phase_history=history,
-                            )
-                            logger.info("Idea '%s' advanced: %s -> %s", result.idea_id, old_phase, next_stage)
-                    elif self.blackboard.is_ready(result.idea_id):
-                        # All stages done — mark as released
-                        old_phase = status.get("phase", "submitted")
-                        history = status.get("phase_history", [])
-                        prior_releases = sum(1 for e in history if e.get("to") == "released")
-                        history.append({
-                            "from": old_phase,
-                            "to": "released",
-                            "at": datetime.now(timezone.utc).isoformat(),
-                        })
-                        max_refinement_cycles = status.get("max_refinement_cycles", 1)
-                        if max_refinement_cycles == 0 or prior_releases < max_refinement_cycles:
-                            # Loop back for another refinement cycle
-                            self.blackboard.update_status(
-                                result.idea_id,
-                                phase="submitted",
-                                phase_history=history,
-                                stage_results={},
-                            )
-                            logger.info(
-                                "Idea '%s' completed pipeline (release %d/%d), looping for refinement",
-                                result.idea_id, prior_releases + 1, max_refinement_cycles,
-                            )
-                        else:
-                            # Hit the refinement cap — mark terminal
-                            self.blackboard.update_status(
-                                result.idea_id,
-                                phase="released",
-                                phase_history=history,
-                            )
-                            logger.info(
-                                "Idea '%s' reached max refinement cycles (%d), marking terminal",
-                                result.idea_id, max_refinement_cycles,
-                            )
-                elif recommendation == "kill":
-                    self.blackboard.update_status(result.idea_id, phase="killed")
-                    logger.info("Idea '%s' killed by %s", result.idea_id, result.role)
-
-            # Apply gating
-            await self._apply_gating(result)
-
-        # Broadcast event
-        try:
-            from incubator.web.api.websocket import broadcast_event
-            await broadcast_event("worker_done", {
-                "worker_id": result.role,
-                "idea_id": result.idea_id,
-                "status": result.status.value,
-                "duration": result.duration_seconds,
-            })
-        except Exception:
-            pass
-
-    async def _apply_gating(self, result: RunResult) -> None:
-        """Apply gating logic after an agent run completes."""
-        gating_mode = self.blackboard.get_gating_mode(result.idea_id, result.role)
-        status = self.blackboard.get_status(result.idea_id)
-        stage_results = status.get("stage_results", {})
-        recommendation = stage_results.get(result.role) or status.get("phase_recommendation", "proceed")
-
-        if gating_mode == "auto":
-            if recommendation == "iterate":
-                # Check iteration cap
-                iteration_count = status.get("iteration_count", 0)
-                if iteration_count >= MAX_ITERATE_PER_STAGE:
-                    logger.warning(
-                        "Max iterations reached for %s on %s, escalating to human review",
-                        result.role, result.idea_id,
-                    )
-                    self.blackboard.update_status(
-                        result.idea_id, needs_human_review=True,
-                        review_reason=f"{result.role} hit max iterations ({MAX_ITERATE_PER_STAGE})",
-                    )
-            # Auto mode: recommendation already set, pool will pick up next stage
-        elif gating_mode == "llm-decides":
-            if recommendation == "needs_review":
-                self.blackboard.update_status(
-                    result.idea_id, needs_human_review=True,
-                    review_reason=status.get("phase_reasoning", "Agent flagged uncertainty"),
-                )
-        elif gating_mode == "human-review":
-            self.blackboard.update_status(
-                result.idea_id, needs_human_review=True,
-                review_reason=f"Human review required after {result.role}",
-            )
-
-    def _recover_from_snapshot(self) -> None:
-        """Crash recovery: read pool/state.json and clean up stale state.
-
-        1. Release locks from any workers marked "running" (they're dead)
-        2. If the snapshot's window is still valid, resume it
-        3. Force-release any locks older than 2 * cycle_time
-        """
-        state_path = self.pool_dir / "state.json"
-        if not state_path.exists():
-            logger.info("No pool state snapshot found, starting fresh")
-            return
-
-        try:
-            state = json.loads(state_path.read_text())
-        except (json.JSONDecodeError, OSError) as e:
-            logger.warning("Could not read pool state snapshot: %s", e)
-            return
-
-        # Release locks from dead workers
-        for w in state.get("workers", []):
-            if not w.get("idle", True) and w.get("idea_id"):
-                logger.info("Releasing stale lock for %s from crashed worker %d",
-                           w["idea_id"], w.get("id", 0))
-                self.lock_manager.release("pool", w["idea_id"])
-
-        # Check if we can resume the window
-        window_data = state.get("current_window", {})
-        started_at_str = window_data.get("started_at")
-        if started_at_str:
-            started_at = datetime.fromisoformat(started_at_str)
-            potential_window = WindowState(
-                started_at=started_at,
-                cycle_time_minutes=self.settings.cycle_time_minutes,
-            )
-            if not potential_window.is_expired:
-                # Resume this window
-                for pair in window_data.get("serviced", []):
-                    potential_window.mark_serviced(pair["role"], pair["idea_id"])
-                self.window = potential_window
-                logger.info("Resuming window from snapshot (%.0fs remaining)",
-                           potential_window.remaining_seconds)
-
-        # Restore role health and deadline counters
-        for role, health in state.get("role_health", {}).items():
-            self.role_health[role] = RoleHealth(
-                expected=health.get("expected", 0),
-                actual=health.get("actual", 0),
-            )
-        self.deadline_counts = defaultdict(int, state.get("deadline_counts", {}))
-
-    async def _rescore_priorities(self) -> None:
-        """Re-score priorities for all active ideas using the orchestrator's scoring."""
-        try:
-            from incubator.orchestrator.orchestrator import Orchestrator
-            orchestrator = Orchestrator.__new__(Orchestrator)
-            orchestrator.blackboard = self.blackboard
-            orchestrator.settings = self.settings
-            await orchestrator.score_priorities()
-            logger.info("Priority scores updated")
-        except Exception as e:
-            logger.warning("Priority re-scoring failed: %s", e)
+    # ── Main loop ────────────────────────────────────────────────────
 
     async def run(self) -> None:
         """Main pool loop. Runs until stopped."""
         self._running = True
-        logger.info("Pool starting with %d workers, %dm cycle time",
-                     self.settings.pool_size, self.settings.cycle_time_minutes)
 
+        if not self._acquire_pool_lock():
+            logger.error("Another pool is already running. Exiting.")
+            return
+
+        try:
+            logger.info("Pool starting with %d workers", self.settings.pool_size)
+            await self._run_loop()
+        finally:
+            self._release_pool_lock()
+
+    async def _run_loop(self) -> None:
+        """Core scheduling loop."""
         # Create workers
         from incubator.core.agent_factory import AgentFactory
         from incubator.comms.notifications import NotificationDispatcher
@@ -519,118 +549,81 @@ class PoolManager:
             for i in range(self.settings.pool_size)
         ]
 
-        # Crash recovery: clean up stale state from previous run
-        self._recover_from_snapshot()
+        # Build cadence trackers from registry
+        cadence_trackers: dict[str, CadenceTracker] = {}
+        for agent in self.registry.agents.values():
+            if agent.cadence and agent.status == "active":
+                cadence_trackers[agent.name] = CadenceTracker(agent.name, agent.cadence)
+
+        queue = JobQueue()
+        pending: dict[asyncio.Task, Worker] = {}
+        now = datetime.now(timezone.utc)
+
+        # Initial priority scoring
+        await self._rescore_priorities()
 
         while self._running:
-            # Start new window (unless we resumed one from crash recovery)
-            if self.window is None or self.window.is_expired:
-                self.window = WindowState(
-                    started_at=datetime.now(timezone.utc),
-                    cycle_time_minutes=self.settings.cycle_time_minutes,
-                )
-                logger.info("New cycle window started, deadline: %s", self.window.deadline.isoformat())
+            now = datetime.now(timezone.utc)
 
-                # Re-score priorities at the start of each new window
-                await self._rescore_priorities()
-
-            # Run window (role health expected/actual updated inside)
-            await self._run_window()
-
-            # Snapshot after window
-            self._snapshot()
-
-            # If window ended early (all work done), wait for next window
-            if not self.window.is_expired:
-                wait = self.window.remaining_seconds
-                logger.info("Window work complete, idling %.0fs until next window", wait)
-                await asyncio.sleep(wait)
-
-    async def _run_window(self) -> None:
-        """Execute work within the current cycle window.
-
-        Uses asyncio tasks so workers run concurrently and the scheduler
-        re-evaluates as soon as any worker finishes (not batch-and-wait).
-        """
-        pending_tasks: dict[asyncio.Task, Worker] = {}
-
-        while not self.window.is_expired and self._running:
-            # Check for completed tasks
-            done = {t for t in pending_tasks if t.done()}
-            for task in done:
-                worker = pending_tasks.pop(task)
+            # 1. Reap completed tasks
+            for task in [t for t in pending if t.done()]:
+                worker = pending.pop(task)
                 try:
                     result = task.result()
                     if isinstance(result, RunResult):
-                        await self._handle_result(result)
+                        await self._handle_result(result, queue)
+                        queue.mark_done(result.role, result.idea_id)
+                        # Reset cadence on ANY completion (TLA+ verified)
+                        if result.role in cadence_trackers:
+                            cadence_trackers[result.role].last_run_at = now
                 except Exception as e:
                     logger.error("Worker task failed: %s", e)
 
-            ideas = self._get_active_ideas()
-            if not ideas:
-                if not pending_tasks:
-                    logger.debug("No active ideas and no pending work, waiting")
-                    await asyncio.sleep(5)
+            # 2. Pipeline producer — scan ideas, enqueue next agents
+            self._pipeline_producer(queue)
+
+            # 3. Cadence producer — enqueue background jobs when due
+            self._cadence_producer(queue, cadence_trackers)
+
+            # 4. Dispatch to idle workers (highest priority first)
+            running = {(w.current_role, w.current_idea) for w in self.workers if not w.is_idle}
+            for worker in self.workers:
+                if not worker.is_idle:
                     continue
-                # Wait for a pending task to complete
-                await asyncio.sleep(1)
-                continue
-
-            # Find available workers
-            idle_workers = [w for w in self.workers if w.is_idle]
-            if not idle_workers:
-                # All workers busy, wait for one to finish
-                if pending_tasks:
-                    done_set, _ = await asyncio.wait(
-                        pending_tasks.keys(), return_when=asyncio.FIRST_COMPLETED,
-                        timeout=30.0,
-                    )
-                    self._snapshot()  # Periodic state update for dashboard
-                    # Results will be processed at top of loop
-                else:
-                    await asyncio.sleep(1)
-                continue
-
-            # Build work queue
-            locked = {w.current_idea for w in self.workers if not w.is_idle}
-            queue = self._build_work_queue(ideas, self.window.serviced, locked)
-
-            if not queue:
-                if not pending_tasks:
-                    logger.info("All eligible work done for this window")
+                job = self._pop_schedulable(queue, running)
+                if job is None:
                     break
-                # Wait for remaining tasks
-                await asyncio.sleep(1)
-                continue
-
-            # Dispatch work to idle workers as async tasks
-            for worker, (role, idea_id) in zip(idle_workers, queue):
-                # Track that this role had eligible work this window
-                self.role_health[role].expected += 1
-                self.window.mark_serviced(role, idea_id)
                 task = asyncio.create_task(
-                    self._run_worker(worker, role, idea_id),
-                    name=f"worker-{worker.worker_id}-{role}-{idea_id}",
+                    self._run_worker(worker, job),
+                    name=f"worker-{worker.worker_id}-{job.role}-{job.idea_id}",
                 )
-                pending_tasks[task] = worker
+                pending[task] = worker
+                running.add((job.role, job.idea_id))
 
-            # Yield to event loop so tasks can start and update worker state
-            await asyncio.sleep(0)
-            self._snapshot()
+            # 5. Wait for something to happen
+            if pending:
+                await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED, timeout=10)
+            else:
+                await asyncio.sleep(self.settings.producer_interval_seconds)
 
-        # Wait for any remaining tasks at window end
-        if pending_tasks:
-            logger.info("Window ending, waiting for %d pending tasks", len(pending_tasks))
-            results = await asyncio.gather(*pending_tasks.keys(), return_exceptions=True)
-            for r in results:
-                if isinstance(r, RunResult):
-                    await self._handle_result(r)
-                elif isinstance(r, Exception):
-                    logger.error("Worker task failed at window end: %s", r)
+            self._snapshot(queue, cadence_trackers)
 
-    async def _run_worker(self, worker: Worker, role: str, idea_id: str) -> RunResult | None:
+    async def _run_worker(self, worker: Worker, job: Job) -> RunResult | None:
         """Run a single worker assignment."""
-        return await worker.execute(role, idea_id, self.window.deadline)
+        timeout = self.settings.job_timeout_minutes * 60
+        return await worker.execute(job, timeout)
+
+    async def _rescore_priorities(self) -> None:
+        """Re-score priorities for all active ideas."""
+        try:
+            from incubator.orchestrator.orchestrator import Orchestrator
+            orchestrator = Orchestrator.__new__(Orchestrator)
+            orchestrator.blackboard = self.blackboard
+            orchestrator.settings = self.settings
+            await orchestrator.score_priorities()
+            logger.info("Priority scores updated")
+        except Exception as e:
+            logger.warning("Priority re-scoring failed: %s", e)
 
     def stop(self) -> None:
         """Signal the pool to stop after current work completes."""

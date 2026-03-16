@@ -38,16 +38,17 @@ def test_pool_defaults():
         telegram_chat_id="test",
     )
     assert s.pool_size == 3
-    assert s.cycle_time_minutes == 30
+    assert s.job_timeout_minutes == 60
+    assert s.producer_interval_seconds == 10
 
 
 def test_pool_settings_from_env(monkeypatch):
     """Pool settings can be overridden via env vars."""
     monkeypatch.setenv("POOL_SIZE", "5")
-    monkeypatch.setenv("CYCLE_TIME_MINUTES", "15")
+    monkeypatch.setenv("JOB_TIMEOUT_MINUTES", "90")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "test")
     s = Settings()
     assert s.pool_size == 5
-    assert s.cycle_time_minutes == 15
+    assert s.job_timeout_minutes == 90

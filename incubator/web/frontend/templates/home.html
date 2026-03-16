@@ -22,6 +22,12 @@
             {{ idea.get('description', '')[:160] }}{% if idea.get('description', '')|length > 160 %}…{% endif %}
         </p>
         {% endif %}
+        {% if idea.get('last_error') %}
+        <div class="flex items-center gap-1.5 text-[0.72rem] text-[#c44] mb-1">
+            {{ icon('alert-triangle', 13) }}
+            <span class="truncate">{{ idea.last_error_agent or 'agent' }} error: {{ idea.last_error[:100] }}{% if idea.last_error|length > 100 %}…{% endif %}</span>
+        </div>
+        {% endif %}
         {% if idea.get('needs_human_review') %}
         <div class="flex items-center gap-1.5 text-[0.72rem] text-[#b85f3e] mb-1">
             {{ icon('alert-triangle', 13) }}

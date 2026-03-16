@@ -69,13 +69,10 @@ class Settings(BaseSettings):
     model_tier_high: str = "claude-sonnet-4-6"
     model_tier_low: str = "claude-haiku-4-5"
 
-    # Watcher cadences
-    watcher_competitive_cron: str = "0 */6 * * *"
-    watcher_research_cron: str = "0 8 * * *"
-
     # Worker pool
     pool_size: int = 3
-    cycle_time_minutes: int = 30
+    job_timeout_minutes: int = 60
+    producer_interval_seconds: int = 10
 
     # Web
     web_host: str = "0.0.0.0"

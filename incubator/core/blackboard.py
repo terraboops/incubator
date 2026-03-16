@@ -9,8 +9,12 @@ from pathlib import Path
 from incubator.core.phase import Phase
 
 DEFAULT_PIPELINE = {
-    "stages": ["ideation", "implementation", "validation", "release"],
-    "post_ready": ["competitive", "research"],
+    "agents": ["ideation", "implementation", "validation", "release"],
+    "post_ready": ["competitive-watcher", "research-watcher"],
+    "parallel_groups": [
+        ["ideation", "implementation", "validation", "release"],
+        ["competitive-watcher", "research-watcher"],
+    ],
     "gating": {"default": "auto", "overrides": {}},
     "preset": "full-pipeline",
 }
@@ -122,7 +126,7 @@ class Blackboard:
         """Get the pipeline config for an idea, returning default if not set."""
         status = self.get_status(idea_id)
         if "pipeline" in status:
-            return status["pipeline"]
+            return self._migrate_pipeline(status["pipeline"])
         # Deep copy to prevent mutation of the module-level default
         return json.loads(json.dumps(DEFAULT_PIPELINE))
 
@@ -130,33 +134,49 @@ class Blackboard:
         """Set the full pipeline config for an idea."""
         self.update_status(idea_id, pipeline=pipeline)
 
-    def next_stage(self, idea_id: str) -> str | None:
-        """Return the next uncompleted pipeline stage, or None if all done.
+    def _migrate_pipeline(self, pipeline: dict) -> dict:
+        """Migrate old pipeline configs to new format."""
+        # Rename stages → agents
+        if "stages" in pipeline and "agents" not in pipeline:
+            pipeline["agents"] = pipeline.pop("stages")
+        # Add parallel_groups if missing
+        if "parallel_groups" not in pipeline:
+            agents = pipeline.get("agents", [])
+            post_ready = pipeline.get("post_ready", [])
+            groups = [agents]
+            if post_ready:
+                groups.append(post_ready)
+            pipeline["parallel_groups"] = groups
+        return pipeline
 
-        Uses per-stage stage_results dict to determine completion:
-        - No entry or "iterate" -> stage needs (re-)running
-        - "proceed" -> stage is done, advance to next
+    def next_agent(self, idea_id: str) -> str | None:
+        """Return the next uncompleted pipeline agent, or None if all done.
+
+        Uses per-agent stage_results dict to determine completion:
+        - No entry or "iterate" -> agent needs (re-)running
+        - "proceed" -> agent is done, advance to next
         """
         pipeline = self.get_pipeline(idea_id)
         status = self.get_status(idea_id)
         serviced = status.get("last_serviced_by", {})
         stage_results = status.get("stage_results", {})
 
-        for stage in pipeline["stages"]:
-            if stage not in serviced:
-                return stage
-            # If this stage's result is "iterate", re-run it
-            if stage_results.get(stage) == "iterate":
-                return stage
-            # If this stage has no result yet (serviced but no recommendation), re-run
-            if stage not in stage_results:
-                return stage
-            # "proceed" -> this stage is done, check next
+        agents = pipeline.get("agents", pipeline.get("stages", []))
+        for agent in agents:
+            if agent not in serviced:
+                return agent
+            if stage_results.get(agent) == "iterate":
+                return agent
+            if agent not in stage_results:
+                return agent
         return None
 
+    # Keep backward compat alias
+    next_stage = next_agent
+
     def is_ready(self, idea_id: str) -> bool:
-        """Check if all pipeline stages have been completed."""
-        return self.next_stage(idea_id) is None
+        """Check if all pipeline agents have been completed."""
+        return self.next_agent(idea_id) is None
 
     def pending_post_ready(self, idea_id: str) -> list[str]:
         """Return post_ready roles that haven't been serviced yet."""
@@ -172,9 +192,10 @@ class Blackboard:
         return gating.get("overrides", {}).get(role, gating.get("default", "auto"))
 
     def pipeline_has_role(self, idea_id: str, role: str) -> bool:
-        """Check if a role is in this idea's pipeline (stages or post_ready)."""
+        """Check if a role is in this idea's pipeline (agents or post_ready)."""
         pipeline = self.get_pipeline(idea_id)
-        return role in pipeline.get("stages", []) or role in pipeline.get("post_ready", [])
+        agents = pipeline.get("agents", pipeline.get("stages", []))
+        return role in agents or role in pipeline.get("post_ready", [])
 
     # ── Feedback helpers ────────────────────────────────────────────
 
