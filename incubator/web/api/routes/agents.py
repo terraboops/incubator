@@ -50,10 +50,10 @@ def _agent_view_data(agent: AgentConfig, settings) -> dict:
             claude_md = claude_md_path.read_text()
     data["claude_md"] = claude_md
 
-    # Load prompt.py content
-    prompt_py = _read_agent_prompt(agent.phase or agent.name)
-    if prompt_py is None:
-        prompt_py = _read_agent_prompt(agent.name)
+    # Load prompt.py content — check agent's own dir first, then phase dir
+    prompt_py = _read_agent_prompt(agent.name)
+    if prompt_py is None and agent.phase and agent.phase not in ("*", ""):
+        prompt_py = _read_agent_prompt(agent.phase)
     data["prompt_py"] = prompt_py or ""
     prompt_path = (
         settings.project_root / "incubator" / "agents"
@@ -285,10 +285,9 @@ async def agent_update(
     registry.save(settings.registry_path)
     _save_claude_md(config, claude_md, settings)
 
-    # Save system prompt
+    # Save system prompt — always to the agent's own directory
     if prompt_py.strip():
-        agent_dir_name = config.phase or config.name
-        _write_agent_prompt(agent_dir_name, prompt_py)
+        _write_agent_prompt(config.name, prompt_py)
 
     return RedirectResponse(url=f"/agents/{agent_name}", status_code=303)
 

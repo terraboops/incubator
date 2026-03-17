@@ -7,13 +7,15 @@ Ideas share state through a filesystem-based blackboard at
 
 - `status.json` — phase, iteration count, cost tracking, phase history
 - `idea.md` — the original idea description
-- Phase artifacts — `competitive-analysis.md`, `feasibility.md`, `mvp-spec.md`, etc.
+- `feedback.json` — structured feedback entries with identity tracking
+- Phase artifacts — self-contained `.html` files (feasibility, market landscape, etc.)
 - `agent-logs/` — full transcripts of every agent run
 - `agent-knowledge/<agent>/` — per-idea notes from each agent
 
 Agents read and write to the blackboard through MCP tools (`read_blackboard`,
-`write_blackboard`, `list_files`, `set_phase_recommendation`). This decouples
-agents from each other — they communicate only through shared files.
+`write_blackboard`, `register_feedback`, `set_phase_recommendation`). This
+decouples agents from each other — they communicate only through shared files
+and structured feedback entries.
 
 The `_template/` directory defines the initial file structure for new ideas.
 
@@ -77,12 +79,15 @@ future agent runs, creating a feedback loop.
 
 ## Watchers
 
-Watcher agents run on a cron schedule (not tied to individual ideas):
+Watcher agents run on a cron cadence alongside the pipeline:
 
 - **competitive-watcher** — monitors competitor activity (default: every 6 hours)
-- **research-watcher** — tracks relevant academic/industry research (default: daily)
+- **research-watcher** — tracks relevant academic/industry research (default: every 8 hours)
 
-Watchers write findings to the blackboard for relevant ideas.
+Watchers don't create their own artifact files. Instead, they either update
+existing artifacts directly with cited research, or use `register_feedback`
+when they find something important but don't know where to apply it. Each
+idea's pipeline config controls which watchers are active for that idea.
 
 ## Web dashboard
 

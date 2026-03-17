@@ -198,6 +198,73 @@ def create_blackboard_mcp_server(blackboard: Blackboard, idea_id: str, agent_rol
         }
 
     @tool(
+        "register_feedback",
+        (
+            "Register feedback on an artifact. Use this to report issues found "
+            "during review. Do NOT use write_blackboard for feedback."
+        ),
+        {
+            "artifact": str,
+            "comment": str,
+            "severity": str,
+            "pending_agents": list,
+        },
+    )
+    async def register_feedback(args):
+        import json as _json
+        from datetime import datetime, timezone
+        import uuid as _uuid
+
+        artifact = args.get("artifact", "")
+        comment = args.get("comment", "")
+        severity = args.get("severity", "structure")
+        caller_pending = args.get("pending_agents", None)
+
+        if not comment:
+            return {
+                "content": [{"type": "text", "text": "Comment is required"}],
+                "isError": True,
+            }
+
+        identity = f"v1:agent:{agent_role}" if agent_role else "v1:agent:unknown"
+
+        # Load existing feedback
+        try:
+            raw = blackboard.read_file(idea_id, "feedback.json")
+            entries = _json.loads(raw)
+            if not isinstance(entries, list):
+                entries = []
+        except (FileNotFoundError, _json.JSONDecodeError):
+            entries = []
+
+        # Determine pending_agents: caller-specified or all previously-serviced roles
+        # Coerce string to list (agents sometimes pass "role1,role2" instead of a list)
+        if isinstance(caller_pending, str):
+            caller_pending = [x.strip() for x in caller_pending.split(",") if x.strip()]
+        if caller_pending:
+            pending_agents = caller_pending
+        else:
+            status = blackboard.get_status(idea_id)
+            pending_agents = list(status.get("last_serviced_by", {}).keys())
+
+        entry = {
+            "id": str(_uuid.uuid4())[:8],
+            "artifact": artifact,
+            "comment": comment,
+            "severity": severity,
+            "from_identity": identity,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "pending_agents": pending_agents,
+            "acknowledged_by": [],
+        }
+        entries.append(entry)
+        blackboard.write_file(idea_id, "feedback.json", _json.dumps(entries, indent=2))
+
+        return {
+            "content": [{"type": "text", "text": f"Feedback registered: [{severity}] {artifact} — {comment[:80]}"}]
+        }
+
+    @tool(
         "acknowledge_feedback",
         (
             "Acknowledge that you have reviewed a feedback entry. Call this for EACH "
@@ -238,6 +305,7 @@ def create_blackboard_mcp_server(blackboard: Blackboard, idea_id: str, agent_rol
             set_phase_recommendation,
             list_blackboard_files,
             declare_artifacts,
+            register_feedback,
             acknowledge_feedback,
         ],
     )

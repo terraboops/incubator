@@ -393,22 +393,36 @@
 
 <!-- Feedback entries -->
 {% if feedback_entries %}
-{% set pending_fb = feedback_entries | selectattr('pending_agents') | rejectattr('acknowledged_by', 'equalto', feedback_entries[0].get('pending_agents', [])) | list %}
-{% set ns = namespace(pending=[], serviced=[]) %}
+{# Split feedback by source: human vs agent #}
+{% set ns = namespace(human_pending=[], human_serviced=[], agent_pending=[], agent_serviced=[]) %}
 {% for fb in feedback_entries %}
     {% set all_acked = fb.get('pending_agents', []) | length > 0 and fb.get('acknowledged_by', []) | length >= fb.get('pending_agents', []) | length %}
-    {% if all_acked %}
-        {% set _ = ns.serviced.append(fb) %}
+    {% set is_agent = fb.get('from_identity', '').startswith('v1:agent:') %}
+    {% if is_agent %}
+        {% if all_acked %}{% set _ = ns.agent_serviced.append(fb) %}{% else %}{% set _ = ns.agent_pending.append(fb) %}{% endif %}
     {% else %}
-        {% set _ = ns.pending.append(fb) %}
+        {% if all_acked %}{% set _ = ns.human_serviced.append(fb) %}{% else %}{% set _ = ns.human_pending.append(fb) %}{% endif %}
     {% endif %}
 {% endfor %}
 
 {% macro feedback_chip(fb) %}
 <div class="feedback-chip">
     <div class="flex items-center gap-2 mb-1">
+        {% set identity = fb.get('from_identity', '') %}
+        {% if identity.startswith('v1:agent:') %}
+        <span class="inline-flex items-center gap-1 text-[0.62rem] font-mono text-[#7c6f64]" title="Agent feedback">
+            {{ icon('bot', 11) }} {{ identity.split(':')[-1] | role_label }}
+        </span>
+        {% elif identity.startswith('v1:user:') %}
+        <span class="inline-flex items-center gap-1 text-[0.62rem] font-mono text-[#6a7a6a]" title="Human feedback">
+            {{ icon('user', 11) }} you
+        </span>
+        {% endif %}
         {% if fb.artifact %}
         <span class="text-[0.68rem] font-mono text-[#8a8074] bg-[#eae6df] px-1.5 py-0.5 rounded">{{ fb.artifact }}</span>
+        {% endif %}
+        {% if fb.get('severity') %}
+        <span class="text-[0.6rem] font-mono text-[#b0a898]">{{ fb.severity }}</span>
         {% endif %}
         <span class="text-[0.65rem] text-[#b0a898] font-mono">{{ fb.created_at[:10] }}</span>
     </div>
@@ -437,21 +451,42 @@
 <div class="mb-8">
     <h3 class="text-[0.78rem] font-medium text-[#8a8074] uppercase tracking-wider mb-3">Feedback</h3>
     <div id="feedback-list">
-        {# Pending feedback — shown by default #}
-        {% for fb in ns.pending | reverse %}
+        {# Human feedback — always visible #}
+        {% for fb in ns.human_pending | reverse %}
         {{ feedback_chip(fb) }}
         {% endfor %}
-
-        {# Serviced feedback — collapsible #}
-        {% if ns.serviced %}
-        <details class="mt-3">
+        {% if ns.human_serviced %}
+        <details class="mt-3" {% if not ns.human_pending %}open{% endif %}>
             <summary class="text-[0.72rem] text-[#b0a898] cursor-pointer hover:text-[#8a8074] py-1">
-                {{ ns.serviced | length }} serviced feedback{{ 's' if ns.serviced | length != 1 }}
+                {{ ns.human_serviced | length }} serviced feedback{{ 's' if ns.human_serviced | length != 1 }}
             </summary>
             <div class="mt-2 opacity-70">
-                {% for fb in ns.serviced | reverse %}
+                {% for fb in ns.human_serviced | reverse %}
                 {{ feedback_chip(fb) }}
                 {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+
+        {# Agent feedback — collapsed by default #}
+        {% if ns.agent_pending or ns.agent_serviced %}
+        <details class="mt-3">
+            <summary class="inline-flex items-center gap-1.5 text-[0.72rem] text-[#b0a898] cursor-pointer hover:text-[#8a8074] py-1">
+                {{ icon('bot', 12) }}
+                {{ ns.agent_pending | length + ns.agent_serviced | length }} agent feedback{{ 's' if (ns.agent_pending | length + ns.agent_serviced | length) != 1 }}
+                {%- if ns.agent_pending %} <span class="text-[#c4956a]">({{ ns.agent_pending | length }} pending)</span>{% endif %}
+            </summary>
+            <div class="mt-2">
+                {% for fb in ns.agent_pending | reverse %}
+                {{ feedback_chip(fb) }}
+                {% endfor %}
+                {% if ns.agent_serviced %}
+                <div class="opacity-70 mt-2">
+                    {% for fb in ns.agent_serviced | reverse %}
+                    {{ feedback_chip(fb) }}
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
         </details>
         {% endif %}

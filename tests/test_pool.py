@@ -25,7 +25,15 @@ def _make_pool_for_handle_result(tmp_path):
     pm.blackboard = MagicMock()
     pm.lock_manager = MagicMock()
     pm.roles = ["ideation", "implementation", "validation", "release"]
+    # Pipeline agents: no cadence, no phase="*"
+    def _get_agent(name):
+        m = MagicMock()
+        m.cadence = None
+        m.phase = name
+        m.max_concurrent = 1
+        return m
     pm.registry = MagicMock()
+    pm.registry.get_agent.side_effect = _get_agent
     pm.pool_dir = tmp_path / "pool"
     pm.pool_dir.mkdir(exist_ok=True)
     pm.workers = []

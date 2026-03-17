@@ -93,10 +93,10 @@ the directory structure and registry entry for you.
 `artifact-check` is a maintenance agent with `phase: "*"`, meaning it runs
 across all ideas rather than within a single pipeline phase. It:
 
-- Iterates over every active idea
-- Validates that expected artifacts exist for each phase
-- Reports missing or malformed files
-- Flags ideas that may be stuck
+- Reviews artifacts for mechanical quality issues (accessibility, clarity, structure)
+- Uses `register_feedback` to report specific, actionable findings
+- Checks existing feedback to avoid duplicates
+- Never creates its own artifact files
 
 This is a useful pattern for any cross-cutting concern: quality gates, cost
 monitoring, compliance checks, etc.

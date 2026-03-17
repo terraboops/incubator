@@ -238,7 +238,15 @@ def _make_pool(tmp_path):
     pm.blackboard = MagicMock()
     pm.lock_manager = MagicMock()
     pm.roles = ["ideation", "implementation", "validation", "release"]
+    # Pipeline agents: no cadence, no phase="*"
+    def _get_agent(name):
+        m = MagicMock()
+        m.cadence = None
+        m.phase = name  # pipeline agents have phase matching their name
+        m.max_concurrent = 1
+        return m
     pm.registry = MagicMock()
+    pm.registry.get_agent.side_effect = _get_agent
     pm.pool_dir = tmp_path / "pool"
     pm.pool_dir.mkdir(exist_ok=True)
     pm.workers = []
@@ -478,33 +486,46 @@ def test_pipeline_producer_skips_terminal(tmp_path):
 
 # ── Cadence producer tests ───────────────────────────────────────────
 
-def test_cadence_producer_enqueues_due_agents(tmp_path):
-    """Cadence producer creates jobs for due background agents."""
+def _make_pool_with_watcher(tmp_path):
+    """Pool with a cadence-tracked watcher agent."""
     pm = _make_pool(tmp_path)
+    def _get_agent(name):
+        m = MagicMock()
+        m.cadence = "0 */6 * * *" if name == "watcher" else None
+        m.phase = None
+        m.max_concurrent = 1
+        return m
+    pm.registry.get_agent.side_effect = _get_agent
+    pm.blackboard.list_ideas.return_value = ["idea-a", "idea-b"]
+    pm.blackboard.get_status.side_effect = lambda id: {
+        "id": id, "phase": "released", "priority_score": 5.0,
+    }
+    return pm
+
+
+def test_cadence_producer_enqueues_due_agents(tmp_path):
+    """Cadence producer creates per-idea jobs for due background agents."""
+    pm = _make_pool_with_watcher(tmp_path)
     queue = JobQueue()
 
-    trackers = {
-        "watcher": CadenceTracker("watcher", "0 */6 * * *"),
-    }
-    # Never run → due
+    trackers = {"watcher": CadenceTracker("watcher", "0 */6 * * *")}
     pm._cadence_producer(queue, trackers)
 
-    job = queue.pop()
-    assert job is not None
-    assert job.role == "watcher"
-    assert job.idea_id == "__all__"
-    assert job.priority == MAX_BACKGROUND_PRIORITY
+    jobs = []
+    while (j := queue.pop()) is not None:
+        jobs.append(j)
+    assert len(jobs) == 2
+    assert {j.idea_id for j in jobs} == {"idea-a", "idea-b"}
+    assert all(j.priority == MAX_BACKGROUND_PRIORITY for j in jobs)
 
 
 def test_cadence_producer_skips_not_due(tmp_path):
     """Cadence producer doesn't enqueue agents that just ran."""
-    pm = _make_pool(tmp_path)
+    pm = _make_pool_with_watcher(tmp_path)
     queue = JobQueue()
 
-    trackers = {
-        "watcher": CadenceTracker("watcher", "0 */6 * * *"),
-    }
-    trackers["watcher"].last_run_at = datetime.now(timezone.utc)  # just ran
+    trackers = {"watcher": CadenceTracker("watcher", "0 */6 * * *")}
+    trackers["watcher"].last_run_at = datetime.now(timezone.utc)
 
     pm._cadence_producer(queue, trackers)
     assert queue.pop() is None

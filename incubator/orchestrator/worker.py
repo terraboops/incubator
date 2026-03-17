@@ -83,11 +83,10 @@ class Worker:
         idea_id = job.idea_id
 
         # Lock keyed by role:idea_id so different agents can run on the same idea
-        lock_id = f"{role}:{idea_id}" if idea_id != "__all__" else None
-        if lock_id:
-            if not self.lock_manager.acquire("pool", lock_id, executor=f"worker-{self.worker_id}"):
-                logger.warning("Worker %d: lock unavailable for %s on %s", self.worker_id, role, idea_id)
-                return None
+        lock_id = f"{role}:{idea_id}"
+        if not self.lock_manager.acquire("pool", lock_id, executor=f"worker-{self.worker_id}"):
+            logger.warning("Worker %d: lock unavailable for %s on %s", self.worker_id, role, idea_id)
+            return None
 
         self.current_role = role
         self.current_idea = idea_id
@@ -144,8 +143,7 @@ class Worker:
                 error=str(e),
             )
         finally:
-            if lock_id:
-                self.lock_manager.release("pool", lock_id)
+            self.lock_manager.release("pool", lock_id)
             self.current_role = None
             self.current_idea = None
             self.started_at = None

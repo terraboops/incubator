@@ -56,6 +56,7 @@ def _read_agent_prompt(agent_name: str) -> str | None:
 def _write_agent_prompt(agent_name: str, prompt_text: str) -> None:
     """Write the SYSTEM_PROMPT string back to an agent's prompt.py."""
     path = _agent_prompt_path(agent_name)
+    path.parent.mkdir(parents=True, exist_ok=True)
     content = f'SYSTEM_PROMPT = """\\\n{prompt_text}\n"""\n'
     path.write_text(content)
 

@@ -9,6 +9,22 @@ from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 logger = logging.getLogger(__name__)
 
 
+def _md_to_html(text: str) -> str:
+    """Convert simple Markdown formatting to Telegram-safe HTML.
+
+    Handles *bold* → <b>bold</b> and `code` → <code>code</code>.
+    Leaves everything else as plain text (no entity-parsing surprises).
+    """
+    import re
+    # Code blocks first (```...```)
+    text = re.sub(r"```(.*?)```", r"<pre>\1</pre>", text, flags=re.DOTALL)
+    # Inline code
+    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
+    # Bold (*text* but not mid-word asterisks)
+    text = re.sub(r"(?<!\w)\*([^*]+)\*(?!\w)", r"<b>\1</b>", text)
+    return text
+
+
 class TelegramNotifier:
     """Bidirectional Telegram communication with inline keyboard support."""
 
@@ -46,8 +62,8 @@ class TelegramNotifier:
         bot = Bot(self.bot_token)
         await bot.send_message(
             chat_id=self.chat_id,
-            text=message,
-            parse_mode="Markdown",
+            text=_md_to_html(message),
+            parse_mode="HTML",
         )
 
     async def ask_human(
@@ -75,9 +91,9 @@ class TelegramNotifier:
         ]
         await bot.send_message(
             chat_id=self.chat_id,
-            text=question,
+            text=_md_to_html(question),
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
 
         try:
@@ -104,4 +120,4 @@ class TelegramNotifier:
         future = self._pending.get(question_id)
         if future and not future.done():
             future.set_result(answer)
-            await query.edit_message_text(f"✅ You chose: *{answer}*", parse_mode="Markdown")
+            await query.edit_message_text(f"✅ You chose: <b>{answer}</b>", parse_mode="HTML")

@@ -18,6 +18,17 @@ router = APIRouter()
 settings = get_settings()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+_CADENCE_PATTERNS = {
+    "0 */6 * * *": "every 6h",
+    "0 */4 * * *": "every 4h",
+    "0 */12 * * *": "every 12h",
+    "0 8 * * *": "daily at 8am",
+    "0 0 * * *": "daily at midnight",
+    "*/30 * * * *": "every 30min",
+    "*/5 * * * *": "every 5min",
+}
+templates.env.filters["cadence_label"] = lambda cron: _CADENCE_PATTERNS.get(cron, cron)
+
 
 def _read_pool_state() -> dict:
     """Read the latest pool state snapshot."""
@@ -91,11 +102,99 @@ def _normalize_workers(state: dict) -> None:
                 pass
 
 
+def _enrich_cadence_trackers(state: dict) -> None:
+    """Add heartbeat dots and time_left to cadence tracker data."""
+    from datetime import datetime, timezone
+    from croniter import croniter
+
+    now = datetime.now(timezone.utc)
+    bb = Blackboard(settings.blackboard_dir)
+
+    for role, tracker in state.get("cadence_trackers", {}).items():
+        cron_expr = tracker.get("cron", "")
+        last_run_at = tracker.get("last_run_at")
+
+        # Compute time_left from cron
+        if last_run_at and cron_expr:
+            try:
+                last_dt = datetime.fromisoformat(last_run_at)
+                cron = croniter(cron_expr, last_dt)
+                next_run = cron.get_next(datetime)
+                remaining = next_run - now
+                secs = int(remaining.total_seconds())
+                if secs > 0:
+                    if secs >= 3600:
+                        tracker["time_left"] = f"{secs // 3600}h{(secs % 3600) // 60:02d}m"
+                    else:
+                        tracker["time_left"] = f"{secs // 60}m"
+                else:
+                    tracker["time_left"] = "due now"
+            except Exception:
+                tracker["time_left"] = ""
+        else:
+            tracker["time_left"] = "never run"
+
+        # Build heartbeat dots from agent logs across all ideas
+        # Look at the last N cadence windows and check if the agent ran in each
+        n_dots = 12
+        if not cron_expr:
+            tracker["heartbeat"] = ["ran"] * n_dots
+            continue
+
+        try:
+            # Walk backwards N intervals from now
+            cron_back = croniter(cron_expr, now)
+            window_boundaries = [now]
+            for _ in range(n_dots):
+                prev = cron_back.get_prev(datetime)
+                window_boundaries.append(prev)
+            window_boundaries.reverse()  # oldest first
+
+            # Collect all run timestamps for this role from agent logs
+            run_times = []
+            for idea_id in bb.list_ideas():
+                log_dir = bb.idea_dir(idea_id) / "agent-logs"
+                if not log_dir.is_dir():
+                    continue
+                for f in log_dir.iterdir():
+                    if not f.name.startswith(role):
+                        continue
+                    try:
+                        data = json.loads(f.read_text())
+                        ts = data.get("timestamp", "")
+                        if ts:
+                            run_times.append(datetime.fromisoformat(ts))
+                    except Exception:
+                        pass
+
+            # For each window, check if any run happened in it
+            dots = []
+            for i in range(len(window_boundaries) - 1):
+                start = window_boundaries[i]
+                end = window_boundaries[i + 1]
+                ran_in_window = any(start <= t < end for t in run_times)
+                if i == len(window_boundaries) - 2:
+                    # Current window
+                    if ran_in_window:
+                        dots.append("ran")
+                    elif tracker.get("is_due"):
+                        dots.append("missed")
+                    else:
+                        dots.append("current")
+                else:
+                    dots.append("ran" if ran_in_window else "missed")
+
+            tracker["heartbeat"] = dots
+        except Exception:
+            tracker["heartbeat"] = ["ran"] * n_dots
+
+
 @router.get("/", response_class=HTMLResponse)
 async def pool_status(request: Request):
     state = _read_pool_state()
     _normalize_workers(state)
     _compute_idle_reasons(state)
+    _enrich_cadence_trackers(state)
 
     return templates.TemplateResponse("pool.html", {
         "request": request,

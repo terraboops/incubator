@@ -80,31 +80,31 @@
 
 <!-- Cadence Trackers -->
 {% if state.cadence_trackers %}
+<style>
+    .hb-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .hb-dot.ran { background: #82b582; }
+    .hb-dot.missed { background: #c45a5a; opacity: 0.7; }
+    .hb-dot.current { background: #d4a843; animation: hb-pulse 1.5s infinite; }
+    @keyframes hb-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+</style>
 <section class="mb-10">
     <h2 class="text-[0.78rem] uppercase tracking-wider text-[#8a8074] mb-4">Background Agents (Cadence)</h2>
     <div class="card divide-y divide-[#eae6df]">
         {% for role, tracker in state.cadence_trackers.items() %}
-        {% set ratio_pct = (tracker.elapsed_ratio * 100)|int %}
         {% set is_due = tracker.is_due %}
         <div class="px-5 py-4 flex items-center gap-4">
             <div class="w-36">
                 <span class="badge badge-{{ role }}">{{ role }}</span>
-                <div class="text-[0.68rem] text-[#8a8074] mt-0.5 font-mono">{{ tracker.cron }}</div>
+                <div class="text-[0.68rem] text-[#8a8074] mt-0.5 font-mono">{{ tracker.cron | cadence_label }}</div>
             </div>
-            <div class="flex-1">
-                <div class="h-2 rounded-full overflow-hidden" style="background: #eae6df;">
-                    <div class="h-full rounded-full transition-all duration-500"
-                         style="width: {{ [ratio_pct, 100]|min }}%;
-                                background: {{ '#d4a843' if is_due else '#82b582' }};">
-                    </div>
-                </div>
+            <div class="flex-1 flex items-center gap-1.5 justify-center">
+                {% for dot in tracker.heartbeat %}
+                <div class="hb-dot {{ dot }}" title="{{ dot }}"></div>
+                {% endfor %}
             </div>
-            <div class="w-28 text-right">
-                <span class="font-mono text-[0.84rem] {% if is_due %}text-[#b8860b]{% else %}text-[#3b3530]{% endif %} font-medium">
-                    {{ ratio_pct }}%
-                </span>
-                <span class="text-[0.72rem] text-[#8a8074] block">
-                    pri {{ tracker.priority }}
+            <div class="w-36 text-right">
+                <span class="text-[0.78rem] {% if is_due %}text-[#b8860b] font-medium{% else %}text-[#8a8074]{% endif %}">
+                    {% if is_due %}overdue{% else %}{{ tracker.time_left }}{% endif %}
                 </span>
             </div>
         </div>

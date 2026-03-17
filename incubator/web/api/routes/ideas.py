@@ -181,10 +181,17 @@ async def home(request: Request):
         # Mark idea as running if any worker is active on it
         if any(idea_id == rid for _, rid in pool_running):
             status["running"] = True
-        # Compute auxiliary agent status
+        # Compute auxiliary agent status — idea's post_ready + global background agents
         aux_status = []
         idea_dir = bb.base_dir / idea_id
-        for role in auxiliary_roles:
+        pipeline = bb.get_pipeline(idea_id)
+        post_ready_set = set(pipeline.get("post_ready", []))
+        background_set = {
+            a.name for a in registry.agents.values()
+            if a.status == "active" and a.phase == "*"
+        }
+        idea_aux_roles = [r for r in auxiliary_roles if r in post_ready_set or r in background_set]
+        for role in idea_aux_roles:
             role_file = idea_dir / f"{role}.md"
             role_dir = idea_dir / role
             has_run = role_file.exists() or (role_dir.exists() and any(role_dir.iterdir()))
@@ -525,6 +532,7 @@ async def submit_feedback(
         "artifact": artifact,
         "selected_text": selected_text.strip(),
         "comment": comment.strip(),
+        "from_identity": "v1:user:me",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "pending_agents": pending_agents,
         "acknowledged_by": [],

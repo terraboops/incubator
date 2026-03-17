@@ -2,16 +2,29 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 from pathlib import Path
 
 from claude_agent_sdk import AgentDefinition
 
 from incubator.comms.notifications import NotificationDispatcher
+from incubator.core.agent import BaseAgent
 from incubator.core.blackboard import Blackboard
 from incubator.core.registry import AgentConfig, Registry
 
 logger = logging.getLogger(__name__)
+
+
+class GenericAgent(BaseAgent):
+    """Concrete agent that loads its system prompt from a prompt.py file."""
+
+    def __init__(self, *args, system_prompt: str, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._system_prompt = system_prompt
+
+    def get_system_prompt(self, idea_id: str) -> str:
+        return self._system_prompt
 
 
 class AgentFactory:
@@ -44,6 +57,41 @@ class AgentFactory:
         self._agent_classes["validation"] = ValidationAgent
         self._agent_classes["release"] = ReleaseAgent
 
+    def _find_system_prompt(self, role: str) -> str | None:
+        """Try to load a SYSTEM_PROMPT from prompt.py in project or defaults dirs."""
+        # Search paths: project agents dir (multiple possible locations), then defaults
+        search_dirs = [
+            self.project_root / "agents" / role,
+            self.project_root / "agents" / "watchers",  # competitive.py, research.py
+            Path(__file__).parent.parent / "defaults" / "agents" / role,
+        ]
+
+        # Try prompt.py first, then role-specific filenames for watchers dir
+        filenames = ["prompt"]
+        role_to_alt = {
+            "competitive-watcher": "competitive",
+            "research-watcher": "research",
+        }
+        if role in role_to_alt:
+            filenames.append(role_to_alt[role])
+
+        for search_dir in search_dirs:
+          for filename in filenames:
+            prompt_file = search_dir / f"{filename}.py"
+            if prompt_file.exists():
+                # Load the module and extract SYSTEM_PROMPT
+                spec = importlib.util.spec_from_file_location(f"_prompt_{role}", prompt_file)
+                if spec and spec.loader:
+                    mod = importlib.util.module_from_spec(spec)
+                    try:
+                        spec.loader.exec_module(mod)
+                        if hasattr(mod, "SYSTEM_PROMPT"):
+                            return mod.SYSTEM_PROMPT
+                    except Exception as e:
+                        logger.warning("Failed to load prompt from %s: %s", prompt_file, e)
+
+        return None
+
     def create_agent(self, role: str):
         """Create an agent instance for the given role."""
         config = self.registry.get_agent(role)
@@ -51,15 +99,28 @@ class AgentFactory:
             raise ValueError(f"No agent config found for role: {role}")
 
         agent_class = self._agent_classes.get(role)
-        if not agent_class:
-            from incubator.core.agent import BaseAgent
-            agent_class = BaseAgent
+        if agent_class:
+            return agent_class(
+                config=config,
+                blackboard=self.blackboard,
+                dispatcher=self.dispatcher,
+                project_root=self.project_root,
+            )
 
-        return agent_class(
+        # No dedicated class — build a GenericAgent with a discovered prompt
+        system_prompt = self._find_system_prompt(role)
+        if not system_prompt:
+            raise ValueError(
+                f"No agent class or prompt.py with SYSTEM_PROMPT found for role '{role}'. "
+                f"Create agents/{role}/prompt.py with a SYSTEM_PROMPT constant."
+            )
+
+        return GenericAgent(
             config=config,
             blackboard=self.blackboard,
             dispatcher=self.dispatcher,
             project_root=self.project_root,
+            system_prompt=system_prompt,
         )
 
     def create_custom_agent(

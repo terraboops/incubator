@@ -122,7 +122,9 @@ myproject/
     implementation/
     validation/
     release/
-    artifact-check/     # runs across all ideas
+    artifact-check/     # quality checks across all ideas
+    competitive-watcher/ # monitors competitive landscape
+    research-watcher/   # tracks relevant research
   blackboard/ideas/     # per-idea shared state
   workspace/            # agent working dirs
 ```
@@ -132,7 +134,7 @@ myproject/
 ```bash
 git clone https://github.com/terrateamio/incubator.git
 pip install -e ".[dev]"
-pytest -v                     # 21 tests
+pytest -v                     # 114 tests
 ```
 
 ## Docs

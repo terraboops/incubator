@@ -163,8 +163,13 @@ class BaseAgent(ABC):
         return {}
 
     def get_working_dir(self, idea_id: str) -> str:
-        """Return agent dir so .claude/ sessions land in the project."""
-        return str(self.project_root / "agents" / self.config.name)
+        """Return agent dir so .claude/ sessions land in the project.
+
+        Creates the directory if it doesn't exist, falling back to project root.
+        """
+        agent_dir = self.project_root / "agents" / self.config.name
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        return str(agent_dir)
 
     def _build_deadline_context(self, deadline: datetime) -> str:
         """Build time-awareness context for the system prompt."""

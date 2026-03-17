@@ -89,18 +89,19 @@ class PoolManager:
         self.pool_dir = settings.project_root / "pool"
         self.pool_dir.mkdir(exist_ok=True)
 
-    # Phases where the pool should not schedule work
-    _TERMINAL_PHASES = {"killed", "released", "paused"}
-
     def _get_active_ideas(self) -> list[dict]:
-        """Get all non-terminal ideas sorted by priority."""
+        """Get ideas that need pipeline work, sorted by priority.
+
+        Excludes killed, paused, review-pending, and fully-released ideas.
+        """
         ideas = []
         for idea_id in self.blackboard.list_ideas():
             status = self.blackboard.get_status(idea_id)
             phase = status.get("phase", "submitted")
-            if phase in self._TERMINAL_PHASES:
-                if phase != "released" or not self.blackboard.pending_post_ready(idea_id):
-                    continue
+            if phase in ("killed", "paused"):
+                continue
+            if phase == "released" and not self.blackboard.pending_post_ready(idea_id):
+                continue
             if phase.endswith("_review"):
                 continue
             if status.get("needs_human_review") and not self.settings.telegram_bot_token:
@@ -108,6 +109,23 @@ class PoolManager:
             score = status.get("priority_score", PRIORITY_DEFAULT)
             if phase in ("submitted",) or self._is_first_pipeline_agent(idea_id):
                 score += PRIORITY_EARLY_BOOST
+            status["_effective_priority"] = score
+            ideas.append(status)
+        ideas.sort(key=lambda s: s.get("_effective_priority", 0), reverse=True)
+        return ideas
+
+    def _get_all_ideas(self) -> list[dict]:
+        """Get ALL ideas (except killed) for background/watcher agents.
+
+        Watchers and global agents always run on every living idea —
+        there's always new research, competitive intel, or refinements.
+        """
+        ideas = []
+        for idea_id in self.blackboard.list_ideas():
+            status = self.blackboard.get_status(idea_id)
+            if status.get("phase") == "killed":
+                continue
+            score = status.get("priority_score", PRIORITY_DEFAULT)
             status["_effective_priority"] = score
             ideas.append(status)
         ideas.sort(key=lambda s: s.get("_effective_priority", 0), reverse=True)
@@ -199,7 +217,11 @@ class PoolManager:
     def _cadence_producer(
         self, queue: JobQueue, cadence_trackers: dict[str, CadenceTracker]
     ) -> None:
-        """Enqueue background jobs when their cadence is due."""
+        """Enqueue background jobs when their cadence is due.
+
+        Background/watcher agents run on ALL ideas (except killed) —
+        there's always new research, competitive intel, or refinements.
+        """
         now = datetime.now(timezone.utc)
         for role, tracker in cadence_trackers.items():
             if not tracker.is_due(now):
@@ -207,7 +229,7 @@ class PoolManager:
             priority = tracker.priority(now)
             if self._is_global_agent(role):
                 # Global agents (phase="*") run per-idea
-                ideas = self._get_active_ideas()
+                ideas = self._get_all_ideas()
                 for idea in ideas:
                     job = Job(
                         priority=priority,
@@ -217,14 +239,16 @@ class PoolManager:
                     )
                     queue.enqueue(job)
             else:
-                # Regular background agents run against all ideas
-                job = Job(
-                    priority=priority,
-                    kind="background",
-                    role=role,
-                    idea_id="__all__",
-                )
-                queue.enqueue(job)
+                # All background/watcher agents run per-idea
+                ideas = self._get_all_ideas()
+                for idea in ideas:
+                    job = Job(
+                        priority=priority,
+                        kind="background",
+                        role=role,
+                        idea_id=idea["id"],
+                    )
+                    queue.enqueue(job)
 
     # ── Dispatch ─────────────────────────────────────────────────────
 
@@ -251,11 +275,10 @@ class PoolManager:
                 continue
 
             # Check parallel group constraints for same-idea scheduling
-            if job.idea_id != "__all__":
-                pipeline = self.blackboard.get_pipeline(job.idea_id)
-                if not can_schedule(job.role, job.idea_id, running, pipeline):
-                    skipped.append(job)
-                    continue
+            pipeline = self.blackboard.get_pipeline(job.idea_id)
+            if not can_schedule(job.role, job.idea_id, running, pipeline):
+                skipped.append(job)
+                continue
 
             result = job
             break
@@ -274,13 +297,17 @@ class PoolManager:
         config = self.registry.get_agent(role)
         return config is not None and config.phase == "*"
 
+    def _is_background_agent(self, role: str) -> bool:
+        """Check if a role is a background/watcher agent (has cadence or phase='*')."""
+        config = self.registry.get_agent(role)
+        if config is None:
+            return False
+        return config.cadence is not None or config.phase == "*"
+
     async def _handle_result(self, result: RunResult, queue: JobQueue) -> None:
         """Process a completed worker run — update tracking, apply gating."""
-        if result.idea_id == "__all__":
-            return
-
-        # Global agents (phase="*") run on ideas but don't affect pipeline state
-        if self._is_global_agent(result.role):
+        # Background/watcher agents don't affect pipeline state
+        if self._is_background_agent(result.role):
             return
 
         now = datetime.now(timezone.utc)
