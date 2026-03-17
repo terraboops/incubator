@@ -8,6 +8,15 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+# Load .env into os.environ so CLAUDE_CONFIG_DIR (and other non-pydantic vars)
+# are available to agent auth code
+from dotenv import load_dotenv
+from incubator.config import find_project_root
+try:
+    load_dotenv(find_project_root() / ".env", override=False)
+except FileNotFoundError:
+    pass
+
 # Allow Agent SDK calls when running inside a Claude Code session
 os.environ.pop("CLAUDECODE", None)
 

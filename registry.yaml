@@ -94,7 +94,6 @@ agents:
   status: active
   tools:
   - Read
-  - Write
   - WebSearch
   - WebFetch
   cadence: 0 */6 * * *
@@ -108,7 +107,6 @@ agents:
   status: active
   tools:
   - Read
-  - Write
   - WebSearch
   - WebFetch
   phase: research

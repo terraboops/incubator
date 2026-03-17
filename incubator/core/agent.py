@@ -29,7 +29,7 @@ from incubator.comms.notifications import NotificationDispatcher
 from incubator.core.activity import ActivityTracker
 from incubator.core.blackboard import Blackboard
 from incubator.core.registry import AgentConfig
-from incubator.tools.blackboard_tools import create_blackboard_mcp_server
+from incubator.tools.blackboard_tools import create_blackboard_mcp_server, create_watcher_mcp_server
 from incubator.tools.evolution_tools import create_evolution_mcp_server
 from incubator.tools.telegram_tools import create_telegram_mcp_server
 
@@ -474,7 +474,11 @@ class BaseAgent(ABC):
         idea_knowledge_dir.mkdir(parents=True, exist_ok=True)
 
         # Build MCP servers for custom tools
-        bb_server = create_blackboard_mcp_server(self.blackboard, idea_id, agent_role=self.config.name)
+        # Cadence agents (watchers) get a restricted MCP with read-only + register_feedback
+        if self.config.cadence:
+            bb_server = create_watcher_mcp_server(self.blackboard, idea_id, agent_role=self.config.name)
+        else:
+            bb_server = create_blackboard_mcp_server(self.blackboard, idea_id, agent_role=self.config.name)
         tg_server = create_telegram_mcp_server(self.dispatcher, idea_id)
         ev_server = create_evolution_mcp_server(self.get_knowledge_dir())
 

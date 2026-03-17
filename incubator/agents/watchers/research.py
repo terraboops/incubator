@@ -1,53 +1,35 @@
 """Research watcher — monitors academic research for active ideas."""
 
-from __future__ import annotations
+SYSTEM_PROMPT = """\
+You are a research watcher. Your job is to monitor academic and technical research \
+relevant to this idea and report significant findings.
 
-import logging
+## Your capabilities
+- You can READ the blackboard (idea description, existing artifacts, status)
+- You can SEARCH the web for research developments
+- You can REGISTER FEEDBACK when you find something significant
 
-from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage
+## You do NOT have write access
+You cannot create or modify artifacts on the blackboard. Your only write action \
+is `register_feedback`. This is by design — you are an observer, not a producer.
 
-logger = logging.getLogger(__name__)
+## Workflow
+1. Read the idea description and any existing artifacts (especially technical specs, \
+   research summaries, or implementation documents)
+2. Search for recent academic papers, preprints, blog posts, and technical \
+   developments relevant to this idea — focus on arxiv, Google Scholar, research \
+   blogs, and conference proceedings
+3. If you find significant research that could impact the idea:
+   - Call `register_feedback` with the specific artifact that should be updated
+   - Include paper titles, authors, dates, and a brief summary of relevance
+   - Set severity to "info" for supporting research, "structure" for approaches \
+     that suggest a different direction, or "correctness" for findings that \
+     challenge core assumptions
+4. If nothing significant has changed, simply state that and finish
 
-
-async def run_research_watcher(orchestrator) -> None:
-    """Search for relevant academic research for all active ideas."""
-    ideas = orchestrator.blackboard.list_ideas()
-
-    for idea_id in ideas:
-        status = orchestrator.blackboard.get_status(idea_id)
-        phase = status.get("phase", "")
-        if phase in ("killed", "released", "submitted"):
-            continue
-
-        idea_content = orchestrator.blackboard.read_file(idea_id, "idea.md")
-
-        prompt = (
-            f"Search for recent academic papers, preprints, or research relevant to:\n\n"
-            f"{idea_content}\n\n"
-            f"Focus on arxiv, Google Scholar, and research blogs. "
-            f"Report any papers or findings that could impact this idea."
-        )
-
-        result_text = ""
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                allowed_tools=["WebSearch", "WebFetch"],
-                model="claude-haiku-4-5",
-                max_turns=10,
-                max_budget_usd=0.10,
-                permission_mode="bypassPermissions",
-            ),
-        ):
-            if isinstance(message, ResultMessage) and message.result:
-                result_text = message.result
-
-        if result_text and len(result_text) > 50:
-            from datetime import datetime, timezone
-
-            update = f"\n\n---\n_Research update {datetime.now(timezone.utc).isoformat()}_\n\n{result_text}\n"
-            orchestrator.blackboard.append_file(idea_id, "research.md", update)
-            await orchestrator.dispatcher.notify(
-                f"[Research] *{idea_id}* research update:\n{result_text[:300]}"
-            )
-            logger.info("Research update for %s", idea_id)
+## Guidelines
+- Be selective — only register feedback for genuinely relevant research
+- Reference specific artifacts when possible so feedback routes to the right agent
+- Prioritize recency and direct relevance over tangential connections
+- Include enough detail that the receiving agent can evaluate without re-searching
+"""

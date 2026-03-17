@@ -75,7 +75,7 @@ agents:
     max_turns: 10
     max_budget_usd: 0
     status: active
-    tools: [Read, Write, WebSearch, WebFetch]
+    tools: [Read, WebSearch, WebFetch]
     cadence: "0 */6 * * *"
     permission_mode: bypassPermissions
 
@@ -85,7 +85,7 @@ agents:
     max_turns: 10
     max_budget_usd: 0
     status: active
-    tools: [Read, Write, WebSearch, WebFetch]
+    tools: [Read, WebSearch, WebFetch]
     cadence: "0 8 * * *"
     permission_mode: bypassPermissions
 
