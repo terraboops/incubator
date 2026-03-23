@@ -181,19 +181,6 @@ class PoolManager:
             )
             queue.enqueue(job)
 
-            # Also enqueue feedback-driven work
-            for role in self.roles:
-                if role == next_role:
-                    continue
-                if self.blackboard.has_pending_feedback(idea_id, role):
-                    job = Job(
-                        priority=compute_priority("feedback", priority),
-                        kind="feedback",
-                        role=role,
-                        idea_id=idea_id,
-                    )
-                    queue.enqueue(job)
-
         # Global agents (phase="*") — one job per active idea
         # Only enqueued by pipeline_producer if they have no cadence;
         # cadence-tracked global agents are handled by _cadence_producer.
@@ -213,6 +200,32 @@ class PoolManager:
                     idea_id=idea["id"],
                 )
                 queue.enqueue(job)
+
+    def _feedback_producer(self, queue: JobQueue) -> None:
+        """Scan ALL non-killed ideas for unacknowledged feedback and enqueue jobs.
+
+        Runs independently of _pipeline_producer so feedback is serviced even
+        when an idea is in a review phase, fully released, or has no next
+        pipeline agent.
+        """
+        for idea_id in self.blackboard.list_ideas():
+            status = self.blackboard.get_status(idea_id)
+            phase = status.get("phase", "submitted")
+            if phase == "killed":
+                continue
+            priority = status.get("priority_score", PRIORITY_DEFAULT)
+            for role in self.roles:
+                config = self.registry.get_agent(role)
+                if config and (config.cadence or config.phase == "*"):
+                    continue
+                if self.blackboard.has_pending_feedback(idea_id, role):
+                    job = Job(
+                        priority=compute_priority("feedback", priority),
+                        kind="feedback",
+                        role=role,
+                        idea_id=idea_id,
+                    )
+                    queue.enqueue(job)
 
     def _cadence_producer(
         self, queue: JobQueue, cadence_trackers: dict[str, CadenceTracker]
@@ -306,8 +319,18 @@ class PoolManager:
 
     async def _handle_result(self, result: RunResult, queue: JobQueue) -> None:
         """Process a completed worker run — update tracking, apply gating."""
-        # Background/watcher agents don't affect pipeline state
+        # Background/watcher agents don't affect pipeline state — but if
+        # they're in post_ready, we must mark them serviced so the idea
+        # doesn't stay perpetually "active" in the scheduler.
         if self._is_background_agent(result.role):
+            if result.status in (RunStatus.OK, RunStatus.DEADLINE):
+                if self.blackboard.pipeline_has_role(result.idea_id, result.role):
+                    status = self.blackboard.get_status(result.idea_id)
+                    serviced = status.get("last_serviced_by", {})
+                    serviced[result.role] = datetime.now(timezone.utc).isoformat()
+                    self.blackboard.update_status(
+                        result.idea_id, last_serviced_by=serviced,
+                    )
             return
 
         now = datetime.now(timezone.utc)
@@ -609,10 +632,13 @@ class PoolManager:
             # 2. Pipeline producer — scan ideas, enqueue next agents
             self._pipeline_producer(queue)
 
-            # 3. Cadence producer — enqueue background jobs when due
+            # 3. Feedback producer — independent of pipeline state
+            self._feedback_producer(queue)
+
+            # 4. Cadence producer — enqueue background jobs when due
             self._cadence_producer(queue, cadence_trackers)
 
-            # 4. Dispatch to idle workers (highest priority first)
+            # 5. Dispatch to idle workers (highest priority first)
             running = {(w.current_role, w.current_idea) for w in self.workers if not w.is_idle}
             for worker in self.workers:
                 if not worker.is_idle:
@@ -627,7 +653,7 @@ class PoolManager:
                 pending[task] = worker
                 running.add((job.role, job.idea_id))
 
-            # 5. Wait for something to happen
+            # 6. Wait for something to happen
             if pending:
                 await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED, timeout=10)
             else:

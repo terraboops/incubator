@@ -4,7 +4,16 @@
 \*         gating modes, feedback scheduling, refinement loops,
 \*         iteration caps, and per-idea background agents.
 \*
-\* Updated 2026-03-16 to match current implementation.
+\* Updated 2026-03-21 to match current implementation.
+\*
+\* Implementation notes (Python divergences — intentional simplifications):
+\*   - The Python iteration counter is global per-idea (not per-agent-per-idea
+\*     as in this spec). This is more restrictive and intentionally simpler.
+\*   - The Python uses continuous floating-point priorities rather than the
+\*     discrete integers modeled here. The spec abstracts this to pipeline=5,
+\*     feedback=4, background=3 for tractable model checking.
+\*   - max_refinement_cycles=0 means infinite in Python (not modeled here;
+\*     the spec uses a finite MaxRefinementCycles constant).
 
 EXTENDS Integers, Sequences, FiniteSets
 
@@ -137,8 +146,25 @@ ProducePipeline(idea) ==
                        releaseCount, needsReview, hasFeedback, cadenceDue, runCount>>
 
 \* Producer: enqueue feedback-driven work for an agent with pending feedback
+\* (original — embedded in pipeline path, restricted to IsEligible ideas)
 ProduceFeedback(idea, agent) ==
     /\ IsEligible(idea)
+    /\ agent \in PipelineAgentSet
+    /\ hasFeedback[idea][agent]
+    /\ ~InQueue(agent, idea)
+    /\ ~IsRunning(agent, idea)
+    /\ queue' = queue \cup {[role |-> agent, idea |-> idea,
+                              kind |-> "feedback", priority |-> 4]}
+    /\ UNCHANGED <<wState, wJob, phase, stageResults, iterCount,
+                    releaseCount, needsReview, hasFeedback, cadenceDue, runCount>>
+
+\* Producer: independent feedback scan (matches Python _feedback_producer).
+\* Deliberately relaxes IsEligible — feedback is serviced even when an idea
+\* is in review, paused, or released-with-pending-work. Only killed ideas
+\* and terminally released ideas are excluded.
+ProduceFeedbackIndependent(idea, agent) ==
+    /\ phase[idea] # "killed"
+    /\ phase[idea] # "released"   \* released is terminal in the spec
     /\ agent \in PipelineAgentSet
     /\ hasFeedback[idea][agent]
     /\ ~InQueue(agent, idea)
@@ -332,6 +358,7 @@ Kill(worker) ==
 Next ==
     \/ \E i \in Ideas : ProducePipeline(i)
     \/ \E i \in Ideas, a \in PipelineAgentSet : ProduceFeedback(i, a)
+    \/ \E i \in Ideas, a \in PipelineAgentSet : ProduceFeedbackIndependent(i, a)
     \/ \E a \in BackgroundAgents : CadenceTick(a)
     \/ \E a \in BackgroundAgents, i \in Ideas : ProduceBackground(a, i)
     \/ \E i \in Ideas, a \in PipelineAgentSet : SubmitFeedback(i, a)
@@ -348,6 +375,7 @@ Next ==
 Fairness ==
     /\ \A i \in Ideas : SF_vars(ProducePipeline(i))
     /\ \A i \in Ideas, a \in PipelineAgentSet : SF_vars(ProduceFeedback(i, a))
+    /\ \A i \in Ideas, a \in PipelineAgentSet : SF_vars(ProduceFeedbackIndependent(i, a))
     /\ \A a \in BackgroundAgents : SF_vars(CadenceTick(a))
     /\ \A a \in BackgroundAgents, i \in Ideas : SF_vars(ProduceBackground(a, i))
     /\ \A i \in Ideas : SF_vars(DismissReview(i))
