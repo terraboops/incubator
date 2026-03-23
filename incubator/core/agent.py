@@ -27,8 +27,10 @@ from claude_agent_sdk import (
 
 from incubator.comms.notifications import NotificationDispatcher
 from incubator.core.activity import ActivityTracker
+from incubator.core.audit import make_audit_hooks
 from incubator.core.blackboard import Blackboard
 from incubator.core.registry import AgentConfig
+from incubator.core.tool_policy import make_role_policy
 from incubator.tools.blackboard_tools import create_blackboard_mcp_server, create_watcher_mcp_server
 from incubator.tools.evolution_tools import create_evolution_mcp_server
 from incubator.tools.telegram_tools import create_telegram_mcp_server
@@ -305,7 +307,7 @@ class BaseAgent(ABC):
             return ""
         parts = []
         for f in sorted(knowledge_dir.iterdir()):
-            if f.is_file() and f.suffix in (".md", ".txt", ".json"):
+            if f.is_file() and f.suffix in (".md", ".txt", ".json", ".yaml"):
                 parts.append(f"### {f.name}\n{f.read_text()}")
         return "\n\n".join(parts)
 
@@ -389,6 +391,53 @@ class BaseAgent(ABC):
             f"Think like a devil's advocate. Challenge everything. Make it bulletproof.\n"
         )
 
+    def _setup_sandbox_env(self, env: dict, idea_id: str) -> Path | None:
+        """Configure nono sandbox env vars and return cli_path if sandbox is enabled.
+
+        Mutates env in-place. Returns the nono-wrapper.sh path if sandbox is
+        enabled, or None to use the SDK default cli path.
+        """
+        if not self.config.sandbox_enabled:
+            return None
+
+        try:
+            from incubator.core.sandbox import build_profile, build_nono_flags
+        except ImportError:
+            logger.error(
+                "sandbox_enabled=True for agent '%s' but nono-py is not installed.\n"
+                "Install it with: pip install nono-py\n"
+                "Also install the nono CLI: brew install always-further/tap/nono\n"
+                "Falling back to unsandboxed mode.",
+                self.config.name,
+            )
+            return None
+
+        try:
+            profile_path = build_profile(
+                config=self.config,
+                idea_id=idea_id,
+                project_root=self.project_root,
+                blackboard_dir=self.blackboard.base_dir,
+            )
+            env["NONO_PROFILE"] = str(profile_path)
+            env["NONO_FLAGS"] = build_nono_flags(self.config, self.project_root)
+
+            if self.config.sandbox_ssh:
+                ssh_sock = os.environ.get("SSH_AUTH_SOCK", "")
+                if ssh_sock:
+                    env["SSH_AUTH_SOCK"] = ssh_sock
+
+            cli_path = self.project_root / "agents" / "nono-wrapper.sh"
+            logger.info("Sandbox enabled for agent '%s', profile: %s", self.config.name, profile_path)
+            return cli_path
+        except Exception as e:
+            logger.error(
+                "Failed to build nono sandbox profile for agent '%s': %s. "
+                "Falling back to unsandboxed mode.",
+                self.config.name, e,
+            )
+            return None
+
     async def _run_global(self, max_turns_override: int | None = None, deadline: datetime | None = None) -> AgentResult:
         """Run in global mode (phase='*') — iterate over all ideas, no idea-specific context."""
         bb_server = create_blackboard_mcp_server(self.blackboard, "__all__")
@@ -413,6 +462,8 @@ class BaseAgent(ABC):
         if self.config.env:
             env.update(self.config.env)
 
+        cli_path = self._setup_sandbox_env(env, "__all__")
+
         options = ClaudeAgentOptions(
             cwd=self.get_working_dir("__all__"),
             system_prompt=system_prompt,
@@ -420,8 +471,14 @@ class BaseAgent(ABC):
             max_turns=max_turns_override or self.config.max_turns,
             model=self.config.model,
             mcp_servers=mcp_servers,
-            permission_mode=self.config.permission_mode,
+            permission_mode=self.config.permission_mode if not self.config.sandbox_enabled else None,
             env=env,
+            cli_path=cli_path,
+            can_use_tool=make_role_policy(
+                self.config.name, "__all__",
+                self.project_root, self.blackboard.base_dir,
+            ),
+            hooks=make_audit_hooks(self.config.name, "__all__", self.project_root),
         )
         if self.config.max_budget_usd > 0:
             options.max_budget_usd = self.config.max_budget_usd
@@ -511,10 +568,11 @@ class BaseAgent(ABC):
 
         # Load accumulated knowledge (global agent knowledge + per-idea knowledge)
         knowledge_context = ""
-        knowledge_path = self.get_knowledge_dir() / "learnings.md"
-        if knowledge_path.exists():
+        from incubator.tools.knowledge_io import load_objects, format_for_prompt
+        knowledge_objects = load_objects(self.get_knowledge_dir())
+        if knowledge_objects:
             knowledge_context += (
-                f"\n\n## Global Agent Learnings\n{knowledge_path.read_text()}"
+                f"\n\n## Global Agent Learnings\n{format_for_prompt(knowledge_objects)}"
             )
         idea_knowledge = self._load_idea_knowledge(idea_id)
         if idea_knowledge:
@@ -581,6 +639,9 @@ class BaseAgent(ABC):
             # Also copy .claude.json oauthAccount metadata so the SDK knows
             # which account to look up in the keychain.
             _ensure_agent_auth(agent_config, self.project_root)
+
+        cli_path = self._setup_sandbox_env(env, idea_id)
+
         options = ClaudeAgentOptions(
             cwd=self.get_working_dir(idea_id),
             system_prompt=system_prompt,
@@ -588,8 +649,14 @@ class BaseAgent(ABC):
             max_turns=max_turns_override or self.config.max_turns,
             model=self.config.model,
             mcp_servers=mcp_servers,
-            permission_mode=self.config.permission_mode,
+            permission_mode=self.config.permission_mode if not self.config.sandbox_enabled else None,
             env=env,
+            cli_path=cli_path,
+            can_use_tool=make_role_policy(
+                self.config.name, idea_id,
+                self.project_root, self.blackboard.base_dir,
+            ),
+            hooks=make_audit_hooks(self.config.name, idea_id, self.project_root),
         )
         # Only set budget if non-zero (0 = unlimited)
         if self.config.max_budget_usd > 0:

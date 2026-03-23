@@ -196,21 +196,94 @@ def kill(idea_id: str = typer.Argument(help="Idea slug to kill")) -> None:
 
 
 @app.command()
-def evolve() -> None:
-    """Run evolution retrospective on agent learnings."""
+def evolve(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change without applying"),
+    agent: str = typer.Option("", "--agent", help="Curate a single agent's knowledge"),
+    no_llm: bool = typer.Option(False, "--no-llm", help="Print stats only, no LLM curation"),
+) -> None:
+    """Run LLM-powered knowledge curation on agent learnings."""
     settings = get_settings()
 
     async def _run():
-        from incubator.comms.telegram import TelegramNotifier
-        from incubator.comms.notifications import NotificationDispatcher
         from incubator.orchestrator.evolution import EvolutionManager
 
-        telegram = TelegramNotifier(settings.telegram_bot_token, settings.telegram_chat_id)
-        dispatcher = NotificationDispatcher(telegram)
+        dispatcher = None
+        if not no_llm and not dry_run:
+            try:
+                from incubator.comms.telegram import TelegramNotifier
+                from incubator.comms.notifications import NotificationDispatcher
+                telegram = TelegramNotifier(settings.telegram_bot_token, settings.telegram_chat_id)
+                dispatcher = NotificationDispatcher(telegram)
+            except Exception:
+                console.print("[dim]Telegram not configured, running without approval gate.[/dim]")
+
         evo = EvolutionManager(settings.project_root, dispatcher)
-        await evo.run_retrospective()
+
+        if no_llm:
+            stats = evo.get_stats(agent_filter=agent or None)
+            if not stats:
+                console.print("[dim]No knowledge entries found.[/dim]")
+                return
+            table = Table(title="Knowledge Stats")
+            table.add_column("Agent")
+            table.add_column("Entries", justify="right")
+            table.add_column("No Justification", justify="right")
+            table.add_column("No Predicates", justify="right")
+            for a, s in stats.items():
+                table.add_row(a, str(s["count"]), str(s["no_justification"]), str(s["no_predicates"]))
+            console.print(table)
+            return
+
+        actions = await evo.run_retrospective(
+            agent_filter=agent or None,
+            dry_run=dry_run,
+        )
+
+        if not actions:
+            console.print("[dim]No curation actions taken.[/dim]")
+        else:
+            for a, acts in actions.items():
+                keeps = sum(1 for x in acts if x.get("action") == "keep")
+                merges = sum(1 for x in acts if x.get("action") == "merge")
+                drops = sum(1 for x in acts if x.get("action") == "drop")
+                console.print(f"[bold]{a}[/bold]: {keeps} kept, {merges} merged, {drops} dropped")
 
     asyncio.run(_run())
+
+
+@app.command(name="migrate-knowledge")
+def migrate_knowledge(
+    registry: str = typer.Option("", "--registry", help="Project root path (defaults to CWD)"),
+) -> None:
+    """Migrate learnings.md files to structured Knowledge Objects."""
+    from pathlib import Path
+    from incubator.tools.knowledge_io import migrate_md_to_objects
+
+    project_root = Path(registry) if registry else get_settings().project_root
+    agents_dir = project_root / "agents"
+
+    if not agents_dir.exists():
+        console.print(f"[red]No agents/ directory at {project_root}[/red]")
+        raise typer.Exit(1)
+
+    total = 0
+    for agent_dir in sorted(agents_dir.iterdir()):
+        if not agent_dir.is_dir() or agent_dir.name.startswith("_"):
+            continue
+        knowledge_dir = agent_dir / "knowledge"
+        if not (knowledge_dir / "learnings.md").exists():
+            continue
+        count = migrate_md_to_objects(knowledge_dir)
+        if count > 0:
+            console.print(f"  [green]{agent_dir.name}[/green]: {count} objects created, original backed up to learnings.md.bak")
+            total += count
+        else:
+            console.print(f"  [dim]{agent_dir.name}[/dim]: no sections found")
+
+    if total:
+        console.print(f"\n[bold green]{total} total knowledge objects created.[/bold green]")
+    else:
+        console.print("[dim]No learnings.md files found to migrate.[/dim]")
 
 
 @app.command()
@@ -419,6 +492,85 @@ def upgrade(
                     console.print(f"  [green]Updated[/green]")
 
     console.print("\n[green]Agent upgrade complete.[/green]")
+
+
+@app.command()
+def migrate(
+    registry: str = typer.Option("", "--registry", "-r", help="Path to registry.yaml (default: project registry)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change without applying"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Auto-apply mechanical migrations without prompting"),
+) -> None:
+    """Check and apply registry.yaml migrations for new incubator versions."""
+    import sys
+    from pathlib import Path
+    from incubator.config import find_project_root
+    from incubator.core.migrations import check_all, load_registry_data, run_migrations
+
+    if registry:
+        registry_path = Path(registry)
+    else:
+        try:
+            project_root = find_project_root()
+            registry_path = project_root / "registry.yaml"
+        except FileNotFoundError:
+            console.print("[red]Not an incubator project. Run 'incubator init' first.[/red]")
+            raise typer.Exit(1)
+
+    if not registry_path.exists():
+        console.print(f"[red]Registry not found: {registry_path}[/red]")
+        raise typer.Exit(1)
+
+    data = load_registry_data(registry_path)
+    needed = check_all(data)
+
+    if not needed:
+        console.print("[green]✓ Registry is up to date — no migrations needed.[/green]")
+        return
+
+    console.print(f"[yellow]{len(needed)} migration(s) needed for {registry_path}:[/yellow]\n")
+    for migration, check in needed:
+        badge = "[cyan][LLM][/cyan]" if migration.llm_assisted else "[dim][auto][/dim]"
+        console.print(f"  {badge} [bold]{migration.version}[/bold] — {migration.description}")
+        if check.affected_agents:
+            console.print(f"       Affects: {', '.join(check.affected_agents)}")
+    console.print("")
+
+    if dry_run:
+        console.print("[dim]--dry-run: no changes written.[/dim]")
+        return
+
+    is_tty = sys.stdin.isatty()
+
+    async def confirm(action: str, details: str) -> bool:
+        console.print(f"\n[cyan]{action}[/cyan]")
+        console.print(details)
+        if yes and not details.startswith("LLM"):
+            return True
+        if is_tty:
+            return typer.confirm("Apply this migration?")
+        return False
+
+    async def _run():
+        results = await run_migrations(
+            registry_path=registry_path,
+            confirm=confirm,
+            dry_run=False,
+            auto_yes=yes,
+        )
+        for result in results:
+            if result.success:
+                if result.agents_modified:
+                    console.print(f"[green]✓ {result.message}[/green]")
+                else:
+                    console.print(f"[dim]  {result.message}[/dim]")
+            else:
+                console.print(f"[red]✗ {result.message}[/red]")
+                if result.errors:
+                    for err in result.errors:
+                        console.print(f"  [red]{err}[/red]")
+
+    asyncio.run(_run())
+    console.print("\n[green]Migration complete.[/green]")
 
 
 if __name__ == "__main__":

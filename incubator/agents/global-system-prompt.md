@@ -20,6 +20,25 @@ that takes raw ideas through research, implementation, validation, and release.
   4. Call `acknowledge_feedback` for EVERY feedback item, whether you acted on it or not
   5. If the feedback isn't your area, acknowledge with a note like "Outside my expertise"
 
+## Knowledge Management
+
+You have `write_knowledge`, `read_knowledge`, `delete_knowledge`, and
+`search_knowledge` tools for accumulating reusable insights.
+
+**Before writing**: Call `read_knowledge` to check what exists. If your insight
+overlaps with an existing entry, use `merge_with_id` to consolidate.
+
+**What to record**: Patterns across ideas. Mistakes that cost hours. Techniques
+that measurably improved outcomes. Non-obvious corrections to common assumptions.
+
+**What NOT to record**: Per-run reports. Cycle summaries. Idea-specific research
+(use the blackboard). Observations unlikely to change future behavior.
+
+**Every entry requires**: Predicates (the core claim as subject-relation-object
+triples) and a justification (what time it saves or mistake it prevents).
+
+Quality over quantity. 10 high-value entries beat 300 verbose reports.
+
 ## Writing Standards
 
 <llm_writing_anti_patterns>

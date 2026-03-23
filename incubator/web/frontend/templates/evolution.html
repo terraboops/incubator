@@ -2,34 +2,225 @@
 {% from "macros/icons.html" import icon, agent_icon %}
 {% block title %}Evolution — incubator{% endblock %}
 {% block content %}
-<div class="mb-6 flex items-center gap-3">
-    <span class="text-[#a690cc]">{{ icon('dna', 22) }}</span>
-    <div>
-        <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Evolution</h1>
-        <p class="text-[0.8rem] text-[#8a8074]">Knowledge accumulated by agents across all ideas.</p>
+<div class="mb-6 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+        <span class="text-[#a690cc]">{{ icon('dna', 22) }}</span>
+        <div>
+            <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Knowledge</h1>
+            <p class="text-[0.8rem] text-[#8a8074]">Structured knowledge accumulated by agents across all ideas.</p>
+        </div>
+    </div>
+    {% if agents %}
+    <button onclick="curateAll()" id="curate-btn" class="btn btn-soft text-[0.78rem]">
+        {{ icon('sparkles', 14) }} Curate with AI
+    </button>
+    {% endif %}
+</div>
+
+{% if agents %}
+<div class="space-y-5">
+    {% for agent in agents %}
+    <div id="agent-{{ agent.name }}">
+        <div class="flex items-center gap-2.5 mb-2">
+            <span class="text-[#8a8074]">{{ agent_icon(agent.name, 16) }}</span>
+            <span class="text-[0.88rem] font-medium text-[#3b3530]">{{ agent.name }}</span>
+            <span class="badge badge-ideation">{{ agent.count }} entries</span>
+            {% if agent.size %}
+            <span class="text-[0.68rem] text-[#b0a898] font-mono">{{ (agent.size / 1024) | round(1) }} KB</span>
+            {% endif %}
+            {% if agent.no_justification > 0 %}
+            <span class="inline-block text-[0.65rem] bg-[#fce8e1] text-[#b85f3e] px-2 py-0.5 rounded-full font-medium">{{ agent.no_justification }} need justification</span>
+            {% endif %}
+        </div>
+
+        <div class="space-y-2" id="entries-{{ agent.name }}">
+            {% for obj in agent.objects %}
+            <div class="card p-4" id="entry-{{ obj.id }}">
+                <div class="flex items-start justify-between gap-3 mb-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[0.68rem] font-mono text-[#b0a898]">[{{ obj.id }}]</span>
+                        <span class="text-[0.68rem] font-mono text-[#8a8074]">conf: {{ obj.confidence }}</span>
+                        {% if not obj.justification or not obj.justification.strip() %}
+                        <span class="inline-block text-[0.65rem] bg-[#fce8e1] text-[#b85f3e] px-2 py-0.5 rounded-full font-medium">needs justification</span>
+                        {% endif %}
+                        {% if not obj.predicates %}
+                        <span class="inline-block text-[0.65rem] bg-[#fce8e1] text-[#b85f3e] px-2 py-0.5 rounded-full font-medium">needs predicates</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex gap-1 flex-shrink-0">
+                        <button onclick="toggleEdit('{{ agent.name }}', '{{ obj.id }}')" class="btn btn-soft text-[0.7rem] py-0.5 px-2">Edit</button>
+                        <button onclick="deleteEntry('{{ agent.name }}', '{{ obj.id }}')" class="btn btn-danger text-[0.7rem] py-0.5 px-2">Delete</button>
+                    </div>
+                </div>
+
+                {# Insight body #}
+                <div class="prose text-[0.84rem]" id="insight-{{ obj.id }}">{{ obj.insight | markdown | safe }}</div>
+
+                {# Justification #}
+                {% if obj.justification and obj.justification.strip() %}
+                <div class="mt-2 p-2 bg-[#f7f5f0] rounded-lg text-[0.8rem] text-[#544d43]">
+                    <span class="font-medium text-[#3b3530]">Why this matters:</span> {{ obj.justification }}
+                </div>
+                {% endif %}
+
+                {# Predicates as pills #}
+                {% if obj.predicates %}
+                <div class="mt-2 flex flex-wrap gap-1">
+                    {% for p in obj.predicates %}
+                    {% if p | length >= 3 %}
+                    <span class="inline-block text-[0.65rem] font-mono bg-[#eee8f6] text-[#7b5ea8] px-2 py-0.5 rounded-full">{{ p[0] }} &rarr; {{ p[1] }} &rarr; {{ p[2] }}</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {# Idea context #}
+                {% if obj.idea_context %}
+                <div class="mt-1 flex flex-wrap gap-1">
+                    {% for ctx in obj.idea_context %}
+                    <span class="inline-block text-[0.65rem] font-mono bg-[#e3edf7] text-[#4a7aaa] px-2 py-0.5 rounded-full">{{ ctx }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="mt-2 text-[0.65rem] text-[#b0a898]">
+                    {% if obj.source_agent %}from: {{ obj.source_agent }} | {% endif %}
+                    updated: {{ obj.updated_at }}
+                </div>
+
+                {# Edit form (hidden by default) #}
+                <div id="edit-{{ obj.id }}" class="hidden mt-3 p-3 bg-[#f7f5f0] rounded-lg space-y-2">
+                    <label class="block text-[0.75rem] font-medium text-[#3b3530]">Insight</label>
+                    <textarea id="edit-insight-{{ obj.id }}" rows="4" class="w-full text-[0.82rem] p-2 border border-[#e2ded4] rounded-lg bg-white font-mono">{{ obj.insight }}</textarea>
+                    <label class="block text-[0.75rem] font-medium text-[#3b3530]">Justification</label>
+                    <textarea id="edit-justification-{{ obj.id }}" rows="2" class="w-full text-[0.82rem] p-2 border border-[#e2ded4] rounded-lg bg-white font-mono">{{ obj.justification or '' }}</textarea>
+                    <label class="block text-[0.75rem] font-medium text-[#3b3530]">Confidence (0-1)</label>
+                    <input type="number" id="edit-confidence-{{ obj.id }}" value="{{ obj.confidence }}" step="0.1" min="0" max="1" class="w-24 text-[0.82rem] p-1.5 border border-[#e2ded4] rounded-lg bg-white font-mono">
+                    <div class="flex gap-2 pt-1">
+                        <button onclick="saveEdit('{{ agent.name }}', '{{ obj.id }}')" class="btn btn-primary text-[0.75rem] py-1">Save</button>
+                        <button onclick="toggleEdit('{{ agent.name }}', '{{ obj.id }}')" class="btn btn-soft text-[0.75rem] py-1">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{# Curation diff preview area #}
+<div id="curation-preview" class="hidden mt-6 card p-5">
+    <h2 class="text-[0.95rem] font-medium text-[#3b3530] mb-3">AI Curation Preview</h2>
+    <div id="curation-content" class="prose text-[0.84rem]"></div>
+    <div class="flex gap-2 mt-4">
+        <button onclick="applyCuration()" class="btn btn-primary text-[0.78rem]">Apply Changes</button>
+        <button onclick="document.getElementById('curation-preview').classList.add('hidden')" class="btn btn-soft text-[0.78rem]">Dismiss</button>
     </div>
 </div>
 
-{% if learnings %}
-<div class="space-y-3">
-    {% for entry in learnings %}
-    <details>
-        <summary class="flex items-center gap-2.5 text-[0.85rem] font-medium text-[#3b3530] py-1.5">
-            <span class="chevron">&#x25B6;</span>
-            <span class="text-[#8a8074]">{{ agent_icon(entry.agent, 16) }}</span>
-            {{ entry.agent }}
-            <span class="text-[0.68rem] text-[#b0a898] font-normal font-mono">{{ (entry.size / 1024) | round(1) }} KB</span>
-        </summary>
-        <div class="card p-5 mt-1">
-            <div class="prose">{{ entry.content | markdown | safe }}</div>
-        </div>
-    </details>
-    {% endfor %}
-</div>
 {% else %}
 <div class="card p-16 text-center">
     <div class="w-12 h-12 rounded-full bg-[#f2efe8] mx-auto mb-4 flex items-center justify-center text-[#bdb4a4]">{{ icon('dna', 22) }}</div>
-    <p class="text-[0.84rem] text-[#8a8074]">No learnings yet. Agents accumulate knowledge as they process ideas.</p>
+    <p class="text-[0.84rem] text-[#8a8074]">No knowledge entries yet. Agents accumulate knowledge as they process ideas.</p>
+    <p class="text-[0.78rem] text-[#b0a898] mt-1">Run <code class="font-mono text-[0.76rem]">incubator migrate-knowledge</code> to convert existing learnings.md files.</p>
 </div>
 {% endif %}
+
+<script>
+function toggleEdit(agent, entryId) {
+    var el = document.getElementById('edit-' + entryId);
+    el.classList.toggle('hidden');
+}
+
+async function saveEdit(agent, entryId) {
+    var insight = document.getElementById('edit-insight-' + entryId).value;
+    var justification = document.getElementById('edit-justification-' + entryId).value;
+    var confidence = parseFloat(document.getElementById('edit-confidence-' + entryId).value);
+
+    var resp = await fetch('/evolution/' + agent + '/' + entryId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({insight: insight, justification: justification, confidence: confidence})
+    });
+
+    if (resp.ok) {
+        var html = await resp.text();
+        document.getElementById('entry-' + entryId).outerHTML = html;
+    }
+}
+
+async function deleteEntry(agent, entryId) {
+    if (!confirm('Delete entry [' + entryId + ']?')) return;
+
+    var resp = await fetch('/evolution/' + agent + '/' + entryId, {method: 'DELETE'});
+    if (resp.ok) {
+        var el = document.getElementById('entry-' + entryId);
+        if (el) el.remove();
+    }
+}
+
+var _curateAgent = null;
+
+async function curateAll() {
+    var btn = document.getElementById('curate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Curating...';
+
+    try {
+        var body = {};
+        if (_curateAgent) body.agent = _curateAgent;
+
+        var resp = await fetch('/evolution/curate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+
+        if (resp.ok) {
+            var data = await resp.json();
+            var preview = document.getElementById('curation-preview');
+            var content = document.getElementById('curation-content');
+
+            var html = '';
+            for (var agent in data.actions) {
+                var actions = data.actions[agent];
+                var keeps = actions.filter(function(a) { return a.action === 'keep'; });
+                var merges = actions.filter(function(a) { return a.action === 'merge'; });
+                var drops = actions.filter(function(a) { return a.action === 'drop'; });
+
+                html += '<h3>' + agent + '</h3>';
+                html += '<p>Keep: ' + keeps.length + ', Merge: ' + merges.length + ', Drop: ' + drops.length + '</p>';
+
+                drops.forEach(function(d) {
+                    html += '<div class="p-2 bg-[#f3e3e3] rounded-lg text-[0.8rem] mb-1">DROP [' + d.id + ']: ' + (d.reason || 'no reason') + '</div>';
+                });
+                merges.forEach(function(m) {
+                    html += '<div class="p-2 bg-[#eee8f6] rounded-lg text-[0.8rem] mb-1">MERGE ' + JSON.stringify(m.ids) + '</div>';
+                });
+            }
+
+            content.innerHTML = html || '<p>No changes proposed.</p>';
+            preview.classList.remove('hidden');
+        }
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Curate with AI';
+    }
+}
+
+async function applyCuration() {
+    var body = {};
+    if (_curateAgent) body.agent = _curateAgent;
+
+    var resp = await fetch('/evolution/curate/apply', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    });
+
+    if (resp.ok) {
+        window.location.reload();
+    }
+}
+</script>
 {% endblock %}
