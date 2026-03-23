@@ -83,6 +83,8 @@ def create_app() -> FastAPI:
     from incubator.web.api.routes.evolution import router as evolution_router
     from incubator.web.api.routes.pool import router as pool_router
     from incubator.web.api.routes.settings import router as settings_router
+    from incubator.web.api.routes.migrations import router as migrations_router
+    from incubator.web.api.routes.pipelines import router as pipelines_router
     from incubator.web.api.websocket import router as ws_router
 
     app.include_router(activity_router, tags=["activity"])
@@ -93,6 +95,8 @@ def create_app() -> FastAPI:
     app.include_router(evolution_router, prefix="/evolution", tags=["evolution"])
     app.include_router(pool_router, prefix="/pool", tags=["pool"])
     app.include_router(settings_router, prefix="/settings", tags=["settings"])
+    app.include_router(pipelines_router, prefix="/pipelines", tags=["pipelines"])
+    app.include_router(migrations_router, prefix="/api/migrations", tags=["migrations"])
     app.include_router(ws_router)
 
     return app
