@@ -15,7 +15,7 @@ from croniter import croniter
 # Priority constants
 PRIORITY_DEFAULT = 5.0
 PRIORITY_EARLY_BOOST = 1.0
-MAX_BACKGROUND_PRIORITY = 10.0
+MAX_BACKGROUND_PRIORITY = 4.5  # must stay below pipeline default (5.0)
 FEEDBACK_PRIORITY_FACTOR = 0.9
 
 
@@ -133,9 +133,9 @@ class CadenceTracker:
         """Compute priority based on cadence urgency.
 
         Just ran → ~0 (no urgency)
-        50% through cadence → ~5.0 (moderate)
-        90% through cadence → ~9.0 (beats most pipeline work)
-        100%+ overdue → 10.0 (max, guaranteed next slot)
+        50% through cadence → ~2.25
+        90% through cadence → ~4.05
+        100%+ overdue → 4.5 (capped below pipeline default of 5.0)
         """
         ratio = self.elapsed_ratio(now)
         return min(ratio * MAX_BACKGROUND_PRIORITY, MAX_BACKGROUND_PRIORITY)

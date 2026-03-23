@@ -10,6 +10,7 @@
     <span class="text-[#a690cc]">{{ icon('sparkles', 20) }}</span>
     <h1 class="text-[1.2rem] font-medium text-[#3b3530]">New Agent</h1>
     {% else %}
+
     <span class="text-[#a690cc]">{{ agent_icon(agent.name, 20) }}</span>
     <h1 class="text-[1.2rem] font-medium text-[#3b3530]">{{ agent.name }}</h1>
     <span class="badge {% if agent.status == 'active' %}badge-release{% else %}badge-killed{% endif %} ml-1">
@@ -17,6 +18,18 @@
     </span>
     {% endif %}
 </div>
+
+{% if is_new %}
+<!-- Wizard suggestion banner -->
+<div class="rounded-xl mb-5" style="background: #eee8f6; border: 1px solid #d8cceb;">
+    <div class="flex items-center gap-3 px-4 py-3">
+        <span class="flex-shrink-0 text-[#7b5ea8]">{{ icon('sparkles', 18) }}</span>
+        <div class="flex-1">
+            <span class="text-[0.8rem] text-[#544d43]">Try the new <a href="/agents/wizard" class="font-medium text-[#7b5ea8] underline underline-offset-2">Agent Wizard</a> for a guided setup.</span>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Time budget notice -->
 {% if deadline_count is defined and deadline_count > 2 %}
@@ -163,6 +176,127 @@
             </button>
             {% endfor %}
         </div>
+    </div>
+
+    <!-- Security -->
+    <div class="card p-5">
+        <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-1">Security</h2>
+        <p class="text-[0.7rem] text-[#b0a898] mb-4">
+            Sandbox restrictions enforced by <a href="https://github.com/always-further/nono" class="underline" target="_blank">nono</a> at the OS kernel level (Seatbelt on macOS, Landlock on Linux). Requires <code class="text-[0.68rem]">pip install nono-py</code> and <code class="text-[0.68rem]">brew install always-further/tap/nono</code>.
+        </p>
+
+        <!-- Row 1: Toggles -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="sandbox_enabled" value="true"
+                           {% if agent.sandbox_enabled %}checked{% endif %}
+                           class="rounded">
+                    <span class="text-[0.82rem] text-[#3b3530]">Sandbox enabled</span>
+                </label>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5 ml-5">Kernel-enforced isolation</p>
+            </div>
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="sandbox_ssh" value="true"
+                           {% if agent.sandbox_ssh %}checked{% endif %}
+                           class="rounded">
+                    <span class="text-[0.82rem] text-[#3b3530]">SSH agent</span>
+                </label>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5 ml-5">Git push/pull over SSH</p>
+            </div>
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="sandbox_rollback" value="true"
+                           {% if agent.sandbox_rollback %}checked{% endif %}
+                           class="rounded">
+                    <span class="text-[0.82rem] text-[#3b3530]">Rollback</span>
+                </label>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5 ml-5">Content-addressable snapshots</p>
+            </div>
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="sandbox_verify_attestations" value="true"
+                           {% if agent.sandbox_verify_attestations %}checked{% endif %}
+                           class="rounded">
+                    <span class="text-[0.82rem] text-[#3b3530]">Verify attestations</span>
+                </label>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5 ml-5">Require signed instruction files (CI → Sigstore)</p>
+            </div>
+        </div>
+
+        <!-- Row 1b: Base Profile -->
+        <div class="mb-4">
+            <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Base Profile</label>
+            <select name="sandbox_profile" class="px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                <option value="claude-code" {% if agent.sandbox_profile == 'claude-code' %}selected{% endif %}>claude-code</option>
+                <option value="custom" {% if agent.sandbox_profile == 'custom' %}selected{% endif %}>custom</option>
+            </select>
+        </div>
+
+        <!-- Row 2: Credentials & Network -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Proxy Credentials</label>
+                <input type="text" name="sandbox_proxy_credentials"
+                       value="{{ (agent.sandbox_proxy_credentials or ['anthropic']) | join(', ') }}"
+                       placeholder="anthropic, github"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Agent never sees raw tokens</p>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Allowed Hosts</label>
+                <input type="text" name="sandbox_allowed_hosts"
+                       value="{{ (agent.sandbox_allowed_hosts or []) | join(', ') }}"
+                       placeholder="api.anthropic.com, github.com"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Network allowlist via nono proxy</p>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Allowed Ports</label>
+                <input type="text" name="sandbox_allowed_ports"
+                       value="{{ (agent.sandbox_allowed_ports or []) | join(', ') }}"
+                       placeholder="3000, 8080"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Local port binding for dev servers</p>
+            </div>
+        </div>
+
+        <!-- Row 3: Filesystem & Commands -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Extra Read Paths</label>
+                <input type="text" name="sandbox_extra_read_paths"
+                       value="{{ (agent.sandbox_extra_read_paths or []) | join(', ') }}"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Extra Write Paths</label>
+                <input type="text" name="sandbox_extra_write_paths"
+                       value="{{ (agent.sandbox_extra_write_paths or []) | join(', ') }}"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Allowed Commands</label>
+                <input type="text" name="sandbox_allowed_commands"
+                       value="{{ (agent.sandbox_allowed_commands or []) | join(', ') }}"
+                       placeholder="rm, docker"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Override destructive command blocks</p>
+            </div>
+        </div>
+
+        <!-- Row 4: Credential Store Mappings (Advanced) -->
+        <details class="mt-2">
+            <summary class="text-[0.78rem] font-medium text-[#8a8074] cursor-pointer select-none">Credential Store Mappings</summary>
+            <div class="mt-2">
+                <textarea name="sandbox_credential_maps" rows="3"
+                          class="w-full px-3 py-2 rounded-xl text-[0.78rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono resize-y"
+                          placeholder="op://Development/OpenAI/credential -> OPENAI_API_KEY&#10;apple-password://github.com -> GH_TOKEN"
+                >{{ (agent.sandbox_credential_maps or []) | join('\n') }}</textarea>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">1Password or Apple Passwords URIs mapped to env vars (one per line)</p>
+            </div>
+        </details>
     </div>
 
     <!-- System Prompt -->

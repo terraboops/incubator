@@ -16,6 +16,7 @@ _clients: set[WebSocket] = set()
 
 async def broadcast_event(event_type: str, data: dict) -> None:
     """Broadcast an event to all connected WebSocket clients."""
+    global _clients
     message = json.dumps({
         "type": event_type,
         "timestamp": datetime.now(timezone.utc).isoformat(),

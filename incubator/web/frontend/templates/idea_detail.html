@@ -554,6 +554,27 @@
 (function() {
     const ideaId = "{{ idea_id }}";
 
+    // ── Toast notifications ────────────────────────────────────────
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:9999;'
+            + 'padding:10px 20px;border-radius:10px;font-size:0.84rem;font-weight:500;'
+            + 'box-shadow:0 4px 16px rgba(0,0,0,0.12);transition:opacity 0.3s;';
+        if (type === 'error') {
+            toast.style.background = '#f3e3e3';
+            toast.style.color = '#944';
+            toast.style.border = '1px solid #e8cece';
+        } else {
+            toast.style.background = '#e3ede3';
+            toast.style.color = '#2c5e2c';
+            toast.style.border = '1px solid #c8dcc8';
+        }
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.style.opacity = '0'; }, 3500);
+        setTimeout(function() { toast.remove(); }, 4000);
+    }
+
     // ── Feedback: text selection handling ───────────────────────────
     window.feedbackState = { artifact: '', selectedText: '' };
     const feedbackState = window.feedbackState;
@@ -665,8 +686,13 @@
             const resp = await fetch(`/api/ideas/${ideaId}/feedback`, { method: 'POST', body: form });
             if (resp.ok) {
                 window.location.reload();
+                return;
             }
-        } catch(e) {}
+            const data = await resp.json().catch(() => ({}));
+            showToast(data.error || 'Failed to submit feedback', 'error');
+        } catch(e) {
+            showToast('Network error — could not submit feedback', 'error');
+        }
 
         btn.textContent = 'Submit';
         btn.disabled = false;

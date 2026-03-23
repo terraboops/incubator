@@ -10,28 +10,19 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from incubator.config import get_settings
+from incubator.web.api.filters import setup_filters
 from incubator.web.api.paths import TEMPLATES_DIR
 from incubator.core.blackboard import Blackboard
 from incubator.core.registry import load_registry
 
 router = APIRouter()
-settings = get_settings()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-_CADENCE_PATTERNS = {
-    "0 */6 * * *": "every 6h",
-    "0 */4 * * *": "every 4h",
-    "0 */12 * * *": "every 12h",
-    "0 8 * * *": "daily at 8am",
-    "0 0 * * *": "daily at midnight",
-    "*/30 * * * *": "every 30min",
-    "*/5 * * * *": "every 5min",
-}
-templates.env.filters["cadence_label"] = lambda cron: _CADENCE_PATTERNS.get(cron, cron)
+setup_filters(templates)
 
 
 def _read_pool_state() -> dict:
     """Read the latest pool state snapshot."""
+    settings = get_settings()
     state_path = settings.project_root / "pool" / "state.json"
     if state_path.exists():
         return json.loads(state_path.read_text())
@@ -52,6 +43,7 @@ def _compute_idle_reasons(state: dict) -> None:
     active_ideas = {w.get("idea") for w in workers if w.get("status") == "active"}
     queue_depth = state.get("queue_depth", 0)
 
+    settings = get_settings()
     bb = Blackboard(settings.blackboard_dir)
     terminal = {"killed", "paused"}
 
@@ -107,6 +99,7 @@ def _enrich_cadence_trackers(state: dict) -> None:
     from datetime import datetime, timezone
     from croniter import croniter
 
+    settings = get_settings()
     now = datetime.now(timezone.utc)
     bb = Blackboard(settings.blackboard_dir)
 

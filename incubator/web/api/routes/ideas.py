@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 
 import re
 
-import markdown
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -17,71 +16,12 @@ from fastapi.templating import Jinja2Templates
 from incubator.config import get_settings
 from incubator.core.blackboard import Blackboard
 from incubator.core.registry import load_registry
+from incubator.web.api.filters import setup_filters
 from incubator.web.api.paths import TEMPLATES_DIR
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-# Register markdown filter for Jinja2
-_md = markdown.Markdown(extensions=["tables", "fenced_code", "nl2br", "toc"])
-
-
-def _render_md(text: str) -> str:
-    _md.reset()
-    return _md.convert(text)
-
-
-templates.env.filters["markdown"] = _render_md
-templates.env.filters["tojson_pretty"] = lambda v: json.dumps(v, indent=2)
-
-_PHASE_LABELS = {
-    "released": "ready",
-    "killed": "shelved",
-    "release": "releasing",
-    "ideation_review": "reviewing ideation",
-    "implementation_review": "reviewing build",
-    "validation_review": "reviewing tests",
-}
-
-
-def _phase_label(phase: str) -> str:
-    """Map internal phase names to display labels."""
-    label = _PHASE_LABELS.get(phase, phase)
-    return label.replace("_", " ")
-
-
-templates.env.filters["phase_label"] = _phase_label
-
-
-_CADENCE_PATTERNS = {
-    "0 */6 * * *": "every 6h",
-    "0 */4 * * *": "every 4h",
-    "0 */12 * * *": "every 12h",
-    "0 8 * * *": "daily at 8am",
-    "0 0 * * *": "daily at midnight",
-    "*/30 * * * *": "every 30min",
-}
-
-
-def _cadence_label(cron: str) -> str:
-    """Turn common cron expressions into readable labels."""
-    return _CADENCE_PATTERNS.get(cron, cron)
-
-
-templates.env.filters["cadence_label"] = _cadence_label
-
-_ROLE_LABELS = {
-    "ideation": "ideation",
-    "implementation": "build",
-    "validation": "validate",
-    "release": "release",
-    "competitive-watcher": "competitive",
-    "research-watcher": "research",
-    "prioritizer": "prioritize",
-}
-
-
-templates.env.filters["role_label"] = lambda r: _ROLE_LABELS.get(r, r.replace("-watcher", "").replace("-", " "))
+setup_filters(templates)
 
 
 def _get_blackboard() -> Blackboard:

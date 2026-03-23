@@ -10,7 +10,66 @@
             <p class="text-[0.8rem] text-[#8a8074]">The team that incubates your ideas.</p>
         </div>
     </div>
+    <div class="flex items-center gap-2">
+        <a href="/agents/wizard" class="btn btn-primary text-[0.78rem]">
+            {{ icon('sparkles', 14) }} Create with Wizard
+        </a>
+        <a href="/agents/plugins" class="btn btn-soft text-[0.78rem]">
+            {{ icon('package', 14) }} Browse Plugins
+        </a>
+    </div>
 </div>
+
+<!-- Migration banner (hidden by default, shown via JS if pending migrations exist) -->
+<div id="migration-banner" class="hidden rounded-xl mb-5" style="background: #fef3c7; border: 1px solid #fde68a;">
+    <div class="flex items-center gap-3 px-4 py-3">
+        <span class="flex-shrink-0 text-[#92400e]">{{ icon('alert-triangle', 18) }}</span>
+        <div class="flex-1">
+            <span class="text-[0.8rem] font-medium text-[#78350f]" id="migration-msg">Registry migrations available</span>
+            <p class="text-[0.72rem] text-[#92400e] mt-0.5">Run <code class="text-[0.68rem]">incubator migrate</code> or apply them here.</p>
+        </div>
+        <button onclick="applyMigrations()" id="migrate-btn"
+                class="text-[0.75rem] px-3 py-1.5 rounded-lg font-medium cursor-pointer transition-colors"
+                style="background: #92400e; color: white;">
+            Apply
+        </button>
+    </div>
+</div>
+
+<script>
+// Check for pending migrations on page load
+fetch('/api/migrations/check')
+    .then(r => r.json())
+    .then(data => {
+        if (!data.up_to_date) {
+            const banner = document.getElementById('migration-banner');
+            const msg = document.getElementById('migration-msg');
+            const count = data.pending.length;
+            msg.textContent = count + ' registry migration' + (count > 1 ? 's' : '') + ' available';
+            banner.classList.remove('hidden');
+        }
+    })
+    .catch(() => {}); // Silently ignore errors
+
+async function applyMigrations() {
+    const btn = document.getElementById('migrate-btn');
+    btn.textContent = 'Applying...';
+    btn.disabled = true;
+    try {
+        const resp = await fetch('/api/migrations/apply', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({auto_yes: true}),
+        });
+        const data = await resp.json();
+        document.getElementById('migration-banner').classList.add('hidden');
+        window.location.reload();
+    } catch (e) {
+        btn.textContent = 'Failed — run incubator migrate';
+        btn.disabled = false;
+    }
+}
+</script>
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for agent in agents %}
