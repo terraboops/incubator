@@ -5,20 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}incubator{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
-                        mono: ['"DM Mono"', 'monospace'],
-                    },
-                }
-            }
-        }
-    </script>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/tailwind.css">
+    <!-- Tailwind CSS pre-built via: tailwindcss -i tailwind-input.css -o static/tailwind.css --config tailwind.config.js --minify -->
     <style>
         body { background: #faf9f6; color: #3b3530; }
 
@@ -239,21 +229,22 @@
 <body class="min-h-screen font-sans antialiased">
     {% from "macros/icons.html" import icon, agent_icon, phase_icon %}
     <nav class="sticky top-0 z-50 bg-[#faf9f6]/80 backdrop-blur-xl border-b border-[#eae6df]/60">
-        <div class="max-w-4xl mx-auto px-6 h-14 flex items-center gap-8">
-            <a href="/" class="flex items-center gap-2.5 group">
+        <div class="max-w-5xl mx-auto px-6 h-14 flex items-center gap-6">
+            <a href="/" class="flex items-center gap-2 group flex-shrink-0">
                 <span class="text-[#a690cc]">{{ icon('sparkles', 18) }}</span>
                 <span class="text-[0.88rem] font-medium tracking-tight text-[#3b3530]">incubator</span>
             </a>
-            <div class="flex items-center gap-5 text-[0.78rem] text-[#8a8074]">
-                <a href="/" class="nav-link flex items-center gap-1.5{% if request.url.path == '/' %} active{% endif %}">{{ icon('layers', 14) }} Ideas</a>
-                <a href="/activity" class="nav-link flex items-center gap-1.5{% if '/activity' in request.url.path %} active{% endif %}">{{ icon('activity', 14) }} Activity</a>
-                <a href="/pool" class="nav-link flex items-center gap-1.5{% if '/pool' in request.url.path %} active{% endif %}">{{ icon('users', 14) }} Pool</a>
-                <a href="/agents" class="nav-link flex items-center gap-1.5{% if '/agents' in request.url.path %} active{% endif %}">{{ icon('brain', 14) }} Agents</a>
-                <a href="/costs" class="nav-link flex items-center gap-1.5{% if '/costs' in request.url.path %} active{% endif %}">{{ icon('dollar-sign', 14) }} Costs</a>
-                <a href="/evolution" class="nav-link flex items-center gap-1.5{% if '/evolution' in request.url.path %} active{% endif %}">{{ icon('dna', 14) }} Evolution</a>
-                <a href="/settings" class="nav-link flex items-center gap-1.5{% if '/settings' in request.url.path %} active{% endif %}">{{ icon('settings', 14) }} Settings</a>
+            <div class="flex items-center gap-4 text-[0.76rem] text-[#8a8074] overflow-x-auto min-w-0">
+                <a href="/" class="nav-link flex items-center gap-1 flex-shrink-0{% if request.url.path == '/' %} active{% endif %}">{{ icon('layers', 13) }} Ideas</a>
+                <a href="/activity" class="nav-link flex items-center gap-1 flex-shrink-0{% if '/activity' in request.url.path %} active{% endif %}">{{ icon('activity', 13) }} Activity</a>
+                <a href="/pool" class="nav-link flex items-center gap-1 flex-shrink-0{% if '/pool' in request.url.path %} active{% endif %}">{{ icon('users', 13) }} Pool</a>
+                <a href="/agents" class="nav-link flex items-center gap-1 flex-shrink-0{% if '/agents' in request.url.path %} active{% endif %}">{{ icon('brain', 13) }} Agents</a>
+                <a href="/pipelines/" class="nav-link flex items-center gap-1 flex-shrink-0{% if '/pipelines' in request.url.path %} active{% endif %}">{{ icon('git-branch', 13) }} Pipelines</a>
+                <a href="/costs" class="nav-link flex items-center gap-1 flex-shrink-0{% if '/costs' in request.url.path %} active{% endif %}">{{ icon('dollar-sign', 13) }} Costs</a>
+                <a href="/evolution" class="nav-link flex items-center gap-1 flex-shrink-0{% if '/evolution' in request.url.path %} active{% endif %}">{{ icon('dna', 13) }} Evolution</a>
+                <a href="/settings" class="nav-link flex items-center gap-1 flex-shrink-0{% if '/settings' in request.url.path %} active{% endif %}">{{ icon('settings', 13) }} Settings</a>
             </div>
-            <div class="ml-auto">
+            <div class="ml-auto flex-shrink-0">
                 <a href="/ideas/new" class="btn btn-primary text-[0.76rem] py-1.5 px-3.5">
                     {{ icon('plus', 14) }} New Idea
                 </a>
