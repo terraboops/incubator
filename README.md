@@ -50,22 +50,52 @@ Or use the web dashboard at `localhost:8000/ideas/new`.
 - **Agents as plain text** — prompts are Python string constants, edit them directly
 - **TLA+-verified scheduling** — the pool scheduler's correctness is formally specified
 
-## Architecture
+## Pipelines
+
+A pipeline defines which agents work on an idea and in what order. The default
+pipeline ships with four stages, but you can build your own:
 
 ```
- You ──► idea ──► [ ideation ] ──► [ implementation ] ──► [ validation ] ──► [ release ]
-                       │                  │                     │                 │
-                       ▼                  ▼                     ▼                 ▼
+ You ──► idea ──► [ stage 1 ] ──► [ stage 2 ] ──► [ ... ] ──► [ stage N ]
+                       │                │                            │
+                       ▼                ▼                            ▼
                   blackboard/ideas/<slug>/  ← shared filesystem state
 ```
+
+The default pipeline (ideation → implementation → validation → release) is just
+one template. Create your own in `pipeline-templates/` or via the dashboard at
+`/pipelines/`:
+
+```yaml
+# pipeline-templates/research-only.yaml
+name: research-only
+description: Deep research without building anything
+agents: [ideation, competitive-watcher]
+post_ready: [research-watcher]
+gating:
+  default: auto
+  overrides:
+    ideation: human-review
+```
+
+Each idea gets its own pipeline config. You can assign different pipelines to
+different ideas, or modify an idea's pipeline mid-flight from the dashboard.
+
+**Pipeline features:**
+- **Custom stages** — any agents in any order
+- **Parallel groups** — control which agents can run concurrently on the same idea
+- **Per-stage gating** — auto, human-review, or llm-decides for each transition
+- **Post-ready watchers** — agents that run continuously after the pipeline completes
+- **Reusable templates** — save and share pipeline configurations
 
 The worker pool schedules agents in time-boxed cycles, rotating across ideas
 by priority. Each agent reads what previous agents wrote and adds its own work.
 
 ## Features
 
+- **Custom pipelines** — define agent stages, gating modes, and parallelism per idea
+- **Pipeline templates** — save and reuse pipeline configurations
 - **Agent wizard** — describe what an agent should do and LLM generates the config
-- **Pipeline templates** — pre-built pipelines for common workflows
 - **Plugin marketplace** — extend agents with MCP servers, hooks, and skills
 - **Sandboxed execution** — kernel-level isolation via nono (Seatbelt/Landlock)
 - **Priority scheduling** — starvation-aware, deadline-pressured, formally verified
@@ -145,19 +175,21 @@ cron jobs, launchd plists, or systemd units.
 
 ```
 myproject/
-  .trellis              # project marker
-  .env                  # config
-  registry.yaml         # agent definitions
-  agents/               # prompts and knowledge
+  .trellis                # project marker
+  .env                    # config
+  registry.yaml           # agent definitions
+  pipeline-templates/     # reusable pipeline configs (YAML)
+  agents/                 # prompts and knowledge per agent
     ideation/
     implementation/
     validation/
     release/
-    artifact-check/     # quality checks across all ideas
-    competitive-watcher/ # monitors competitive landscape
-    research-watcher/   # tracks relevant research
-  blackboard/ideas/     # per-idea shared state
-  workspace/            # agent working dirs
+    artifact-check/       # quality checks across all ideas
+    competitive-watcher/  # monitors competitive landscape
+    research-watcher/     # tracks relevant research
+    your-custom-agent/    # add your own
+  blackboard/ideas/       # per-idea shared state
+  workspace/              # agent working dirs
 ```
 
 ## Development
@@ -170,6 +202,7 @@ pytest -v
 
 ## Docs
 
+- [Pipelines](docs/pipelines.md) — custom pipelines, templates, gating modes, parallel groups
 - [Agent system](docs/agents.md) — customization, creating new agents
 - [Architecture](docs/architecture.md) — blackboard pattern, pool scheduler, phase transitions
 - [Self-hosting](docs/self-hosting.md) — daemon mode, launchd, systemd, reverse proxy

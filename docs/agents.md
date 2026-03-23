@@ -79,14 +79,29 @@ system prompt on subsequent runs.
   max_budget_usd: 0
   status: active
   tools: [Read, Write, Bash, Glob, Grep]
-  phase: ideation          # which pipeline phase, or "*" for all
   permission_mode: bypassPermissions
 ```
 
 ### Via the web UI
 
-The dashboard at `/agents` lets you create agents through a form. This creates
+The dashboard at `/agents` lets you create agents through a form or via
+the agent wizard (LLM generates the config from a description). Both create
 the directory structure and registry entry for you.
+
+## Using agents in pipelines
+
+Once an agent exists in the registry, it can be added to any pipeline template
+or per-idea pipeline config. There are three ways an agent participates:
+
+- **Pipeline stage** — listed in the pipeline's `agents` array, runs sequentially
+- **Post-ready watcher** — listed in `post_ready`, runs after all stages complete
+- **Global agent** — `phase: "*"` in registry, runs across all ideas on a cadence
+
+The same agent can appear in multiple pipeline templates. An agent doesn't need
+a `phase` field in the registry to be used in a pipeline — the pipeline config
+determines when it runs.
+
+See [architecture.md](architecture.md) for the full pipeline configuration reference.
 
 ## The artifact-check agent
 
