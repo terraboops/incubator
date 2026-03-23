@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon, agent_icon %}
+{% block title %}Pipelines — trellis{% endblock %}
+{% block content %}
+<div class="flex items-end justify-between mb-6">
+    <div class="flex items-center gap-3">
+        <span class="text-[#a690cc]">{{ icon('git-branch', 22) }}</span>
+        <div>
+            <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Pipeline Templates</h1>
+            <p class="text-[0.8rem] text-[#8a8074]">Reusable agent pipeline configurations for your ideas.</p>
+        </div>
+    </div>
+    <a href="/pipelines/new" class="btn btn-primary">
+        {{ icon('plus', 14) }} New Template
+    </a>
+</div>
+
+{% if templates %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for tpl in templates %}
+    <a href="/pipelines/{{ tpl.name }}" class="card p-5 block group">
+        <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-full bg-[#eee8f6] flex items-center justify-center flex-shrink-0">
+                    <span class="text-[#7b5ea8]">{{ icon('git-branch', 16) }}</span>
+                </div>
+                <div>
+                    <h3 class="text-[0.85rem] font-medium text-[#3b3530] group-hover:text-[#1a1714] transition-colors">{{ tpl.name }}</h3>
+                    {% if tpl.description %}
+                    <p class="text-[0.7rem] text-[#b0a898] leading-snug mt-0.5 line-clamp-2">{{ tpl.description[:100] }}{% if tpl.description|length > 100 %}…{% endif %}</p>
+                    {% endif %}
+                </div>
+            </div>
+            <span class="badge badge-ideation flex-shrink-0 mt-0.5">{{ tpl.agents|length }} agent{{ 's' if tpl.agents|length != 1 else '' }}</span>
+        </div>
+
+        {# Pipeline flow visualization #}
+        {% if tpl.agents %}
+        <div class="flex items-center gap-0 mb-3 mt-1">
+            {% for agent in tpl.agents %}
+            <div class="flex flex-col items-center relative" style="min-width: 4.5rem;">
+                <div class="w-5 h-5 rounded-full flex items-center justify-center text-[0.5rem] font-bold z-10
+                    {% if loop.index0 == 0 %}bg-[#eee8f6] text-[#7b5ea8] ring-[2px] ring-[#eee8f6]
+                    {% elif loop.index0 == 1 %}bg-[#e3edf7] text-[#4a7aaa] ring-[2px] ring-[#e3edf7]
+                    {% elif loop.index0 == 2 %}bg-[#fce8e1] text-[#b85f3e] ring-[2px] ring-[#fce8e1]
+                    {% elif loop.index0 == 3 %}bg-[#e3ede3] text-[#4e834e] ring-[2px] ring-[#e3ede3]
+                    {% else %}bg-[#f1efe9] text-[#998c74] ring-[2px] ring-[#f1efe9]{% endif %}">
+                    <span class="scale-[0.7]">{{ agent_icon(agent, 14) }}</span>
+                </div>
+                <span class="text-[0.58rem] mt-1 font-medium tracking-tight text-[#8a8074] truncate max-w-[4.5rem] text-center">
+                    {{ agent }}
+                </span>
+            </div>
+            {% if not loop.last %}
+            <div class="flex-1 h-[2px] -mx-1 relative" style="margin-top: -1rem;">
+                <div class="absolute inset-0 bg-[#e8e3da] rounded-full"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-[#a690cc]/40 to-[#82b582]/40 rounded-full"></div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Watchers row #}
+        {% if tpl.post_ready %}
+        <div class="flex items-center gap-1.5 flex-wrap mb-3">
+            <span class="text-[0.56rem] text-[#b0a898] mr-0.5">watchers</span>
+            {% for watcher in tpl.post_ready %}
+            <span class="inline-flex items-center gap-1 px-1.5 py-[2px] rounded-full text-[0.58rem] font-medium bg-[#f5f3ee] text-[#b0a898] border border-[#e8e3da]">
+                <span class="scale-[0.8]">{{ agent_icon(watcher, 10) }}</span>
+                {{ watcher }}
+            </span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="flex items-center gap-4 text-[0.7rem] text-[#b0a898] pt-2 border-t border-[#f2efe8]">
+            <span class="flex items-center gap-1">
+                {{ icon('layers', 12) }}
+                {{ tpl.parallel_groups|length }} group{{ 's' if tpl.parallel_groups|length != 1 else '' }}
+            </span>
+            <span class="flex items-center gap-1">
+                {{ icon('check', 12) }}
+                {{ tpl.gating.default }}
+            </span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card p-16 text-center">
+    <div class="w-14 h-14 rounded-full bg-[#f2efe8] mx-auto mb-5 flex items-center justify-center text-[#bdb4a4]">{{ icon('git-branch', 26) }}</div>
+    <h2 class="text-[1rem] font-medium text-[#3b3530] mb-2">No pipeline templates</h2>
+    <p class="text-[0.84rem] text-[#8a8074] mb-6 max-w-xs mx-auto">Create your first pipeline template to define reusable agent workflows.</p>
+    <a href="/pipelines/new" class="btn btn-primary">{{ icon('plus', 14) }} New Template</a>
+</div>
+{% endif %}
+{% endblock %}

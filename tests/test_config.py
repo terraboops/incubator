@@ -5,23 +5,23 @@ from pathlib import Path
 
 import pytest
 
-from incubator.config import Settings, find_project_root
+from trellis.config import Settings, find_project_root
 
 
 def test_find_project_root_finds_marker(tmp_path):
-    (tmp_path / ".incubator").write_text(json.dumps({"version": "0.2.0"}))
+    (tmp_path / ".trellis").write_text(json.dumps({"version": "0.2.0"}))
     assert find_project_root(start=tmp_path) == tmp_path
 
 
 def test_find_project_root_walks_up(tmp_path):
-    (tmp_path / ".incubator").write_text(json.dumps({"version": "0.2.0"}))
+    (tmp_path / ".trellis").write_text(json.dumps({"version": "0.2.0"}))
     deep = tmp_path / "sub" / "deep"
     deep.mkdir(parents=True)
     assert find_project_root(start=deep) == tmp_path
 
 
 def test_find_project_root_raises_when_missing(tmp_path):
-    with pytest.raises(FileNotFoundError, match="incubator init"):
+    with pytest.raises(FileNotFoundError, match="trellis init"):
         find_project_root(start=tmp_path)
 
 

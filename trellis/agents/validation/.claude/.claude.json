@@ -1,0 +1,123 @@
+{
+  "cachedGrowthBookFeatures": {
+    "tengu_claudeai_mcp_connectors": true,
+    "tengu_kairos_cron": true,
+    "tengu_herring_clock": false,
+    "tengu_keybinding_customization_release": true,
+    "tengu_marble_whisper": true,
+    "tengu_amber_quartz": true,
+    "tengu_thinkback": false,
+    "tengu_cicada_nap_ms": 0,
+    "tengu_miraculo_the_bard": false,
+    "tengu_miraculo_the_bard2": false,
+    "tengu_paper_halyard": false,
+    "tengu_chomp_inflection": false,
+    "tengu_penguins_off": null,
+    "tengu_desktop_upsell": {
+      "enable_shortcut_tip": false,
+      "enable_startup_dialog": false
+    },
+    "tengu_marble_lantern_disabled": false,
+    "tengu_pebble_leaf_prune": false,
+    "tengu_mcp_elicitation": true,
+    "tengu_swinburne_dune": true,
+    "tengu_coral_fern": false,
+    "tengu_basalt_3kr": false,
+    "tengu_summarize_tool_results": true,
+    "tengu_bergotte_lantern": false,
+    "tengu_sotto_voce": true,
+    "tengu_system_prompt_global_cache": true,
+    "tengu_turtle_carbon": true,
+    "tengu_glacier_2xr": false,
+    "enhanced_telemetry_beta": false,
+    "tengu_streaming_tool_execution2": true,
+    "tengu_moth_copse": false,
+    "tengu_tool_search_unsupported_models": [
+      "haiku"
+    ],
+    "tengu_defer_all_bn4": false,
+    "tengu_fgts": false,
+    "tengu_tst_hint_m7r": false,
+    "tengu_attribution_header": true,
+    "tengu_prompt_cache_1h_config": {
+      "allowlist": [
+        "repl_main_thread*",
+        "sdk",
+        "auto_mode"
+      ]
+    },
+    "tengu_satin_quoll": {},
+    "tengu_event_sampling_config": {},
+    "tengu_frond_boric": {},
+    "tengu_log_segment_events": false,
+    "tengu_log_datadog_events": true,
+    "tengu_marble_anvil": true,
+    "tengu_tool_pear": false,
+    "tengu_scarf_coffee": false,
+    "tengu_tight_weave": true,
+    "tengu_auto_background_agents": false,
+    "tengu_tool_input_aliasing": false,
+    "tengu_pid_based_version_locking": true,
+    "tengu_plum_vx3": true
+  },
+  "oauthAccount": {
+    "accountUuid": "1a366b1d-074c-4895-a6a5-73ec053884c5",
+    "emailAddress": "autonav@terratauri.com",
+    "organizationUuid": "d7ccc4e9-c8a8-4ab7-9119-4b1d06a71c79",
+    "hasExtraUsageEnabled": false,
+    "billingType": "stripe_subscription",
+    "accountCreatedAt": "2026-02-05T18:53:52.679969Z",
+    "subscriptionCreatedAt": "2026-02-05T19:03:51.394999Z",
+    "displayName": "terra",
+    "organizationRole": "admin",
+    "workspaceRole": null,
+    "organizationName": "autonav@terratauri.com's Organization"
+  },
+  "firstStartTime": "2026-03-13T14:47:45.478Z",
+  "opusProMigrationComplete": true,
+  "sonnet1m45MigrationComplete": true,
+  "userID": "fef865c14247a6c5c40adafbc69f40e7706e942f150dab5e541988a2f356ddd8",
+  "clientDataCache": {
+    "data": {},
+    "timestamp": 1773413265767
+  },
+  "penguinModeOrgEnabled": false,
+  "groveConfigCache": {
+    "e6dbb4e5-5063-49b1-8f81-b96f0d651055": {
+      "grove_enabled": true,
+      "timestamp": 1773413265800
+    },
+    "1a366b1d-074c-4895-a6a5-73ec053884c5": {
+      "grove_enabled": true,
+      "timestamp": 1773499926184
+    }
+  },
+  "passesEligibilityCache": {
+    "b6c06830-6e62-40ac-9f3d-94190432416b": {
+      "eligible": true,
+      "referral_code_details": {
+        "code": "GGzlauG22A",
+        "campaign": "claude_code_guest_pass",
+        "referral_link": "https://claude.ai/referral/GGzlauG22A"
+      },
+      "referrer_reward": null,
+      "remaining_passes": 2,
+      "timestamp": 1773413266593
+    },
+    "d7ccc4e9-c8a8-4ab7-9119-4b1d06a71c79": {
+      "eligible": true,
+      "referral_code_details": {
+        "code": "zsqeLcQPmQ",
+        "campaign": "claude_code_guest_pass_a47c",
+        "referral_link": "https://claude.ai/referral/zsqeLcQPmQ"
+      },
+      "referrer_reward": {
+        "amount_minor_units": 1500,
+        "currency": "CAD"
+      },
+      "remaining_passes": 3,
+      "timestamp": 1773499926141
+    }
+  },
+  "cachedExtraUsageDisabledReason": "org_level_disabled"
+}

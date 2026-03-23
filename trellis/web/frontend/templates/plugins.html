@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}Plugins — trellis{% endblock %}
+{% block content %}
+
+<div class="flex items-end justify-between mb-6">
+    <div class="flex items-center gap-3">
+        <span class="text-[#a690cc]">{{ icon('package', 22) }}</span>
+        <div>
+            <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Plugins</h1>
+            <p class="text-[0.8rem] text-[#8a8074]">Browse Claude Code plugin marketplaces. Install plugins to extend agent capabilities.</p>
+        </div>
+    </div>
+    <a href="/agents" class="btn btn-soft text-[0.78rem]">{{ icon('brain', 14) }} Agents</a>
+</div>
+
+<!-- Marketplaces -->
+<section class="mb-8">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-[0.78rem] uppercase tracking-wider text-[#8a8074]">Marketplaces</h2>
+        <button type="button" onclick="showAddMarketplace()" class="btn btn-soft text-[0.76rem] py-1 px-3">
+            {{ icon('plus', 13) }} Add Marketplace
+        </button>
+    </div>
+    <div id="marketplaces-area">
+        <div class="card-flat p-6 text-center" id="mp-loading">
+            <span class="inline-block w-4 h-4 border-2 border-[#a690cc] border-t-transparent rounded-full animate-spin mr-2"></span>
+            <span class="text-[0.82rem] text-[#8a8074]">Loading marketplaces...</span>
+        </div>
+    </div>
+</section>
+
+<!-- Plugins -->
+<section class="mb-8">
+    <div class="mb-4">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-[0.78rem] uppercase tracking-wider text-[#8a8074]">Available Plugins</h2>
+            <input type="text" id="plugin-search" placeholder="Search plugins..." oninput="applyFilters()"
+                   class="px-3 py-1.5 rounded-lg text-[0.78rem] bg-white border border-[#eae6df] text-[#3b3530] w-56">
+        </div>
+        <div class="flex flex-wrap gap-1.5" id="cat-buttons" role="tablist" aria-label="Filter by category"></div>
+    </div>
+    <div id="plugins-area">
+        <div class="card-flat p-6 text-center" id="pl-loading">
+            <span class="inline-block w-4 h-4 border-2 border-[#a690cc] border-t-transparent rounded-full animate-spin mr-2"></span>
+            <span class="text-[0.82rem] text-[#8a8074]">Loading plugins...</span>
+        </div>
+    </div>
+</section>
+
+<!-- How to use -->
+<section class="mb-8">
+    <details>
+        <summary class="flex items-center gap-2 text-[0.82rem] font-medium text-[#8a8074] py-1 cursor-pointer">
+            <span class="chevron">&#x25B6;</span>
+            How plugins work with trellis agents
+        </summary>
+        <div class="card p-5 mt-2 prose text-[0.8rem]">
+            <p>Plugins extend Claude Code with MCP servers, hooks, skills, and LSP servers. In trellis, plugins are installed at the <strong>user level</strong> via Claude Code and are available to all agents.</p>
+            <h3>Installing a plugin</h3>
+            <p>From Claude Code, run:</p>
+            <pre><code>/plugin install plugin-name@marketplace-name</code></pre>
+            <h3>Adding a marketplace</h3>
+            <pre><code>/plugin marketplace add owner/repo</code></pre>
+            <h3>Marketplace format</h3>
+            <p>A marketplace is a repo with <code>.claude-plugin/marketplace.json</code> listing plugins.</p>
+        </div>
+    </details>
+</section>
+
+<!-- Add Marketplace Modal -->
+<div id="add-mp-modal" class="modal-overlay">
+    <div class="modal-box">
+        <h3 class="text-[0.95rem] font-medium text-[#3b3530] mb-4">Add Marketplace</h3>
+        <div>
+            <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Source</label>
+            <input type="text" id="mp-source" placeholder="owner/repo, git URL, or local path"
+                   class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+            <p class="text-[0.7rem] text-[#b0a898] mt-1">
+                Examples: <code>anthropics/claude-code</code>, <code>https://gitlab.com/team/plugins.git</code>
+            </p>
+        </div>
+        <div class="bg-[#f7f5f0] rounded-xl p-3 mt-3">
+            <div class="text-[0.72rem] font-medium text-[#8a8074] mb-1">Quick add</div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" onclick="document.getElementById('mp-source').value='anthropics/claude-code'"
+                        class="text-[0.72rem] px-2.5 py-1 rounded-lg border border-[#eae6df] bg-white text-[#544d43] hover:bg-[#f2efe8] cursor-pointer">
+                    anthropics/claude-code (demo)
+                </button>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 mt-5">
+            <button type="button" onclick="addMarketplace()" id="add-mp-btn" class="btn btn-primary">Add Marketplace</button>
+            <button type="button" onclick="document.getElementById('add-mp-modal').classList.remove('active')" class="text-[0.82rem] text-[#8a8074] cursor-pointer">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var allPlugins = [];
+var marketplaces = [];
+var categories = {};
+var currentCat = 'all';
+
+function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.textContent; }
+
+async function loadData() {
+    try {
+        var resp = await fetch('/agents/plugins/api');
+        var data = await resp.json();
+        marketplaces = data.marketplaces || [];
+        allPlugins = data.plugins || [];
+        renderMarketplaces();
+        buildCategories();
+        applyFilters();
+    } catch(e) {
+        document.getElementById('mp-loading').textContent = 'Failed to load: ' + e.message;
+        document.getElementById('pl-loading').textContent = 'Failed to load plugins';
+    }
+}
+
+function renderMarketplaces() {
+    var area = document.getElementById('marketplaces-area');
+    if (marketplaces.length === 0) {
+        area.textContent = '';
+        var p = document.createElement('div');
+        p.className = 'card-flat p-6 text-center';
+        var t = document.createElement('p');
+        t.className = 'text-[0.82rem] text-[#8a8074]';
+        t.textContent = 'No custom marketplaces. The official Anthropic marketplace is available by default in Claude Code.';
+        p.appendChild(t);
+        area.appendChild(p);
+        return;
+    }
+    area.textContent = '';
+    var grid = document.createElement('div');
+    grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-3';
+    marketplaces.forEach(function(mp) {
+        var card = document.createElement('div');
+        card.className = 'card p-4';
+
+        var header = document.createElement('div');
+        header.className = 'flex items-center justify-between mb-1';
+        var name = document.createElement('span');
+        name.className = 'text-[0.85rem] font-medium text-[#3b3530]';
+        name.textContent = mp.name;
+        var count = document.createElement('span');
+        count.className = 'text-[0.68rem] font-mono text-[#b0a898]';
+        count.textContent = (mp.plugin_count || 0) + ' plugins';
+        header.appendChild(name);
+        header.appendChild(count);
+        card.appendChild(header);
+
+        var src = document.createElement('div');
+        src.className = 'text-[0.72rem] font-mono text-[#8a8074] truncate';
+        src.textContent = mp.source || '';
+        card.appendChild(src);
+
+        if (mp.description) {
+            var desc = document.createElement('div');
+            desc.className = 'text-[0.75rem] text-[#8a8074] mt-1';
+            desc.textContent = mp.description;
+            card.appendChild(desc);
+        }
+        grid.appendChild(card);
+    });
+    area.appendChild(grid);
+}
+
+function buildCategories() {
+    categories = {};
+    allPlugins.forEach(function(p) {
+        var c = p.category || 'other';
+        categories[c] = (categories[c] || 0) + 1;
+    });
+    // Sort by count descending
+    var sorted = Object.entries(categories).sort(function(a,b) { return b[1] - a[1]; });
+
+    var btns = document.getElementById('cat-buttons');
+    btns.textContent = '';
+
+    // "All" button first
+    var allBtn = document.createElement('button');
+    allBtn.className = 'cat-btn text-[0.7rem] px-2.5 py-1 rounded-full cursor-pointer transition-colors bg-[#3b3530] text-[#faf9f6]';
+    allBtn.textContent = 'All ' + allPlugins.length;
+    allBtn.dataset.cat = 'all';
+    allBtn.setAttribute('role', 'tab');
+    allBtn.setAttribute('aria-selected', 'true');
+    allBtn.onclick = function() { filterByCategory('all'); };
+    btns.appendChild(allBtn);
+
+    sorted.forEach(function(entry) {
+        var cat = entry[0], count = entry[1];
+        var b = document.createElement('button');
+        b.className = 'cat-btn text-[0.7rem] px-2.5 py-1 rounded-full cursor-pointer transition-colors bg-[#f2efe8] text-[#8a8074] hover:bg-[#eae6df]';
+        b.textContent = (cat.charAt(0).toUpperCase() + cat.slice(1)) + ' ' + count;
+        b.dataset.cat = cat;
+        b.setAttribute('role', 'tab');
+        b.setAttribute('aria-selected', 'false');
+        b.onclick = function() { filterByCategory(cat); };
+        btns.appendChild(b);
+    });
+}
+
+function filterByCategory(cat) {
+    currentCat = cat;
+    document.querySelectorAll('.cat-btn').forEach(function(b) {
+        var isActive = b.dataset.cat === cat;
+        b.className = 'cat-btn text-[0.7rem] px-2.5 py-1 rounded-full cursor-pointer transition-colors ' +
+            (isActive ? 'bg-[#3b3530] text-[#faf9f6]' : 'bg-[#f2efe8] text-[#8a8074] hover:bg-[#eae6df]');
+        b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    applyFilters();
+}
+
+function applyFilters() {
+    var query = (document.getElementById('plugin-search').value || '').toLowerCase();
+    var area = document.getElementById('plugins-area');
+    area.textContent = '';
+
+    var filtered = allPlugins.filter(function(p) {
+        if (currentCat !== 'all' && (p.category || 'other') !== currentCat) return false;
+        if (query && !((p.name || '') + ' ' + (p.description || '')).toLowerCase().includes(query)) return false;
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'card-flat p-6 text-center text-[0.82rem] text-[#8a8074]';
+        empty.textContent = allPlugins.length === 0 ? 'No plugins loaded. Add a marketplace to browse plugins.' : 'No plugins match your filters.';
+        area.appendChild(empty);
+        return;
+    }
+
+    var grid = document.createElement('div');
+    grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3';
+
+    filtered.forEach(function(p) {
+        var catColors = {
+            integration: 'bg-[#e3edf7] text-[#4a7aaa]',
+            lsp: 'bg-[#eee8f6] text-[#7b5ea8]',
+            workflow: 'bg-[#e3ede3] text-[#4e834e]',
+            style: 'bg-[#fce8e1] text-[#b85f3e]'
+        };
+        var catClass = catColors[p.category] || 'bg-[#f2efe8] text-[#8a8074]';
+
+        var card = document.createElement('div');
+        card.className = 'card p-4';
+
+        // Header
+        var hdr = document.createElement('div');
+        hdr.className = 'flex items-center justify-between mb-2';
+        var nm = document.createElement('span');
+        nm.className = 'text-[0.85rem] font-medium text-[#3b3530]';
+        nm.textContent = p.name;
+        var badge = document.createElement('span');
+        badge.className = 'text-[0.6rem] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full ' + catClass;
+        badge.textContent = p.category || 'plugin';
+        hdr.appendChild(nm);
+        hdr.appendChild(badge);
+        card.appendChild(hdr);
+
+        // Description
+        if (p.description) {
+            var desc = document.createElement('p');
+            desc.className = 'text-[0.75rem] text-[#8a8074] leading-relaxed mb-2 line-clamp-2';
+            desc.textContent = p.description;
+            card.appendChild(desc);
+        }
+
+        // Footer
+        var foot = document.createElement('div');
+        foot.className = 'flex items-center justify-between mt-auto pt-2 border-t border-[#f2efe8]';
+        var mp = document.createElement('span');
+        mp.className = 'text-[0.68rem] text-[#b0a898]';
+        mp.textContent = p.marketplace || '';
+        var cmd = document.createElement('code');
+        cmd.className = 'text-[0.65rem] text-[#8a8074] bg-[#f7f5f0] px-2 py-0.5 rounded cursor-pointer';
+        cmd.textContent = '/plugin install ' + (p.name || '') + '@' + (p.marketplace || '');
+        cmd.title = 'Click to copy';
+        cmd.onclick = function() {
+            navigator.clipboard.writeText(cmd.textContent);
+            cmd.textContent = 'Copied!';
+            setTimeout(function() {
+                cmd.textContent = '/plugin install ' + (p.name || '') + '@' + (p.marketplace || '');
+            }, 1500);
+        };
+        foot.appendChild(mp);
+        foot.appendChild(cmd);
+        card.appendChild(foot);
+
+        grid.appendChild(card);
+    });
+    area.appendChild(grid);
+}
+
+function showAddMarketplace() {
+    document.getElementById('add-mp-modal').classList.add('active');
+    document.getElementById('mp-source').focus();
+}
+
+async function addMarketplace() {
+    var source = document.getElementById('mp-source').value.trim();
+    if (!source) return;
+    var btn = document.getElementById('add-mp-btn');
+    btn.disabled = true;
+    btn.textContent = 'Adding...';
+    try {
+        var resp = await fetch('/agents/plugins/api/add-marketplace', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({source: source})
+        });
+        var data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed');
+        document.getElementById('add-mp-modal').classList.remove('active');
+        loadData();
+    } catch(e) {
+        alert('Error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Add Marketplace';
+    }
+}
+
+loadData();
+</script>
+
+{% endblock %}

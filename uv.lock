@@ -377,60 +377,6 @@ wheels = [
 ]
 
 [[package]]
-name = "incubator"
-version = "0.3.0"
-source = { editable = "." }
-dependencies = [
-    { name = "anthropic" },
-    { name = "claude-agent-sdk" },
-    { name = "croniter" },
-    { name = "fastapi" },
-    { name = "gitpython" },
-    { name = "jinja2" },
-    { name = "markdown" },
-    { name = "pydantic-settings" },
-    { name = "python-multipart" },
-    { name = "python-telegram-bot" },
-    { name = "pyyaml" },
-    { name = "rich" },
-    { name = "typer" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "watchfiles" },
-    { name = "websockets" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic" },
-    { name = "claude-agent-sdk" },
-    { name = "croniter" },
-    { name = "fastapi" },
-    { name = "gitpython" },
-    { name = "jinja2" },
-    { name = "markdown" },
-    { name = "pydantic-settings", specifier = ">=2.0" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'" },
-    { name = "python-multipart" },
-    { name = "python-telegram-bot", specifier = ">=21.0" },
-    { name = "pyyaml" },
-    { name = "rich" },
-    { name = "ruff", marker = "extra == 'dev'" },
-    { name = "typer", extras = ["all"] },
-    { name = "uvicorn", extras = ["standard"] },
-    { name = "watchfiles" },
-    { name = "websockets" },
-]
-provides-extras = ["dev"]
-
-[[package]]
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -662,6 +608,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "nono-py"
+version = "0.4.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/e6/7107ea7099098fbe8643184260c2605791bd7f45df2e7985751c5e8465a8/nono_py-0.4.2.tar.gz", hash = "sha256:b8f417bfa89b598c87126987f1388375fe8100119531bc81ada9a713881e1a95", size = 101266, upload-time = "2026-03-16T18:30:09.39Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/74/a4/77cb1d77dc18b2eb89248f450fcd21080926fceab81f08877619ca0ea075/nono_py-0.4.2-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:e02d0c6ffe234f45cdf41105af4eec46f80e6ef638225fdf86d66dc9dece1416", size = 882184, upload-time = "2026-03-16T18:29:54.931Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/1b/9fee48fe3e01a5261b664ee71d32b22ab9f219904091b0124b5a97c97260/nono_py-0.4.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:6eda78100212dc0e2f1cded6da86bbea3667c1f8f6a5951cacf4ca1ddbdfddd6", size = 765249, upload-time = "2026-03-16T18:29:56.807Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/19/dea592b5406093d93afe5d5234d5f506f81fa050d21939fc1b97dea0de06/nono_py-0.4.2-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:60b08a3a981c47a1848a40387f0371cdc3201c553ad8be81680d3264447d9b33", size = 1631041, upload-time = "2026-03-16T18:29:58.666Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/79/385897444d21b1de7f720b72da6561e81e75b839193a35fddae47b2111e2/nono_py-0.4.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:88e08112d879b0768750415a63c31684d2f2afbe6f452b295f8c7884c458821b", size = 659914, upload-time = "2026-03-16T18:30:00.016Z" },
+    { url = "https://files.pythonhosted.org/packages/85/71/b5cfb1f51892521419da4fa726ab6c010ce8b4e925cbd6cc3e25660815a2/nono_py-0.4.2-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:161361b8c6748aff4f15d929b2f1ae432de7d884652aba722ce3597310f9a9a5", size = 1630221, upload-time = "2026-03-16T18:30:01.579Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/c7/79b840a163347a348992f874769d92d0363e63dd8559d25e7b6289f50ebe/nono_py-0.4.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:03223ac5eb487abd6c437fca24178a960377101bfdfec4aa3ce78180c1290295", size = 660139, upload-time = "2026-03-16T18:30:04.037Z" },
 ]
 
 [[package]]
@@ -1151,6 +1111,62 @@ sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
 ]
+
+[[package]]
+name = "trellis"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "anthropic" },
+    { name = "claude-agent-sdk" },
+    { name = "croniter" },
+    { name = "fastapi" },
+    { name = "gitpython" },
+    { name = "jinja2" },
+    { name = "markdown" },
+    { name = "nono-py" },
+    { name = "pydantic-settings" },
+    { name = "python-multipart" },
+    { name = "python-telegram-bot" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "typer" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "watchfiles" },
+    { name = "websockets" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic" },
+    { name = "claude-agent-sdk" },
+    { name = "croniter" },
+    { name = "fastapi" },
+    { name = "gitpython" },
+    { name = "jinja2" },
+    { name = "markdown" },
+    { name = "nono-py" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
+    { name = "pytest", marker = "extra == 'dev'" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'" },
+    { name = "python-multipart" },
+    { name = "python-telegram-bot", specifier = ">=21.0" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "ruff", marker = "extra == 'dev'" },
+    { name = "typer", extras = ["all"] },
+    { name = "uvicorn", extras = ["standard"] },
+    { name = "watchfiles" },
+    { name = "websockets" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "typer"

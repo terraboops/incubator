@@ -1,0 +1,12 @@
+{
+  "oauthAccount": {
+    "accountUuid": "e6dbb4e5-5063-49b1-8f81-b96f0d651055",
+    "emailAddress": "me@terratauri.com",
+    "organizationUuid": "b6c06830-6e62-40ac-9f3d-94190432416b",
+    "hasExtraUsageEnabled": true,
+    "billingType": "google_play_subscription",
+    "accountCreatedAt": "2025-08-10T05:54:53.572961Z",
+    "subscriptionCreatedAt": "2025-09-13T00:15:14.935226Z",
+    "displayName": "terra"
+  }
+}

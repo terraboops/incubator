@@ -23,7 +23,7 @@ agents:
     type: adaptive
   setting_sources:
   - project
-  claude_home: incubator/agents/ideation/.claude
+  claude_home: trellis/agents/ideation/.claude
 - name: implementation
   description: Software engineer that builds MVPs from validated specs
   model: claude-sonnet-4-6
@@ -45,7 +45,7 @@ agents:
     type: adaptive
   setting_sources:
   - project
-  claude_home: incubator/agents/implementation/.claude
+  claude_home: trellis/agents/implementation/.claude
 - name: validation
   description: QA engineer that tests implementations against specs
   model: claude-sonnet-4-6
@@ -65,7 +65,7 @@ agents:
     type: adaptive
   setting_sources:
   - project
-  claude_home: incubator/agents/validation/.claude
+  claude_home: trellis/agents/validation/.claude
 - name: release
   description: Release engineer that deploys software and creates launch materials
   model: claude-sonnet-4-6
@@ -85,7 +85,7 @@ agents:
     type: adaptive
   setting_sources:
   - project
-  claude_home: incubator/agents/release/.claude
+  claude_home: trellis/agents/release/.claude
 - name: competitive-watcher
   description: Monitors competitive landscape for active ideas
   model: claude-haiku-4-5

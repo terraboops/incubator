@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vancouver Group Dinner — Restaurant Options — March 27, 2026</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --surface2: #232640;
+    --accent: #c8a96e;
+    --accent2: #7eb8c9;
+    --text: #e8e6e0;
+    --muted: #8a8799;
+    --green: #6dbb8a;
+    --red: #e07070;
+    --purple: #b49ae0;
+    --border: rgba(200,169,110,0.15);
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f3ee;
+      --surface: #ffffff;
+      --surface2: #f0ede6;
+      --accent: #96722a;
+      --accent2: #2a7a96;
+      --text: #1a1a1a;
+      --muted: #6b6659;
+      --green: #2d7a4f;
+      --red: #b84040;
+      --purple: #6b4ba8;
+      --border: rgba(150,114,42,0.2);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Georgia', serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    padding: 0 0 80px;
+  }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 48px 40px 36px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 340px;
+    background: linear-gradient(135deg, transparent, rgba(200,169,110,0.05));
+    pointer-events: none;
+  }
+  header .label {
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  header h1 {
+    font-size: 2.4rem;
+    font-weight: normal;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  header .subtitle {
+    color: var(--muted);
+    font-size: 1.05rem;
+    font-style: italic;
+  }
+  .alert-bar {
+    background: linear-gradient(90deg, rgba(200,169,110,0.12), rgba(200,169,110,0.06));
+    border-left: 3px solid var(--accent);
+    padding: 14px 40px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: var(--accent);
+    letter-spacing: 0.03em;
+  }
+  .main { max-width: 1100px; margin: 0 auto; padding: 40px 24px 0; }
+  section { margin-bottom: 56px; }
+  .section-label {
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* CORRECTIONS NOTICE */
+  .corrections-bar {
+    background: rgba(224,112,112,0.07);
+    border: 1px solid rgba(224,112,112,0.2);
+    border-radius: var(--radius);
+    padding: 16px 22px;
+    margin-bottom: 32px;
+    font-size: 0.83rem;
+    color: var(--muted);
+  }
+  .corrections-bar strong { color: var(--red); font-style: normal; }
+  .corrections-bar ul { margin-top: 8px; padding-left: 18px; }
+  .corrections-bar li { margin-bottom: 4px; }
+
+  /* Timeline strip */
+  .timeline {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+  .tl-item {
+    background: var(--surface);
+padding: 20px 22px;
+  }
+  .tl-item .date {
+    font-family: 'Courier New', monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .tl-item .action { font-size: 0.92rem; font-weight: bold; color: var(--text); margin-bottom: 4px; }
+  .tl-item .detail { font-size: 0.82rem; color: var(--muted); }
+  .tl-item.urgent { border-top: 3px solid var(--red); }
+  .tl-item.normal { border-top: 3px solid var(--accent); }
+  .tl-item.soft { border-top: 3px solid var(--green); }
+
+  /* Restaurant cards */
+  .restaurants { display: grid; gap: 24px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: rgba(200,169,110,0.35); }
+  .card-header {
+    padding: 24px 28px 18px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: start;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-name { font-size: 1.35rem; letter-spacing: -0.01em; margin-bottom: 4px; }
+  .card-cuisine { font-size: 0.85rem; color: var(--muted); font-style: italic; }
+  .card-meta { text-align: right; }
+  .price-tag {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: rgba(200,169,110,0.1);
+    border: 1px solid rgba(200,169,110,0.25);
+    border-radius: 6px;
+    padding: 4px 10px;
+    display: inline-block;
+    margin-bottom: 4px;
+  }
+  .card-body {
+    padding: 20px 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+  }
+  .info-group .ig-label {
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .info-group .ig-val { font-size: 0.9rem; color: var(--text); }
+  .info-group a { color: var(--accent2); text-decoration: none; }
+  .info-group a:hover { text-decoration: underline; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .tag {
+    font-size: 0.72rem;
+    font-family: 'Courier New', monospace;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+  }
+  .tag.veg { color: var(--green); border-color: var(--green); background: rgba(109,187,138,0.08); }
+  .tag.gf { color: var(--accent2); border-color: var(--accent2); background: rgba(126,184,201,0.08); }
+  .tag.vegan { color: var(--purple); border-color: var(--purple); background: rgba(180,154,224,0.08); }
+  .tag.halal { color: #e0b47a; border-color: #e0b47a; background: rgba(224,180,122,0.08); }
+  .tag.caveat { color: var(--red); border-color: var(--red); background: rgba(224,112,112,0.08); }
+  .card-footer {
+    background: var(--surface2);
+    padding: 16px 28px;
+    border-top: 1px solid var(--border);
+  }
+  .transit-line {
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .transit-badge {
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(126,184,201,0.15);
+    color: var(--accent2);
+    border: 1px solid rgba(126,184,201,0.3);
+    white-space: nowrap;
+  }
+  .transit-text { color: var(--muted); font-size: 0.82rem; }
+  .fix-badge {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(224,112,112,0.12);
+    color: var(--red);
+    border: 1px solid rgba(224,112,112,0.3);
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  /* Comparison table */
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  .compare-table th {
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .compare-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table tr:hover td { background: rgba(200,169,110,0.04); }
+  .dot-yes { color: var(--green); font-size: 1rem; }
+  .dot-no { color: var(--red); font-size: 1rem; }
+  .dot-partial { color: var(--accent); font-size: 1rem; }
+
+  /* Script box */
+  .script-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-top: 16px;
+  }
+  .script-box .script-label {
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+  .script-box .script-text {
+    font-size: 0.93rem;
+    line-height: 1.75;
+    color: var(--text);
+    border-left: 2px solid var(--border);
+    padding-left: 18px;
+    font-style: italic;
+  }
+  .script-box .placeholder {
+    background: rgba(200,169,110,0.15);
+    color: var(--accent);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-style: normal;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+  }
+  .script-box .note {
+    margin-top: 16px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  /* Transit visual */
+  .transit-visual {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    overflow: auto;
+  }
+  svg text { font-family: 'Courier New', monospace; }
+
+  /* Tips grid */
+  .tips-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .tip-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+  }
+  .tip-card h4 { font-size: 0.95rem; margin-bottom: 8px; color: var(--text); }
+  .tip-card p { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+
+  .rec-pill {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 4px;
+    border: 1px solid var(--green);
+    color: var(--green);
+    background: rgba(109,187,138,0.08);
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  .alt-pill {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 4px;
+    border: 1px solid var(--muted);
+    color: var(--muted);
+    background: transparent;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  .new-pill {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 4px;
+    border: 1px solid var(--purple);
+    color: var(--purple);
+    background: rgba(180,154,224,0.08);
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+
+  @media (max-width: 600px) {
+    header { padding: 32px 20px 24px; }
+    header h1 { font-size: 1.7rem; }
+    .main { padding: 28px 16px 0; }
+    .card-header { grid-template-columns: 1fr; }
+    .card-meta { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="label">Vancouver Group Dinner</div>
+  <h1>Friday, March 27, 2026</h1>
+  <div class="subtitle">5&ndash;10 people &middot; Dietary-inclusive &middot; Central transit access &middot; Greater Vancouver</div>
+</header>
+
+<div class="alert-bar">
+  TODAY IS MARCH 13 &mdash; YOU HAVE 14 DAYS. RESERVE TODAY. DOWNTOWN FRIDAYS FILL BY TUESDAY OF THAT WEEK.
+</div>
+
+  <!-- MARCH 27 EVENT ALERTS -->
+  <div class="main" style="padding-bottom:0">
+  <div style="background:rgba(224,112,112,0.08); border:1px solid rgba(224,112,112,0.25); border-radius:12px; padding:18px 22px; margin-top:32px; font-size:0.85rem; line-height:1.7;">
+    <div style="font-family:'Courier New',monospace; font-size:0.68rem; letter-spacing:0.18em; text-transform:uppercase; color:#e07070; margin-bottom:10px;">March 27 Event Conflicts &mdash; Affects Specific Venues</div>
+    <p style="color:#e8e6e0; margin-bottom:8px;"><strong>Vancouver International Auto Show</strong> at Vancouver Convention Centre (10am&ndash;9pm, March 25&ndash;29) &mdash; The Convention Centre is steps from Miku Vancouver. Waterfront Station and Coal Harbour will be significantly more crowded than a typical Friday. If choosing Miku, allow extra transit time and book the private room early.</p>
+    <p style="color:#e8e6e0; margin-bottom:8px;"><strong>Les Mis&eacute;rables</strong> at Queen Elizabeth Theatre (7:30pm curtain, runs March 18&ndash;29) &mdash; QE Theatre is 3 blocks from Chambar. Pre-show dinner traffic in the Crosstown area peaks from 5:30&ndash;7:00pm. The Chambar recommendation to book 6:30&ndash;7:00pm still holds, but call early &mdash; other groups in this area will be competing for the same window.</p>
+    <p style="color:#8a8799;">Rogers Arena has no event March 27. Earls (Yaletown), Nuba (Gastown), and CRAFT (Olympic Village) are not materially affected by either event.</p>
+  </div>
+  </div>
+
+
+<div class="main">>
+
+  <!-- CORRECTIONS NOTICE -->
+  <div class="corrections-bar">
+    <strong>Corrections from prior version</strong> &mdash; the following errors were found and fixed in this revision:
+    <ul>
+      <li>Earls Yaletown phone was wrong: was 604-684-4990, correct is <strong>604-688-4990</strong></li>
+      <li>Chambar opening time was wrong: dinner starts at <strong>5:00 PM</strong>, not 5:30 PM</li>
+      <li>CRAFT Beer Market listed as having no private room &mdash; it has <strong>a private room plus two mezzanines</strong></li>
+      <li>Nuba Gastown booking method was incomplete &mdash; groups of 8+ should email <strong>nubagastown@gmail.com</strong>; restaurant uses <strong>Resy</strong>, not OpenTable</li>
+      <li>Miku Vancouver added as a fifth option &mdash; private dining room (Blue Sky Room), waterfront location, near Waterfront Station</li>
+    </ul>
+  </div>
+
+  <!-- TIMELINE -->
+  <section>
+    <div class="section-label">Action Timeline</div>
+    <div class="timeline">
+      <div class="tl-item urgent">
+        <div class="date">TODAY &mdash; Mar 13</div>
+        <div class="action">Call your top pick</div>
+        <div class="detail">Phone reservations for groups are always better than online. Mention party size, date, time, and dietary needs.</div>
+      </div>
+      <div class="tl-item urgent">
+        <div class="date">Mar 14&ndash;16</div>
+        <div class="action">Confirm headcount</div>
+        <div class="detail">Text or message guests. Get a firm yes/no. Most restaurants need final numbers 48&ndash;72 hrs ahead.</div>
+      </div>
+      <div class="tl-item normal">
+        <div class="date">Mar 20 &mdash; Fri</div>
+        <div class="action">Collect dietary info</div>
+        <div class="detail">Ask guests for allergies and restrictions. Share with the restaurant at the confirmation call.</div>
+      </div>
+      <div class="tl-item normal">
+        <div class="date">Mar 25 &mdash; Wed</div>
+        <div class="action">Confirmation call</div>
+        <div class="detail">Re-confirm headcount and all dietary requirements. Ask about split billing and late arrivals.</div>
+      </div>
+      <div class="tl-item soft">
+        <div class="date">Mar 27 &mdash; Fri</div>
+        <div class="action">Dinner night</div>
+        <div class="detail">Arrive together or name a meeting point. Confirm it in the morning text so no one is waiting outside alone.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRANSIT SVG MAP -->
+  <section>
+    <div class="section-label">Transit Overview &mdash; Getting Everyone There</div>
+    <div class="transit-visual">
+      <svg viewBox="0 0 860 280" width="100%" style="max-height:280px">
+        <!-- Expo Line (blue) -->
+        <line x1="30" y1="100" x2="830" y2="100" stroke="#7eb8c9" stroke-width="5" stroke-linecap="round"/>
+        <!-- Canada Line (gold) -->
+        <line x1="310" y1="20" x2="310" y2="255" stroke="#c8a96e" stroke-width="5" stroke-linecap="round"/>
+        <!-- Millennium Line (purple) -->
+        <line x1="30" y1="140" x2="440" y2="140" stroke="#b49ae0" stroke-width="5" stroke-linecap="round"/>
+
+        <!-- Key stations -->
+        <circle cx="310" cy="100" r="9" fill="#0f1117" stroke="#7eb8c9" stroke-width="3"/>
+        <circle cx="400" cy="100" r="7" fill="#0f1117" stroke="#7eb8c9" stroke-width="2.5"/>
+        <circle cx="500" cy="100" r="7" fill="#0f1117" stroke="#7eb8c9" stroke-width="2.5"/>
+        <circle cx="310" cy="165" r="7" fill="#0f1117" stroke="#c8a96e" stroke-width="2.5"/>
+        <circle cx="310" cy="215" r="5" fill="#0f1117" stroke="#c8a96e" stroke-width="2"/>
+        <circle cx="640" cy="100" r="5" fill="#7eb8c9" stroke="none" opacity="0.4"/>
+        <circle cx="750" cy="100" r="5" fill="#7eb8c9" stroke="none" opacity="0.25"/>
+        <circle cx="30" cy="100" r="6" fill="#6dbb8a" stroke="none"/>
+        <circle cx="215" cy="100" r="5" fill="#7eb8c9" stroke="none" opacity="0.4"/>
+
+        <!-- Labels -->
+        <text x="310" y="85" text-anchor="middle" font-size="11" fill="#e8e6e0">Waterfront</text>
+        <text x="400" y="85" text-anchor="middle" font-size="11" fill="#e8e6e0">Granville</text>
+        <text x="500" y="85" text-anchor="middle" font-size="11" fill="#e8e6e0">Stadium</text>
+        <text x="310" y="183" text-anchor="middle" font-size="11" fill="#e8e6e0">Yaletown</text>
+        <text x="310" y="232" text-anchor="middle" font-size="10" fill="#8a8799">Olympic Village</text>
+        <text x="640" y="85" text-anchor="middle" font-size="10" fill="#8a8799">Burnaby</text>
+        <text x="750" y="85" text-anchor="middle" font-size="10" fill="#8a8799">Coquitlam</text>
+        <text x="30" y="85" text-anchor="start" font-size="10" fill="#6dbb8a">SeaBus</text>
+        <text x="215" y="85" text-anchor="middle" font-size="10" fill="#8a8799">New West.</text>
+
+        <!-- Restaurant pins -->
+        <!-- Chambar near Stadium -->
+        <polygon points="500,115 494,132 506,132" fill="#c8a96e"/>
+        <text x="500" y="150" text-anchor="middle" font-size="10" fill="#c8a96e">Chambar</text>
+
+        <!-- Nuba near Waterfront -->
+        <polygon points="340,115 334,132 346,132" fill="#6dbb8a"/>
+        <text x="340" y="150" text-anchor="middle" font-size="10" fill="#6dbb8a">Nuba</text>
+
+        <!-- Miku near Waterfront/Canada Place -->
+        <polygon points="285,115 279,132 291,132" fill="#b49ae0"/>
+        <text x="285" y="150" text-anchor="middle" font-size="10" fill="#b49ae0">Miku</text>
+
+        <!-- Earls near Yaletown -->
+        <polygon points="310,180 304,197 316,197" fill="#e07070"/>
+        <text x="340" y="204" text-anchor="start" font-size="10" fill="#e07070">Earls</text>
+
+        <!-- CRAFT near Olympic Village -->
+        <polygon points="310,228 304,245 316,245" fill="#d4886e"/>
+        <text x="332" y="249" text-anchor="start" font-size="10" fill="#d4886e">CRAFT</text>
+
+        <!-- Legend -->
+        <rect x="560" y="178" width="280" height="90" rx="6" fill="rgba(26,29,46,0.88)" stroke="rgba(200,169,110,0.2)" stroke-width="1"/>
+        <line x1="574" y1="196" x2="600" y2="196" stroke="#7eb8c9" stroke-width="4"/>
+        <text x="608" y="200" font-size="10" fill="#8a8799">Expo Line</text>
+        <line x1="574" y1="214" x2="600" y2="214" stroke="#c8a96e" stroke-width="4"/>
+        <text x="608" y="218" font-size="10" fill="#8a8799">Canada Line</text>
+        <line x1="574" y1="232" x2="600" y2="232" stroke="#b49ae0" stroke-width="4"/>
+        <text x="608" y="236" font-size="10" fill="#8a8799">Millennium Line</text>
+        <polygon points="828,196 822,208 834,208" fill="#c8a96e"/>
+        <text x="792" y="208" font-size="10" fill="#8a8799" text-anchor="end">Restaurant pin</text>
+      </svg>
+      <p style="font-size:0.78rem; color:var(--muted); margin-top:12px; text-align:center;">All five restaurants are within 5&ndash;10 minutes walk of a major SkyTrain station. Waterfront Station (all three lines + SeaBus) is the single best meeting point for guests coming from all directions.</p>
+    </div>
+  </section>
+
+  <!-- RESTAURANT OPTIONS -->
+  <section>
+    <div class="section-label">Restaurant Options</div>
+    <div class="restaurants">
+
+      <!-- CHAMBAR -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-name">Chambar <span class="rec-pill">Top Pick</span></div>
+            <div class="card-cuisine">Belgian-inspired, globally-influenced &mdash; Downtown / Crosstown</div>
+          </div>
+          <div class="card-meta">
+            <div class="price-tag">$$$ &mdash; ~$60&ndash;85 per person</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="info-group">
+            <div class="ig-label">Address</div>
+            <div class="ig-val">568 Beatty St, Vancouver<br><span style="font-size:0.8rem; color:var(--muted)">Near BC Place &amp; Rogers Arena</span></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Phone</div>
+            <div class="ig-val"><a href="tel:+16048797119">604-879-7119</a></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Booking Method</div>
+            <div class="ig-val">Phone (604-879-7119) or Tock (exploretock.com/chambar) for up to 11 guests. Large Party Request Form (on chambar.com) for 12 or more. Chambar does not use OpenTable.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Hours (Friday)</div>
+            <div class="ig-val">Dinner from 5:00 PM. Book 6:30 or 7:00 PM for the group.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Dietary</div>
+            <div class="tags">
+              <span class="tag veg">Vegetarian</span>
+              <span class="tag gf">Gluten-Free</span>
+              <span class="tag vegan">Vegan options</span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--muted); margin-top:6px;">Kitchen accommodates allergies. State all restrictions when booking.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Private Space</div>
+            <div class="ig-val">Semi-private room for up to 20 seated. Ideal for 8&ndash;10.</div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="transit-line">
+            <span class="transit-badge">Stadium&ndash;Chinatown</span>
+            <span class="transit-text">4 min walk south on Beatty St &mdash; Expo Line &amp; Millennium Line</span>
+          </div>
+          <div style="margin-top:8px; font-size:0.8rem; color:var(--muted);">North Shore: SeaBus to Waterfront, Expo Line 1 stop to Stadium. Richmond: Canada Line to Waterfront, transfer. Burnaby/Surrey/Coquitlam: Expo or Millennium direct.</div>
+        </div>
+      </div>
+
+      <!-- MIKU -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-name">Miku Vancouver <span class="new-pill">New Option</span></div>
+            <div class="card-cuisine">Japanese aburi sushi, waterfront dining &mdash; Coal Harbour</div>
+          </div>
+          <div class="card-meta">
+            <div class="price-tag">$$$$ &mdash; ~$80&ndash;120 per person</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="info-group">
+            <div class="ig-label">Address</div>
+            <div class="ig-val">200 Granville St (Granville Square)<br><span style="font-size:0.8rem; color:var(--muted)">At Canada Place Way &amp; Howe St. Waterfront views.</span></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Contact</div>
+            <div class="ig-val"><a href="mailto:info@mikurestaurant.com">info@mikurestaurant.com</a><br><span style="font-size:0.8rem; color:var(--muted)">Or book via OpenTable Experiences (groups 7+)</span></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Booking Method</div>
+            <div class="ig-val">Email or OpenTable Experiences for groups of 7 or more. The private room (Blue Sky Room) is booked directly &mdash; contact 2&ndash;3 weeks ahead. There is a minimum spend requirement.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Hours (Friday)</div>
+            <div class="ig-val">11:30 AM to 10:00 PM. Book 6:30 or 7:00 PM.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Dietary</div>
+            <div class="tags">
+              <span class="tag veg">Vegetarian</span>
+              <span class="tag gf">GF-aware</span>
+              <span class="tag caveat">Not ideal for non-sushi eaters</span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--muted); margin-top:6px;">Good vegetarian and GF options. Seafood-forward menu. If any guests strongly dislike sushi or fish, consider a different venue.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Private Space</div>
+            <div class="ig-val">Blue Sky Room: 7&ndash;20 guests, dedicated senior server. Dedicated private event space with harbour views.</div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="transit-line">
+            <span class="transit-badge">Waterfront Station</span>
+            <span class="transit-text">7 min walk &mdash; all three SkyTrain lines converge here; SeaBus terminal is in this station</span>
+          </div>
+          <div style="margin-top:8px; font-size:0.8rem; color:var(--muted);">Best single station for the entire GVA. North Shore SeaBus lands directly at Waterfront. Every SkyTrain line passes through. This is the most transit-accessible location of the five options.</div>
+        </div>
+      </div>
+
+      <!-- NUBA GASTOWN -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-name">Nuba Gastown <span class="alt-pill">Alt Pick</span></div>
+            <div class="card-cuisine">Lebanese, plant-forward &mdash; Gastown</div>
+          </div>
+          <div class="card-meta">
+            <div class="price-tag">$$ &mdash; ~$30&ndash;45 per person</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="info-group">
+            <div class="ig-label">Address</div>
+            <div class="ig-val">207 W Hastings St, Vancouver<br><span style="font-size:0.8rem; color:var(--muted)">Heart of Gastown</span></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Phone</div>
+            <div class="ig-val"><a href="tel:+16046881655">604-688-1655</a></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Booking Method</div>
+            <div class="ig-val">Book via <strong>Resy</strong> (resy.com) for standard reservations. For groups of 8 or more, email <a href="mailto:nubagastown@gmail.com">nubagastown@gmail.com</a> directly &mdash; they do not use OpenTable.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Hours (Friday)</div>
+            <div class="ig-val">11:30 AM to 10:00 PM. Book 6:30 or 7:00 PM.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Dietary</div>
+            <div class="tags">
+              <span class="tag veg">Vegetarian</span>
+              <span class="tag gf">Mostly GF</span>
+              <span class="tag vegan">Largely Vegan</span>
+              <span class="tag halal">Halal-friendly</span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--muted); margin-top:6px;">Large portion of menu is vegan and naturally GF. Kitchen is not dedicated GF &mdash; note for severe celiac. Best diet-inclusive option of the five.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Private Space</div>
+            <div class="ig-val">No private room. Can arrange a reserved section for groups. Casual atmosphere.</div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="transit-line">
+            <span class="transit-badge">Waterfront Station</span>
+            <span class="transit-text">7 min walk &mdash; Expo, Canada, Millennium Lines + SeaBus terminus</span>
+          </div>
+          <div style="margin-top:8px; font-size:0.8rem; color:var(--muted);">Excellent transit access from all areas. Gastown is an easy walk from Waterfront. Lowest price point of the five, best for mixed budgets.</div>
+        </div>
+      </div>
+
+      <!-- EARLS YALETOWN -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-name">Earls Kitchen + Bar &mdash; Yaletown <span class="alt-pill">Casual Pick</span></div>
+            <div class="card-cuisine">American / Canadian, polished casual &mdash; Yaletown</div>
+          </div>
+          <div class="card-meta">
+            <div class="price-tag">$$ &mdash; ~$35&ndash;55 per person</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="info-group">
+            <div class="ig-label">Address</div>
+            <div class="ig-val">1095 Mainland St, Vancouver<br><span style="font-size:0.8rem; color:var(--muted)">Yaletown, near seawall</span></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Phone <span class="fix-badge">corrected</span></div>
+            <div class="ig-val"><a href="tel:+16046884990">604-688-4990</a></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Booking Method</div>
+            <div class="ig-val">Phone or OpenTable. Groups of 7 or more should call directly.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Hours (Friday)</div>
+            <div class="ig-val">Open from 11:00 AM until 2:00 AM. No time pressure on a Friday.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Dietary</div>
+            <div class="tags">
+              <span class="tag veg">Vegetarian</span>
+              <span class="tag gf">Gluten-Free</span>
+              <span class="tag vegan">Some Vegan</span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--muted); margin-top:6px;">Menu labels GF and vegetarian items clearly. Allergy-aware kitchen. Solid but not specialized.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Private Space</div>
+            <div class="ig-val">No private room. Booth seating handles groups well. Enclosed patio (good for March).</div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="transit-line">
+            <span class="transit-badge">Yaletown&ndash;Roundhouse</span>
+            <span class="transit-text">5 min walk &mdash; Canada Line (direct from Richmond, Airport, South Van)</span>
+          </div>
+          <div style="margin-top:8px; font-size:0.8rem; color:var(--muted);">Best for guests coming from Richmond, YVR, or South Vancouver. Expo/Millennium guests: Waterfront then 3 stops south on Canada Line, or bus. Least convenient option for east-side guests.</div>
+        </div>
+      </div>
+
+      <!-- CRAFT Beer Market -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-name">CRAFT Beer Market &mdash; False Creek <span class="alt-pill">Lively Pick</span></div>
+            <div class="card-cuisine">Canadian pub-style, large format &mdash; Olympic Village</div>
+          </div>
+          <div class="card-meta">
+            <div class="price-tag">$$ &mdash; ~$30&ndash;50 per person</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="info-group">
+            <div class="ig-label">Address</div>
+            <div class="ig-val">85 W 1st Ave, Vancouver<br><span style="font-size:0.8rem; color:var(--muted)">Salt Building, Olympic Village, False Creek waterfront</span></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Phone</div>
+            <div class="ig-val"><a href="tel:+16047092337">604-709-2337</a></div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Booking Method</div>
+            <div class="ig-val">Phone or OpenTable for up to 20 guests. Group bookings form (craftbeermarket.ca) for larger events. They have a dedicated events coordinator.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Hours (Friday)</div>
+            <div class="ig-val">11:00 AM to midnight. Good for a longer social evening.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Dietary</div>
+            <div class="tags">
+              <span class="tag veg">Vegetarian</span>
+              <span class="tag gf">Some GF</span>
+              <span class="tag vegan">Some Vegan</span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--muted); margin-top:6px;">Least diet-forward of the five. Good variety but confirm specific needs when booking. Not suitable if dietary restrictions are extensive.</div>
+          </div>
+          <div class="info-group">
+            <div class="ig-label">Private Space <span class="fix-badge">corrected</span></div>
+            <div class="ig-val">Yes. Private dining room plus two exclusive mezzanines. Can accommodate 10 people comfortably in a semi-private loft area overlooking the restaurant.</div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="transit-line">
+            <span class="transit-badge">Olympic Village</span>
+            <span class="transit-text">8 min walk &mdash; Canada Line (2 stops south of Waterfront)</span>
+          </div>
+          <div style="margin-top:8px; font-size:0.8rem; color:var(--muted);">Good for Canada Line riders. North Shore guests: SeaBus + Canada Line. Expo/Millennium guests: transfer at Waterfront. Slightly less convenient for east-side guests but best fallback if other venues are full &mdash; handles large walk-ins better than the rest.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- COMPARISON TABLE -->
+  <section>
+    <div class="section-label">Quick Comparison</div>
+    <div style="overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius);">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Restaurant</th>
+            <th>Price/Person</th>
+            <th>Best For</th>
+            <th>Vegan-Friendly</th>
+            <th>GF-Friendly</th>
+            <th>Private Space</th>
+            <th>Noise Level</th>
+            <th>Nearest Station</th>
+            <th>How to Book (groups)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Chambar</strong></td>
+            <td>$60&ndash;85</td>
+            <td>Special occasion, best food quality</td>
+            <td><span class="dot-yes">Yes</span></td>
+            <td><span class="dot-yes">Yes</span></td>
+            <td><span class="dot-yes">Yes &mdash; up to 20</span></td>
+            <td>Moderate</td>
+            <td>Stadium&ndash;Chinatown (4 min)</td>
+            <td>Phone: 604-879-7119 / Tock</td>
+          </tr>
+          <tr>
+            <td><strong>Miku Vancouver</strong></td>
+            <td>$80&ndash;120</td>
+            <td>Memorable experience, harbour views</td>
+            <td><span class="dot-partial">Limited</span></td>
+            <td><span class="dot-partial">GF-aware</span></td>
+            <td><span class="dot-yes">Yes &mdash; 7 to 20</span></td>
+            <td>Moderate</td>
+            <td>Waterfront (7 min)</td>
+            <td>Email: info@mikurestaurant.com / OpenTable Experiences</td>
+          </tr>
+          <tr>
+            <td><strong>Nuba Gastown</strong></td>
+            <td>$30&ndash;45</td>
+            <td>Budget-friendly, best diet inclusivity</td>
+            <td><span class="dot-yes">Largely vegan</span></td>
+            <td><span class="dot-partial">Mostly GF*</span></td>
+            <td><span class="dot-no">No (reserved section)</span></td>
+            <td>Moderate</td>
+            <td>Waterfront (7 min)</td>
+            <td>Email: nubagastown@gmail.com (8+) / Resy</td>
+          </tr>
+          <tr>
+            <td><strong>Earls Yaletown</strong></td>
+            <td>$35&ndash;55</td>
+            <td>Reliable crowd-pleaser, easy parking</td>
+            <td><span class="dot-partial">Some options</span></td>
+            <td><span class="dot-yes">Yes</span></td>
+            <td><span class="dot-no">No</span></td>
+            <td>Moderate&ndash;High</td>
+            <td>Yaletown&ndash;Roundhouse (5 min)</td>
+            <td>Phone: 604-688-4990 / OpenTable</td>
+          </tr>
+          <tr>
+            <td><strong>CRAFT False Creek</strong></td>
+            <td>$30&ndash;50</td>
+            <td>Lively evening, beer lovers, walk-ins</td>
+            <td><span class="dot-partial">Some options</span></td>
+            <td><span class="dot-partial">Some options</span></td>
+            <td><span class="dot-yes">Yes &mdash; mezzanines + room</span></td>
+            <td>Loud</td>
+            <td>Olympic Village (8 min)</td>
+            <td>Phone: 604-709-2337 / Group bookings form</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.78rem; color:var(--muted); margin-top:10px;">* Nuba GF note: dishes are prepared without gluten but the kitchen is not certified GF. Not safe for severe celiac disease.</p>
+    <p style="font-size:0.78rem; color:var(--muted); margin-top:4px;">Miku caveat: seafood and sushi-forward menu. If any guests have strong aversions to fish, choose a different venue.</p>
+  </section>
+
+  <!-- RESERVATION SCRIPTS -->
+  <section>
+    <div class="section-label">Reservation Scripts</div>
+
+    <h3 style="font-size:1rem; margin-bottom:12px; color:var(--text);">Calling for a group of 8&ndash;10 (Chambar or Earls)</h3>
+    <div class="script-box">
+      <div class="script-label">Phone Script &mdash; Standard Group Booking</div>
+      <div class="script-text">
+        "Hi, I'd like to make a reservation for a group of <span class="placeholder">[8 or 10]</span> people for dinner on Friday, March 27th. We're flexible on time between 6:30 and 7:30 PM &mdash; what works best for you?<br><br>
+        We have a few dietary restrictions in the group: <span class="placeholder">[e.g., one vegetarian, one gluten-free, one dairy-free]</span>. Can your kitchen accommodate that?<br><br>
+        Is there any chance of a semi-private section or a table together? We'd love to be able to hear each other.<br><br>
+        Could I give you a name and phone number to hold that? My name is <span class="placeholder">[Your Name]</span>, my number is <span class="placeholder">[Your Number]</span>.<br><br>
+        And just to confirm &mdash; do you have a cancellation policy for large groups? We'll confirm final numbers by Wednesday the 25th."
+      </div>
+      <div class="note">If they ask for a credit card to hold a large-group reservation, that is standard. Ask about the cancellation window (usually 24&ndash;48 hours). At Chambar, for 12 or more people, you need to fill out the Large Party Request Form at chambar.com first.</div>
+    </div>
+
+    <h3 style="font-size:1rem; margin-top:24px; margin-bottom:12px; color:var(--text);">Emailing for Nuba Gastown (groups of 8 or more)</h3>
+    <div class="script-box">
+      <div class="script-label">Email to nubagastown@gmail.com</div>
+      <div class="script-text">
+        Subject: Group reservation request &mdash; March 27, 2026<br><br>
+        "Hi,<br><br>
+        I'm hoping to book a dinner for <span class="placeholder">[8 or 10]</span> people at Nuba Gastown on Friday, March 27th. We'd like to dine around 6:30 or 7:00 PM.<br><br>
+        We have the following dietary needs in the group: <span class="placeholder">[e.g., three people who are vegan, one who is gluten-free, one with a nut allergy]</span>.<br><br>
+        Could you let me know if you have availability, and whether you can accommodate a reserved section for the group?<br><br>
+        Thank you,<br>
+        <span class="placeholder">[Your Name]</span><br>
+        <span class="placeholder">[Your phone number]</span>"
+      </div>
+      <div class="note">Nuba does not use OpenTable. Use Resy for smaller bookings, or email for groups. Their reply time is typically within a few hours during business hours.</div>
+    </div>
+
+    <h3 style="font-size:1rem; margin-top:24px; margin-bottom:12px; color:var(--text);">If your first choice is fully booked</h3>
+    <div class="script-box">
+      <div class="script-label">Phone Script &mdash; Waitlist / Fallback</div>
+      <div class="script-text">
+        "Oh, that's too bad. Is there any chance of a cancellation by next Friday? Could you add us to a waitlist?<br><br>
+        And if anything opens up by Tuesday the 24th, could you give me a call?"
+      </div>
+      <div class="note">Call order if your first choice is full: Chambar (604-879-7119) &rarr; Miku (email info@mikurestaurant.com) &rarr; Nuba (email nubagastown@gmail.com) &rarr; Earls (604-688-4990) &rarr; CRAFT (604-709-2337). CRAFT is the most reliable walk-in fallback for a group this size.</div>
+    </div>
+
+    <h3 style="font-size:1rem; margin-top:24px; margin-bottom:12px; color:var(--text);">Confirmation call (Wednesday, March 25)</h3>
+    <div class="script-box">
+      <div class="script-label">Confirmation Call Script</div>
+      <div class="script-text">
+        "Hi, I have a reservation for <span class="placeholder">[Your Name]</span>, a group of <span class="placeholder">[final number]</span> on Friday, March 27th. I'm calling to confirm and to share our final dietary needs.<br><br>
+        We have: <span class="placeholder">[list specific restrictions, e.g., one person with a severe tree nut allergy, two vegans, one person who is gluten-sensitive but not celiac]</span>.<br><br>
+        Is that something the kitchen can manage? Great. And can you split the bill multiple ways? We'll see you Friday."
+      </div>
+    </div>
+  </section>
+
+  <!-- PRACTICAL TIPS -->
+  <section>
+    <div class="section-label">Practical Tips</div>
+    <div class="tips-grid">
+      <div class="tip-card">
+        <h4>Headcount discipline</h4>
+        <p>Most restaurants charge a per-head no-show fee for large groups. Get a firm commitment from each guest before giving the restaurant a number. Eight confirmed is better than ten with two maybes.</p>
+      </div>
+      <div class="tip-card">
+        <h4>Arrival time</h4>
+        <p>Friday nights in downtown Vancouver are busy. Book 6:30 or 7:00 PM to avoid the post-work rush at 6:00 PM. Tell guests to arrive by 6:20 so you are all seated together on time.</p>
+      </div>
+      <div class="tip-card">
+        <h4>Transit tip for guests</h4>
+        <p>Share station and walk directions with each guest when you confirm. "Take Expo Line to Stadium-Chinatown, then walk south on Beatty for 4 minutes" is all anyone needs. Compass Card works on all TransLink services.</p>
+      </div>
+      <div class="tip-card">
+        <h4>Communicate dietary needs now</h4>
+        <p>Ask guests for restrictions today, not the day before. If anyone has a severe allergy (nut, shellfish, dairy), tell the restaurant at booking and repeat it on the confirmation call. Saying "I'm allergic to tree nuts and it can be serious" is more actionable than a vague note.</p>
+      </div>
+      <div class="tip-card">
+        <h4>Splitting the bill</h4>
+        <p>Ask when you book whether they can do multiple bill splits. Most downtown Vancouver restaurants split up to 6 ways without trouble. More than that requires advance notice. Mention it when you call so there's no awkward conversation at the end of the night.</p>
+      </div>
+      <div class="tip-card">
+        <h4>Backup plan</h4>
+        <p>Book your first choice today. If that falls through close to the date, CRAFT Beer Market is the most forgiving walk-in option for a group this size &mdash; they handle large parties without reservations better than the rest.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

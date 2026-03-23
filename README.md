@@ -1,10 +1,15 @@
-# incubator
+# Trellis
 
-A team of Claude agents that takes an idea from research to release.
+**A structure for growing ideas with agent teams.**
 
-You describe an idea. Agents research the market, write a feasibility study,
-build an MVP, test it, and prepare launch materials — running autonomously with
-human checkpoints between phases.
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/terraboops?style=social)](https://github.com/sponsors/terraboops)
+[![GitHub Stars](https://img.shields.io/github/stars/terraboops/trellis?style=social)](https://github.com/terraboops/trellis)
+
+Trellis is an agentic pipeline platform. You describe an idea. Agent teams
+research, build, test, and launch it — running autonomously with human
+checkpoints between phases. Custom pipelines, sandboxed execution, plugin
+marketplace, TLA+-verified scheduling.
 
 ![Ideas pipeline](docs/screenshots/dashboard-ideas.png)
 
@@ -12,7 +17,7 @@ human checkpoints between phases.
 
 ```bash
 brew tap terraboops/tap
-brew install incubator
+brew install trellis
 ```
 
 Or from source:
@@ -24,38 +29,26 @@ pip install .
 ## Quick start
 
 ```bash
-incubator init myproject && cd myproject
-incubator serve                      # dashboard + agents at localhost:8000
+trellis init myproject && cd myproject
+trellis serve                      # dashboard + agents at localhost:8000
 ```
 
 Submit your first idea:
 
 ```bash
-incubator incubate "Cat cafe in Vancouver" -d "A cat cafe targeting remote workers"
+trellis incubate "Cat cafe in Vancouver" -d "A cat cafe targeting remote workers"
 ```
 
 Or use the web dashboard at `localhost:8000/ideas/new`.
 
-## How it works
+## Philosophy
 
-An idea flows through four phases, each handled by a specialized agent:
-
-| Phase | Agent does |
-|-------|-----------|
-| **Ideation** | Competitive analysis, feasibility study, feedback synthesis |
-| **Implementation** | Builds an MVP in a sandboxed workspace |
-| **Validation** | Tests the implementation against the spec |
-| **Release** | Deployment artifacts and launch materials |
-
-Agents share state through a **blackboard** — a plain filesystem directory per
-idea. Each agent reads what previous agents wrote and adds its own work, so
-context accumulates naturally without a database.
-
-A **worker pool** schedules agents in time-boxed cycles, rotating across ideas
-by priority. Between phases, the system pauses for **human approval** via
-Telegram or the dashboard before proceeding.
-
-![Agent team](docs/screenshots/dashboard-agents.png)
+- **Filesystem-first** — agents coordinate through files on a shared blackboard, not message passing
+- **No framework** — agents are Claude sessions with plain-text prompts and MCP tools
+- **Blackboard pattern** — context accumulates naturally per idea without a database
+- **Human-in-the-loop** — approval gates between phases via Telegram or the web dashboard
+- **Agents as plain text** — prompts are Python string constants, edit them directly
+- **TLA+-verified scheduling** — the pool scheduler's correctness is formally specified
 
 ## Architecture
 
@@ -66,11 +59,21 @@ Telegram or the dashboard before proceeding.
                   blackboard/ideas/<slug>/  ← shared filesystem state
 ```
 
-- **No framework** — agents are Claude sessions with plain-text prompts and MCP tools
-- **Blackboard pattern** — agents coordinate through files, not message passing
-- **Worker pool** — configurable concurrency, time-boxing, and priority rotation
-- **Human-in-the-loop** — Telegram notifications + approval gates between phases
-- **Self-improving** — agents accumulate learnings in `knowledge/learnings.md` across runs
+The worker pool schedules agents in time-boxed cycles, rotating across ideas
+by priority. Each agent reads what previous agents wrote and adds its own work.
+
+## Features
+
+- **Agent wizard** — describe what an agent should do and LLM generates the config
+- **Pipeline templates** — pre-built pipelines for common workflows
+- **Plugin marketplace** — extend agents with MCP servers, hooks, and skills
+- **Sandboxed execution** — kernel-level isolation via nono (Seatbelt/Landlock)
+- **Priority scheduling** — starvation-aware, deadline-pressured, formally verified
+- **Feedback routing** — structured feedback with identity tracking and deduplication
+- **Knowledge curation** — agents accumulate and self-curate learnings across runs
+- **Real-time dashboard** — WebSocket-powered activity feed, cost tracking, pool status
+
+![Agent team](docs/screenshots/dashboard-agents.png)
 
 ## Agent customization
 
@@ -78,7 +81,7 @@ Each agent lives in `agents/<name>/` with:
 
 - `prompt.py` — the system prompt (a Python string constant)
 - `.claude/CLAUDE.md` — project-level instructions
-- `knowledge/learnings.md` — accumulated learnings (preserved across upgrades)
+- `knowledge/` — structured Knowledge Objects accumulated across runs
 
 The prompts are plain text. No abstractions, no DSLs. Edit them directly.
 
@@ -90,31 +93,35 @@ Copy `.env.example` to `.env`:
 |---|---|---|
 | `TELEGRAM_BOT_TOKEN` | — | Telegram bot for notifications + approval |
 | `POOL_SIZE` | 3 | Concurrent agent slots |
-| `CYCLE_TIME_MINUTES` | 30 | Worker pool cycle window |
+| `JOB_TIMEOUT_MINUTES` | 60 | Worker pool job timeout |
 | `MODEL_TIER_HIGH` | claude-sonnet-4-6 | Model for pipeline agents |
 | `MODEL_TIER_LOW` | claude-haiku-4-5 | Model for watchers |
 
 Agent definitions live in `registry.yaml` — models, tool access, turn limits,
 and token budgets per agent.
 
-## CLI
+## CLI reference
 
 ```
-incubator init [DIR]          Scaffold a new project
-incubator incubate TITLE      Submit an idea
-incubator status IDEA         Show idea status
-incubator list                List all ideas
-incubator serve               Dashboard + worker pool
-incubator serve --background  Run as daemon
-incubator serve --stop        Stop daemon
-incubator agent upgrade       Update agents from package defaults
+trellis init [DIR]              Scaffold a new project
+trellis incubate TITLE          Submit an idea
+trellis status IDEA             Show idea status
+trellis list                    List all ideas
+trellis serve                   Dashboard + worker pool
+trellis serve --background      Run as daemon
+trellis serve --stop            Stop daemon
+trellis run                     Worker pool only (no web UI)
+trellis evolve                  Run knowledge curation
+trellis migrate                 Apply registry migrations
+trellis migrate-knowledge       Convert learnings.md to Knowledge Objects
+trellis agent upgrade           Update agents from package defaults
 ```
 
 ## Project layout
 
 ```
 myproject/
-  .incubator            # project marker
+  .trellis              # project marker
   .env                  # config
   registry.yaml         # agent definitions
   agents/               # prompts and knowledge
@@ -132,9 +139,9 @@ myproject/
 ## Development
 
 ```bash
-git clone https://github.com/terrateamio/incubator.git
+git clone https://github.com/terraboops/trellis.git
 pip install -e ".[dev]"
-pytest -v                     # 114 tests
+pytest -v
 ```
 
 ## Docs
@@ -142,3 +149,19 @@ pytest -v                     # 114 tests
 - [Agent system](docs/agents.md) — customization, creating new agents
 - [Architecture](docs/architecture.md) — blackboard pattern, pool scheduler, phase transitions
 - [Self-hosting](docs/self-hosting.md) — daemon mode, launchd, systemd, reverse proxy
+- [Security](docs/security.md) — sandbox, credential proxy, tool policy, audit, attestation
+
+## Support Trellis
+
+Trellis is built in the open by [terraboops](https://github.com/terraboops).
+
+If Trellis saves you time or sparks ideas, consider:
+
+- **Star this repo** — it helps others discover the project
+- **[Sponsor on GitHub](https://github.com/sponsors/terraboops)** or **[Ko-fi](https://ko-fi.com/terraboops)** — supports ongoing development
+- **Open an issue** — bugs, ideas, and feedback all welcome
+- **Share what you build** — tag `#trellis` or open a discussion
+
+## License
+
+[Apache-2.0](LICENSE)

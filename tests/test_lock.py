@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from incubator.core.lock import LockManager
+from trellis.core.lock import LockManager
 
 
 @pytest.fixture

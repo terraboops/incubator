@@ -6,7 +6,7 @@ import pytest
 
 def test_serve_command_has_no_pool_flag():
     """serve command accepts --no-pool flag."""
-    from incubator.cli import app
+    from trellis.cli import app
     from typer.testing import CliRunner
     runner = CliRunner()
     result = runner.invoke(app, ["serve", "--no-pool", "--help"])
@@ -15,7 +15,7 @@ def test_serve_command_has_no_pool_flag():
 
 def test_run_command_exists():
     """run command is registered."""
-    from incubator.cli import app
+    from trellis.cli import app
     from typer.testing import CliRunner
     runner = CliRunner()
     result = runner.invoke(app, ["run", "--help"])
@@ -24,7 +24,7 @@ def test_run_command_exists():
 
 def test_pool_enabled_flag():
     """set_pool_enabled controls whether pool starts with the app."""
-    from incubator.web.api.app import set_pool_enabled, _pool_enabled_flag
+    from trellis.web.api.app import set_pool_enabled, _pool_enabled_flag
     set_pool_enabled(True)
     assert _pool_enabled_flag() is True
     set_pool_enabled(False)

@@ -1,4 +1,4 @@
-"""Tests for incubator/core/sandbox.py — profile generation and flag building."""
+"""Tests for trellis/core/sandbox.py — profile generation and flag building."""
 from __future__ import annotations
 
 import json
@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from incubator.core.registry import AgentConfig
-from incubator.core.sandbox import build_nono_flags
+from trellis.core.registry import AgentConfig
+from trellis.core.sandbox import build_nono_flags
 
 
 # ── build_nono_flags tests (no nono-py required) ──────────────────────────
@@ -132,6 +132,6 @@ def test_build_profile_requires_nono_py(tmp_path):
     except ImportError:
         pass
 
-    from incubator.core.sandbox import build_profile
+    from trellis.core.sandbox import build_profile
     with pytest.raises(ImportError, match="nono-py"):
         build_profile(config, "test-idea", tmp_path, blackboard)

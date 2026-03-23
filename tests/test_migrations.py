@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from incubator.core.migrations import (
+from trellis.core.migrations import (
     AddSandboxFieldsMigration,
     RemoveIdeationBashAgentMigration,
     check_all,

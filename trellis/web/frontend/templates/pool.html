@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon, agent_icon, phase_icon %}
+
+{% block title %}Worker Pool – trellis{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-baseline justify-between mb-8">
+    <div class="flex items-center gap-3">
+        <span class="text-[#a690cc]">{{ icon('users', 22) }}</span>
+        <div>
+        <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Worker Pool</h1>
+        <p class="text-[0.82rem] text-[#8a8074] mt-1">
+            <span class="font-mono text-[#3b3530] font-medium">{{ state.pool_size }}</span> workers
+            &middot;
+            <span class="font-mono text-[#3b3530] font-medium">{{ state.queue_depth }}</span> queued jobs
+        </p>
+        </div>
+    </div>
+</div>
+
+<!-- Workers -->
+<section class="mb-10">
+    <h2 class="text-[0.78rem] uppercase tracking-wider text-[#8a8074] mb-4">Workers</h2>
+
+    {% if state.workers %}
+    <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+        {% for w in state.workers %}
+        <div class="card px-5 py-5">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="agent-ring {{ 'running' if w.status == 'active' else 'idle' }}">
+                    {{ loop.index }}
+                </div>
+                <div>
+                    <div class="text-[0.82rem] font-medium">Worker {{ loop.index }}</div>
+                    <div class="text-[0.72rem] text-[#8a8074]">
+                        {% if w.status == 'active' %}
+                            <span style="color: #7b5ea8;">active</span>
+                        {% else %}
+                            idle
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% if w.status == 'active' %}
+            <div class="card-flat px-3 py-2.5 text-[0.78rem]">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="badge badge-{{ w.role|default('ideation') }}">{{ w.role|default('–') }}</span>
+                </div>
+                {% if w.idea %}
+                <div class="text-[#544d43] truncate">{{ w.idea }}</div>
+                {% endif %}
+                {% if w.elapsed_seconds is defined %}
+                <div class="text-[0.72rem] text-[#8a8074] mt-1 font-mono">
+                    {% set em = (w.elapsed_seconds // 60)|int %}
+                    {% set es = (w.elapsed_seconds % 60)|int %}
+                    {{ "%02d"|format(em) }}:{{ "%02d"|format(es) }} elapsed
+                </div>
+                {% endif %}
+            </div>
+            {% elif w.idle_reason %}
+            <div class="text-[0.72rem] text-[#b0a898] leading-relaxed">
+                {{ w.idle_reason }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="card-flat px-5 py-8 text-center">
+        <div class="text-[0.88rem] text-[#bdb4a4]">No workers registered</div>
+        <div class="text-[0.76rem] text-[#ccc5b8] mt-1">
+            Workers appear when the pool is started via <code class="text-[0.74rem]">trellis serve</code>
+        </div>
+    </div>
+    {% endif %}
+</section>
+
+<!-- Cadence Trackers -->
+{% if state.cadence_trackers %}
+<style>
+    .hb-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .hb-dot.ran { background: #82b582; }
+    .hb-dot.missed { background: #c45a5a; opacity: 0.7; }
+    .hb-dot.current { background: #d4a843; animation: hb-pulse 1.5s infinite; }
+    @keyframes hb-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+</style>
+<section class="mb-10">
+    <h2 class="text-[0.78rem] uppercase tracking-wider text-[#8a8074] mb-4">Background Agents (Cadence)</h2>
+    <div class="card divide-y divide-[#eae6df]">
+        {% for role, tracker in state.cadence_trackers.items() %}
+        {% set is_due = tracker.is_due %}
+        <div class="px-5 py-4 flex items-center gap-4">
+            <div class="w-36">
+                <span class="badge badge-{{ role }}">{{ role }}</span>
+                <div class="text-[0.68rem] text-[#8a8074] mt-0.5 font-mono">{{ tracker.cron | cadence_label }}</div>
+            </div>
+            <div class="flex-1 flex items-center gap-1.5 justify-center">
+                {% for dot in tracker.heartbeat %}
+                <div class="hb-dot {{ dot }}" title="{{ dot }}"></div>
+                {% endfor %}
+            </div>
+            <div class="w-36 text-right">
+                <span class="text-[0.78rem] {% if is_due %}text-[#b8860b] font-medium{% else %}text-[#8a8074]{% endif %}">
+                    {% if is_due %}overdue{% else %}{{ tracker.time_left }}{% endif %}
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

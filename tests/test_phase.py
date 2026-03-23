@@ -1,4 +1,4 @@
-from incubator.core.phase import Phase, can_transition, get_agent_phase
+from trellis.core.phase import Phase, can_transition, get_agent_phase
 
 
 def test_valid_transitions():

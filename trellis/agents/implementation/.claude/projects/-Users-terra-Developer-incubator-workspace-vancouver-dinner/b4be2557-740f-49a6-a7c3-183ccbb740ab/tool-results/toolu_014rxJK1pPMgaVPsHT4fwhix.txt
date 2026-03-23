@@ -1,0 +1,1215 @@
+     1→<!DOCTYPE html>
+     2→<html lang="en">
+     3→<head>
+     4→<meta charset="UTF-8">
+     5→<meta name="viewport" content="width=device-width, initial-scale=1.0">
+     6→<title>Vancouver Dinner Organizer — March 27, 2026</title>
+     7→<style>
+     8→  :root {
+     9→    --bg: #0d0f18;
+    10→    --surface: #13162a;
+    11→    --surface2: #1c2040;
+    12→    --surface3: #242850;
+    13→    --accent: #d4a847;
+    14→    --accent2: #5fa8c7;
+    15→    --accent3: #7ec98a;
+    16→    --red: #d96b6b;
+    17→    --purple: #9d80d4;
+    18→    --text: #ede9e1;
+    19→    --muted: #7a7892;
+    20→    --border: rgba(212,168,71,0.13);
+    21→    --border2: rgba(255,255,255,0.07);
+    22→    --radius: 10px;
+    23→    --radius-lg: 16px;
+    24→  }
+    25→  * { box-sizing: border-box; margin: 0; padding: 0; }
+    26→  body {
+    27→    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    28→    background: var(--bg);
+    29→    color: var(--text);
+    30→    min-height: 100vh;
+    31→    padding-bottom: 80px;
+    32→  }
+    33→
+    34→  /* NAV */
+    35→  nav {
+    36→    position: sticky;
+    37→    top: 0;
+    38→    z-index: 100;
+    39→    background: rgba(13,15,24,0.92);
+    40→    backdrop-filter: blur(16px);
+    41→    border-bottom: 1px solid var(--border);
+    42→    display: flex;
+    43→    align-items: center;
+    44→    gap: 0;
+    45→    padding: 0 28px;
+    46→    height: 54px;
+    47→  }
+    48→  .nav-brand {
+    49→    font-size: 0.82rem;
+    50→    letter-spacing: 0.12em;
+    51→    text-transform: uppercase;
+    52→    color: var(--accent);
+    53→    font-weight: 600;
+    54→    margin-right: 32px;
+    55→    white-space: nowrap;
+    56→  }
+    57→  .nav-tabs {
+    58→    display: flex;
+    59→    gap: 0;
+    60→    flex: 1;
+    61→    overflow-x: auto;
+    62→    scrollbar-width: none;
+    63→  }
+    64→  .nav-tabs::-webkit-scrollbar { display: none; }
+    65→  .tab-btn {
+    66→    background: none;
+    67→    border: none;
+    68→    color: var(--muted);
+    69→    font-size: 0.83rem;
+    70→    padding: 0 18px;
+    71→    height: 54px;
+    72→    cursor: pointer;
+    73→    border-bottom: 2px solid transparent;
+    74→    white-space: nowrap;
+    75→    transition: color 0.15s, border-color 0.15s;
+    76→    font-family: inherit;
+    77→  }
+    78→  .tab-btn:hover { color: var(--text); }
+    79→  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    80→
+    81→  /* HEADER */
+    82→  header {
+    83→    padding: 44px 36px 36px;
+    84→    border-bottom: 1px solid var(--border);
+    85→    background: linear-gradient(135deg, var(--surface) 0%, var(--bg) 100%);
+    86→    position: relative;
+    87→    overflow: hidden;
+    88→  }
+    89→  header::after {
+    90→    content: '';
+    91→    position: absolute;
+    92→    top: -60px; right: -60px;
+    93→    width: 320px; height: 320px;
+    94→    border-radius: 50%;
+    95→    background: radial-gradient(circle, rgba(212,168,71,0.06) 0%, transparent 70%);
+    96→    pointer-events: none;
+    97→  }
+    98→  .header-top {
+    99→    display: flex;
+   100→    justify-content: space-between;
+   101→    align-items: flex-start;
+   102→    flex-wrap: wrap;
+   103→    gap: 20px;
+   104→  }
+   105→  .event-label {
+   106→    font-size: 0.7rem;
+   107→    letter-spacing: 0.2em;
+   108→    text-transform: uppercase;
+   109→    color: var(--accent);
+   110→    margin-bottom: 8px;
+   111→    font-weight: 600;
+   112→  }
+   113→  header h1 {
+   114→    font-size: 2rem;
+   115→    font-weight: 300;
+   116→    letter-spacing: -0.025em;
+   117→    color: var(--text);
+   118→    margin-bottom: 6px;
+   119→  }
+   120→  header .sub { color: var(--muted); font-size: 0.92rem; }
+   121→  .countdown-block {
+   122→    background: var(--surface2);
+   123→    border: 1px solid var(--border);
+   124→    border-radius: var(--radius);
+   125→    padding: 14px 22px;
+   126→    text-align: center;
+   127→    min-width: 140px;
+   128→  }
+   129→  #countdown-days {
+   130→    font-size: 2.4rem;
+   131→    font-weight: 700;
+   132→    color: var(--accent);
+   133→    line-height: 1;
+   134→    display: block;
+   135→  }
+   136→  .countdown-label { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+   137→
+   138→  /* PROGRESS BAR */
+   139→  .progress-strip {
+   140→    display: grid;
+   141→    grid-template-columns: repeat(5, 1fr);
+   142→    gap: 1px;
+   143→    background: var(--border2);
+   144→    border-top: 1px solid var(--border2);
+   145→    margin-top: 0;
+   146→  }
+   147→  .prog-step {
+   148→    background: var(--surface);
+   149→    padding: 12px 18px;
+   150→    cursor: pointer;
+   151→    transition: background 0.15s;
+   152→    position: relative;
+   153→  }
+   154→  .prog-step:hover { background: var(--surface2); }
+   155→  .prog-step.done { background: rgba(126,201,138,0.07); }
+   156→  .prog-step.done .prog-label { color: var(--accent3); }
+   157→  .prog-step.active-step { background: rgba(212,168,71,0.06); }
+   158→  .prog-step.active-step .prog-label { color: var(--accent); }
+   159→  .prog-date { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+   160→  .prog-label { font-size: 0.82rem; color: var(--text); }
+   161→  .prog-check {
+   162→    display: inline-block;
+   163→    width: 14px; height: 14px;
+   164→    border: 1.5px solid var(--border2);
+   165→    border-radius: 3px;
+   166→    margin-right: 6px;
+   167→    vertical-align: middle;
+   168→    cursor: pointer;
+   169→    flex-shrink: 0;
+   170→    position: relative;
+   171→  }
+   172→  .prog-check.checked {
+   173→    background: var(--accent3);
+   174→    border-color: var(--accent3);
+   175→  }
+   176→  .prog-check.checked::after {
+   177→    content: '';
+   178→    position: absolute;
+   179→    left: 3px; top: 0px;
+   180→    width: 5px; height: 9px;
+   181→    border: 2px solid var(--bg);
+   182→    border-top: none;
+   183→    border-left: none;
+   184→    transform: rotate(45deg);
+   185→  }
+   186→
+   187→  /* MAIN LAYOUT */
+   188→  .main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 0; }
+   189→  .tab-panel { display: none; }
+   190→  .tab-panel.active { display: block; }
+   191→  section { margin-bottom: 48px; }
+   192→  .section-label {
+   193→    font-size: 0.68rem;
+   194→    letter-spacing: 0.2em;
+   195→    text-transform: uppercase;
+   196→    color: var(--accent);
+   197→    margin-bottom: 18px;
+   198→    padding-bottom: 8px;
+   199→    border-bottom: 1px solid var(--border);
+   200→  }
+   201→
+   202→  /* STATUS CARDS */
+   203→  .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+   204→  .stat-card {
+   205→    background: var(--surface);
+   206→    border: 1px solid var(--border);
+   207→    border-radius: var(--radius);
+   208→    padding: 18px 20px;
+   209→  }
+   210→  .stat-num {
+   211→    font-size: 2rem;
+   212→    font-weight: 700;
+   213→    color: var(--accent);
+   214→    line-height: 1;
+   215→    margin-bottom: 4px;
+   216→  }
+   217→  .stat-label { font-size: 0.8rem; color: var(--muted); }
+   218→
+   219→  /* VENUE SELECTOR */
+   220→  .venue-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 4px; }
+   221→  .venue-card {
+   222→    background: var(--surface);
+   223→    border: 1.5px solid var(--border);
+   224→    border-radius: var(--radius);
+   225→    padding: 18px 20px;
+   226→    cursor: pointer;
+   227→    transition: border-color 0.15s, background 0.15s;
+   228→    position: relative;
+   229→  }
+   230→  .venue-card:hover { border-color: rgba(212,168,71,0.35); background: var(--surface2); }
+   231→  .venue-card.selected { border-color: var(--accent); background: rgba(212,168,71,0.06); }
+   232→  .venue-card.selected::after {
+   233→    content: 'SELECTED';
+   234→    position: absolute;
+   235→    top: 12px; right: 12px;
+   236→    font-size: 0.6rem;
+   237→    letter-spacing: 0.12em;
+   238→    color: var(--accent);
+   239→    border: 1px solid var(--accent);
+   240→    padding: 2px 6px;
+   241→    border-radius: 3px;
+   242→  }
+   243→  .venue-name { font-size: 0.97rem; font-weight: 600; margin-bottom: 4px; }
+   244→  .venue-meta { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+   245→  .venue-phone { font-size: 0.82rem; color: var(--accent2); margin-top: 6px; font-family: 'Courier New', monospace; }
+   246→
+   247→  /* GUEST TABLE */
+   248→  .guest-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+   249→  table.guest-table { width: 100%; border-collapse: collapse; min-width: 700px; }
+   250→  .guest-table th {
+   251→    font-size: 0.67rem;
+   252→    letter-spacing: 0.13em;
+   253→    text-transform: uppercase;
+   254→    color: var(--muted);
+   255→    padding: 11px 16px;
+   256→    text-align: left;
+   257→    background: var(--surface2);
+   258→    border-bottom: 1px solid var(--border);
+   259→  }
+   260→  .guest-table td {
+   261→    padding: 10px 16px;
+   262→    border-bottom: 1px solid var(--border2);
+   263→    font-size: 0.87rem;
+   264→    vertical-align: middle;
+   265→  }
+   266→  .guest-table tr:last-child td { border-bottom: none; }
+   267→  .guest-table tr:hover td { background: rgba(255,255,255,0.02); }
+   268→  .guest-table input[type="text"],
+   269→  .guest-table input[type="tel"],
+   270→  .guest-table select {
+   271→    background: var(--surface2);
+   272→    border: 1px solid var(--border);
+   273→    color: var(--text);
+   274→    border-radius: 5px;
+   275→    padding: 5px 9px;
+   276→    font-size: 0.83rem;
+   277→    width: 100%;
+   278→    font-family: inherit;
+   279→    outline: none;
+   280→    transition: border-color 0.15s;
+   281→  }
+   282→  .guest-table input:focus,
+   283→  .guest-table select:focus { border-color: rgba(212,168,71,0.5); }
+   284→  .status-pill {
+   285→    display: inline-block;
+   286→    font-size: 0.68rem;
+   287→    letter-spacing: 0.08em;
+   288→    text-transform: uppercase;
+   289→    padding: 3px 8px;
+   290→    border-radius: 4px;
+   291→    border: 1px solid;
+   292→    white-space: nowrap;
+   293→  }
+   294→  .pill-pending { color: var(--muted); border-color: var(--muted); }
+   295→  .pill-yes { color: var(--accent3); border-color: var(--accent3); background: rgba(126,201,138,0.08); }
+   296→  .pill-no { color: var(--red); border-color: var(--red); background: rgba(217,107,107,0.08); }
+   297→  .pill-maybe { color: var(--accent); border-color: var(--accent); background: rgba(212,168,71,0.08); }
+   298→  .icon-btn {
+   299→    background: none;
+   300→    border: none;
+   301→    color: var(--muted);
+   302→    cursor: pointer;
+   303→    padding: 4px 6px;
+   304→    border-radius: 4px;
+   305→    font-size: 0.9rem;
+   306→    transition: color 0.15s, background 0.15s;
+   307→    font-family: inherit;
+   308→  }
+   309→  .icon-btn:hover { color: var(--red); background: rgba(217,107,107,0.1); }
+   310→  .add-guest-btn {
+   311→    background: var(--surface2);
+   312→    border: 1px dashed rgba(212,168,71,0.3);
+   313→    color: var(--accent);
+   314→    border-radius: var(--radius);
+   315→    padding: 10px 20px;
+   316→    font-size: 0.83rem;
+   317→    cursor: pointer;
+   318→    margin-top: 14px;
+   319→    font-family: inherit;
+   320→    letter-spacing: 0.05em;
+   321→    transition: background 0.15s, border-color 0.15s;
+   322→    display: block;
+   323→    width: 100%;
+   324→    text-align: center;
+   325→  }
+   326→  .add-guest-btn:hover { background: var(--surface3); border-color: rgba(212,168,71,0.6); }
+   327→
+   328→  /* DIETARY SUMMARY */
+   329→  .diet-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+   330→  .diet-card {
+   331→    background: var(--surface);
+   332→    border: 1px solid var(--border);
+   333→    border-radius: var(--radius);
+   334→    padding: 14px 16px;
+   335→    display: flex;
+   336→    align-items: center;
+   337→    gap: 12px;
+   338→  }
+   339→  .diet-icon { font-size: 1.4rem; flex-shrink: 0; }
+   340→  .diet-count { font-size: 1.4rem; font-weight: 700; color: var(--accent); line-height: 1; }
+   341→  .diet-name { font-size: 0.77rem; color: var(--muted); }
+   342→
+   343→  /* SCRIPT PANEL */
+   344→  .script-card {
+   345→    background: var(--surface);
+   346→    border: 1px solid var(--border);
+   347→    border-radius: var(--radius-lg);
+   348→    margin-bottom: 20px;
+   349→    overflow: hidden;
+   350→  }
+   351→  .script-head {
+   352→    padding: 16px 24px;
+   353→    background: var(--surface2);
+   354→    border-bottom: 1px solid var(--border);
+   355→    display: flex;
+   356→    justify-content: space-between;
+   357→    align-items: center;
+   358→  }
+   359→  .script-head h3 { font-size: 0.9rem; font-weight: 600; }
+   360→  .script-head .when { font-size: 0.75rem; color: var(--accent); font-family: 'Courier New', monospace; }
+   361→  .script-body { padding: 22px 24px; }
+   362→  .script-text {
+   363→    font-size: 0.88rem;
+   364→    line-height: 1.8;
+   365→    color: var(--text);
+   366→    border-left: 2px solid var(--border);
+   367→    padding-left: 16px;
+   368→    font-style: italic;
+   369→  }
+   370→  .fill-in {
+   371→    background: rgba(212,168,71,0.15);
+   372→    color: var(--accent);
+   373→    padding: 1px 6px;
+   374→    border-radius: 3px;
+   375→    font-style: normal;
+   376→    font-family: 'Courier New', monospace;
+   377→    font-size: 0.83em;
+   378→  }
+   379→  .script-note { font-size: 0.79rem; color: var(--muted); margin-top: 14px; border-top: 1px solid var(--border2); padding-top: 12px; }
+   380→  .copy-btn {
+   381→    background: var(--surface3);
+   382→    border: 1px solid var(--border);
+   383→    color: var(--text);
+   384→    border-radius: 6px;
+   385→    padding: 6px 14px;
+   386→    font-size: 0.75rem;
+   387→    cursor: pointer;
+   388→    font-family: inherit;
+   389→    letter-spacing: 0.05em;
+   390→    transition: background 0.15s;
+   391→  }
+   392→  .copy-btn:hover { background: rgba(212,168,71,0.1); border-color: rgba(212,168,71,0.3); }
+   393→  .copy-btn.copied { color: var(--accent3); border-color: var(--accent3); }
+   394→
+   395→  /* TRANSIT PANEL */
+   396→  .transit-directions { display: grid; gap: 16px; }
+   397→  .direction-card {
+   398→    background: var(--surface);
+   399→    border: 1px solid var(--border);
+   400→    border-radius: var(--radius);
+   401→    padding: 18px 22px;
+   402→  }
+   403→  .direction-from {
+   404→    font-size: 0.82rem;
+   405→    color: var(--muted);
+   406→    margin-bottom: 8px;
+   407→    text-transform: uppercase;
+   408→    letter-spacing: 0.1em;
+   409→    font-size: 0.68rem;
+   410→  }
+   411→  .direction-steps { font-size: 0.88rem; line-height: 1.7; }
+   412→  .direction-steps strong { color: var(--accent2); }
+   413→
+   414→  /* SHARE TEXT */
+   415→  .share-block {
+   416→    background: var(--surface);
+   417→    border: 1px solid var(--border);
+   418→    border-radius: var(--radius-lg);
+   419→    padding: 24px;
+   420→  }
+   421→  .share-text {
+   422→    font-size: 0.9rem;
+   423→    line-height: 1.8;
+   424→    color: var(--text);
+   425→    white-space: pre-wrap;
+   426→    font-family: 'Courier New', monospace;
+   427→  }
+   428→
+   429→  /* GENERAL BUTTON */
+   430→  .btn {
+   431→    display: inline-block;
+   432→    background: var(--accent);
+   433→    color: #0d0f18;
+   434→    border: none;
+   435→    border-radius: 7px;
+   436→    padding: 9px 22px;
+   437→    font-size: 0.83rem;
+   438→    font-weight: 600;
+   439→    cursor: pointer;
+   440→    font-family: inherit;
+   441→    letter-spacing: 0.04em;
+   442→    transition: opacity 0.15s;
+   443→  }
+   444→  .btn:hover { opacity: 0.88; }
+   445→  .btn-ghost {
+   446→    background: transparent;
+   447→    color: var(--text);
+   448→    border: 1px solid var(--border);
+   449→    border-radius: 7px;
+   450→    padding: 8px 20px;
+   451→    font-size: 0.83rem;
+   452→    cursor: pointer;
+   453→    font-family: inherit;
+   454→    transition: border-color 0.15s, background 0.15s;
+   455→  }
+   456→  .btn-ghost:hover { border-color: rgba(212,168,71,0.4); background: rgba(212,168,71,0.05); }
+   457→
+   458→  @media (max-width: 620px) {
+   459→    header { padding: 28px 18px 24px; }
+   460→    header h1 { font-size: 1.5rem; }
+   461→    nav { padding: 0 16px; }
+   462→    .progress-strip { grid-template-columns: 1fr; }
+   463→    .main { padding: 20px 14px 0; }
+   464→  }
+   465→</style>
+   466→</head>
+   467→<body>
+   468→
+   469→<nav>
+   470→  <div class="nav-brand">Mar 27 Dinner</div>
+   471→  <div class="nav-tabs">
+   472→    <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+   473→    <button class="tab-btn" onclick="switchTab('guests')">Guests</button>
+   474→    <button class="tab-btn" onclick="switchTab('venue')">Venue</button>
+   475→    <button class="tab-btn" onclick="switchTab('scripts')">Call Scripts</button>
+   476→    <button class="tab-btn" onclick="switchTab('transit')">Transit</button>
+   477→    <button class="tab-btn" onclick="switchTab('share')">Share</button>
+   478→  </div>
+   479→</nav>
+   480→
+   481→<header>
+   482→  <div class="header-top">
+   483→    <div>
+   484→      <div class="event-label">Group Dinner Organizer</div>
+   485→      <h1>Vancouver Dinner</h1>
+   486→      <div class="sub">Friday, March 27, 2026 &middot; 5&ndash;10 people &middot; Greater Vancouver Area</div>
+   487→    </div>
+   488→    <div class="countdown-block">
+   489→      <span id="countdown-days">14</span>
+   490→      <div class="countdown-label">days remaining</div>
+   491→    </div>
+   492→  </div>
+   493→</header>
+   494→
+   495→<!-- PROGRESS STRIP -->
+   496→<div class="progress-strip">
+   497→  <div class="prog-step active-step" id="step-1">
+   498→    <div class="prog-date">Mar 13 &mdash; Today</div>
+   499→    <div class="prog-label">
+   500→      <span class="prog-check" id="chk-1" onclick="toggleCheck(1)"></span>
+   501→      Call restaurant
+   502→    </div>
+   503→  </div>
+   504→  <div class="prog-step" id="step-2">
+   505→    <div class="prog-date">Mar 14 &mdash; Sat</div>
+   506→    <div class="prog-label">
+   507→      <span class="prog-check" id="chk-2" onclick="toggleCheck(2)"></span>
+   508→      Confirm headcount
+   509→    </div>
+   510→  </div>
+   511→  <div class="prog-step" id="step-3">
+   512→    <div class="prog-date">Mar 20 &mdash; Fri</div>
+   513→    <div class="prog-label">
+   514→      <span class="prog-check" id="chk-3" onclick="toggleCheck(3)"></span>
+   515→      Collect dietary info
+   516→    </div>
+   517→  </div>
+   518→  <div class="prog-step" id="step-4">
+   519→    <div class="prog-date">Mar 25 &mdash; Wed</div>
+   520→    <div class="prog-label">
+   521→      <span class="prog-check" id="chk-4" onclick="toggleCheck(4)"></span>
+   522→      Confirm reservation
+   523→    </div>
+   524→  </div>
+   525→  <div class="prog-step" id="step-5">
+   526→    <div class="prog-date">Mar 27 &mdash; Fri</div>
+   527→    <div class="prog-label">
+   528→      <span class="prog-check" id="chk-5" onclick="toggleCheck(5)"></span>
+   529→      Dinner night
+   530→    </div>
+   531→  </div>
+   532→</div>
+   533→
+   534→<div class="main">
+   535→
+   536→  <!-- OVERVIEW TAB -->
+   537→  <div class="tab-panel active" id="panel-overview">
+   538→    <section>
+   539→      <div class="section-label">Status at a Glance</div>
+   540→      <div class="status-grid">
+   541→        <div class="stat-card">
+   542→          <div class="stat-num" id="stat-confirmed">0</div>
+   543→          <div class="stat-label">Guests confirmed</div>
+   544→        </div>
+   545→        <div class="stat-card">
+   546→          <div class="stat-num" id="stat-pending">0</div>
+   547→          <div class="stat-label">Awaiting reply</div>
+   548→        </div>
+   549→        <div class="stat-card">
+   550→          <div class="stat-num" id="stat-dietary">0</div>
+   551→          <div class="stat-label">Dietary restrictions flagged</div>
+   552→        </div>
+   553→        <div class="stat-card">
+   554→          <div class="stat-num" id="stat-venue">--</div>
+   555→          <div class="stat-label">Venue selected</div>
+   556→        </div>
+   557→      </div>
+   558→    </section>
+   559→
+   560→    <section>
+   561→      <div class="section-label">Immediate Actions</div>
+   562→      <div style="display:grid; gap:12px;">
+   563→        <div style="background:var(--surface); border:1px solid rgba(217,107,107,0.3); border-left:3px solid var(--red); border-radius:var(--radius); padding:16px 20px;">
+   564→          <div style="font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--red); margin-bottom:4px;">Urgent &mdash; Today</div>
+   565→          <div style="font-size:0.9rem; margin-bottom:4px;">Call your chosen restaurant and make the reservation.</div>
+   566→          <div style="font-size:0.8rem; color:var(--muted);">Friday March 27 fills up. Most downtown restaurants will be at capacity by Tuesday next week. Call today, not tomorrow.</div>
+   567→        </div>
+   568→        <div style="background:var(--surface); border:1px solid rgba(212,168,71,0.2); border-left:3px solid var(--accent); border-radius:var(--radius); padding:16px 20px;">
+   569→          <div style="font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent); margin-bottom:4px;">This Week</div>
+   570→          <div style="font-size:0.9rem; margin-bottom:4px;">Add all guests to the Guests tab and send the invite message.</div>
+   571→          <div style="font-size:0.8rem; color:var(--muted);">Use the Share tab to generate a ready-to-send message with venue, time, and transit details.</div>
+   572→        </div>
+   573→        <div style="background:var(--surface); border:1px solid rgba(95,168,199,0.2); border-left:3px solid var(--accent2); border-radius:var(--radius); padding:16px 20px;">
+   574→          <div style="font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent2); margin-bottom:4px;">By Mar 20</div>
+   575→          <div style="font-size:0.9rem; margin-bottom:4px;">Collect dietary restrictions from every confirmed guest.</div>
+   576→          <div style="font-size:0.8rem; color:var(--muted);">Severe allergies (nuts, shellfish) must be communicated to the restaurant atbooking and again on your March 25 confirmation call.</div>
+   577→        </div>
+   578→      </div>
+   579→    </section>
+   580→
+   581→    <section>
+   582→      <div class="section-label">Dietary Summary</div>
+   583→      <div class="diet-grid" id="diet-summary">
+   584→        <div class="diet-card"><div class="diet-icon">V</div><div><div class="diet-count" id="dc-veg">0</div><div class="diet-name">Vegetarian</div></div></div>
+   585→        <div class="diet-card"><div class="diet-icon">GF</div><div><div class="diet-count" id="dc-gf">0</div><div class="diet-name">Gluten-Free</div></div></div>
+   586→        <div class="diet-card"><div class="diet-icon">VN</div><div><div class="diet-count" id="dc-vegan">0</div><div class="diet-name">Vegan</div></div></div>
+   587→        <div class="diet-card"><div class="diet-icon">HA</div><div><div class="diet-count" id="dc-halal">0</div><div class="diet-name">Halal</div></div></div>
+   588→        <div class="diet-card"><div class="diet-icon">AL</div><div><div class="diet-count" id="dc-allergy">0</div><div class="diet-name">Severe Allergy</div></div></div>
+   589→        <div class="diet-card"><div class="diet-icon">DF</div><div><div class="diet-count" id="dc-dairy">0</div><div class="diet-name">Dairy-Free</div></div></div>
+   590→      </div>
+   591→    </section>
+   592→  </div>
+   593→
+   594→  <!-- GUESTS TAB -->
+   595→  <div class="tab-panel" id="panel-guests">
+   596→    <section>
+   597→      <div class="section-label">Guest List</div>
+   598→      <div class="guest-table-wrap">
+   599→        <table class="guest-table" id="guest-table">
+   600→          <thead>
+   601→            <tr>
+   602→              <th>#</th>
+   603→              <th>Name</th>
+   604→              <th>Area / Neighbourhood</th>
+   605→              <th>Phone / Contact</th>
+   606→              <th>RSVP Status</th>
+   607→              <th>Dietary Restrictions</th>
+   608→              <th></th>
+   609→            </tr>
+   610→          </thead>
+   611→          <tbody id="guest-tbody">
+   612→          </tbody>
+   613→        </table>
+   614→      </div>
+   615→      <button class="add-guest-btn" onclick="addGuest()">+ Add Guest</button>
+   616→    </section>
+   617→  </div>
+   618→
+   619→  <!-- VENUE TAB -->
+   620→  <div class="tab-panel" id="panel-venue">
+   621→    <section>
+   622→      <div class="section-label">Select Your Venue</div>
+   623→      <p style="font-size:0.87rem; color:var(--muted); margin-bottom:18px;">Click a venue to mark it as your choice. This will update scripts and the share message with the correct address and transit directions.</p>
+   624→      <div class="venue-cards" id="venue-cards">
+   625→        <div class="venue-card" onclick="selectVenue('chambar')" id="venue-chambar">
+   626→          <div class="venue-name">Chambar</div>
+   627→          <div class="venue-meta">568 Beatty St, Vancouver<br>Belgian-inspired &middot; $$$ &middot; 4 min to Stadium SkyTrain<br>Private room available (up to 20)</div>
+   628→          <div class="venue-phone">604-879-7119</div>
+   629→        </div>
+   630→        <div class="venue-card" onclick="selectVenue('nuba')" id="venue-nuba">
+   631→          <div class="venue-name">Nuba Gastown</div>
+   632→          <div class="venue-meta">207 W Hastings St, Vancouver<br>Lebanese, plant-forward &middot; $$ &middot; 7 min to Waterfront<br>Best for dietary diversity</div>
+   633→          <div class="venue-phone">604-688-1655</div>
+   634→        </div>
+   635→        <div class="venue-card" onclick="selectVenue('earls')" id="venue-earls">
+   636→          <div class="venue-name">Earls Yaletown</div>
+   637→          <div class="venue-meta">1095 Mainland St, Vancouver<br>Canadian casual &middot; $$ &middot; 5 min to Yaletown SkyTrain<br>Best for Canada Line riders</div>
+   638→          <div class="venue-phone">604-684-4990</div>
+   639→        </div>
+   640→        <div class="venue-card" onclick="selectVenue('craft')" id="venue-craft">
+   641→          <div class="venue-name">CRAFT Beer Market</div>
+   642→          <div class="venue-meta">85 W 1st Ave, Vancouver<br>Pub-style, large groups &middot; $$ &middot; 8 min to Olympic Village<br>Best walk-in fallback</div>
+   643→          <div class="venue-phone">604-709-2337</div>
+   644→        </div>
+   645→      </div>
+   646→    </section>
+   647→    <section>
+   648→      <div class="section-label">Venue Decision Guide</div>
+   649→      <div style="overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-lg);">
+   650→        <table style="width:100%; border-collapse:collapse; font-size:0.85rem; min-width:560px;">
+   651→          <thead>
+   652→            <tr style="background:var(--surface2);">
+   653→              <th style="padding:10px 16px; text-align:left; font-size:0.67rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border);">Consideration</th>
+   654→              <th style="padding:10px 16px; text-align:center; font-size:0.67rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border);">Chambar</th>
+   655→              <th style="padding:10px 16px; text-align:center; font-size:0.67rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border);">Nuba</th>
+   656→              <th style="padding:10px 16px; text-align:center; font-size:0.67rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border);">Earls</th>
+   657→              <th style="padding:10px 16px; text-align:center; font-size:0.67rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border);">CRAFT</th>
+   658→            </tr>
+   659→          </thead>
+   660→          <tbody>
+   661→            <tr>
+   662→              <td style="padding:11px 16px; border-bottom:1px solid var(--border2); color:var(--muted);">Strong vegan menu</td>
+   663→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Yes</td>
+   664→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Best</td>
+   665→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent);">Some</td>
+   666→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent);">Some</td>
+   667→            </tr>
+   668→            <tr>
+   669→              <td style="padding:11px 16px; border-bottom:1px solid var(--border2); color:var(--muted);">Gluten-free safe</td>
+   670→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Yes</td>
+   671→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent);">Mostly*</td>
+   672→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Yes</td>
+   673→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent);">Some</td>
+   674→            </tr>
+   675→            <tr>
+   676→              <td style="padding:11px 16px; border-bottom:1px solid var(--border2); color:var(--muted);">Private/semi-private room</td>
+   677→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Yes</td>
+   678→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--red);">No</td>
+   679→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--red);">No</td>
+   680→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--red);">No</td>
+   681→            </tr>
+   682→            <tr>
+   683→              <td style="padding:11px 16px; border-bottom:1px solid var(--border2); color:var(--muted);">Quiet enough to talk</td>
+   684→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Yes</td>
+   685→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Yes</td>
+   686→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent);">Ok</td>
+   687→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--red);">Loud</td>
+   688→            </tr>
+   689→            <tr>
+   690→              <td style="padding:11px 16px; border-bottom:1px solid var(--border2); color:var(--muted);">Transit centrality (all GVA)</td>
+   691→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Excellent</td>
+   692→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Best</td>
+   693→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent3);">Excellent</td>
+   694→              <td style="padding:11px 16px; text-align:center; border-bottom:1px solid var(--border2); color:var(--accent);">Good</td>
+   695→            </tr>
+   696→            <tr>
+   697→              <td style="padding:11px 16px; color:var(--muted);">Budget</td>
+   698→              <td style="padding:11px 16px; text-align:center; color:var(--muted);">$$$</td>
+   699→              <td style="padding:11px 16px; text-align:center; color:var(--accent3);">$$</td>
+   700→              <td style="padding:11px 16px; text-align:center; color:var(--accent3);">$$</td>
+   701→              <td style="padding:11px 16px; text-align:center; color:var(--accent3);">$$</td>
+   702→            </tr>
+   703→          </tbody>
+   704→        </table>
+   705→      </div>
+   706→      <p style="font-size:0.76rem; color:var(--muted); margin-top:8px;">* Nuba GF: dishes made without gluten but kitchen is not certified GF. Caution for severe celiac.</p>
+   707→    </section>
+   708→  </div>
+   709→
+   710→  <!-- SCRIPTS TAB -->
+   711→  <div class="tab-panel" id="panel-scripts">
+   712→    <section>
+   713→      <div class="section-label">Phone Call Scripts</div>
+   714→
+   715→      <div class="script-card">
+   716→        <div class="script-head">
+   717→          <h3>Initial Group Booking Call</h3>
+   718→          <div class="when">Call today &mdash; March 13</div>
+   719→        </div>
+   720→        <div class="script-body">
+   721→          <div id="script-initial-label" style="font-size:0.78rem; color:var(--muted); margin-bottom:12px;">
+   722→            Calling: <span id="script-venue-name" style="color:var(--accent);">your chosen venue</span> &mdash; <span id="script-venue-phone" style="font-family:monospace; color:var(--accent2);">select venue first</span>
+   723→          </div>
+   724→          <div class="script-text" id="script-initial">
+   725→"Hi, I'd like to make a reservation for a group of <span class="fill-in">[8 or 10]</span> people for dinner on Friday, March 27th. We're flexible on time between 6:30 and 7:30 PM &mdash; what works best for you?<br><br>
+   726→We do have a few dietary restrictions in the group. We have <span class="fill-in">[e.g., one vegetarian, one gluten-free, one dairy-free]</span>. Can your kitchen accommodate that?<br><br>
+   727→Is there any chance of a semi-private section or a table together? We'd love to be able to hear each other.<br><br>
+   728→Could I give you a name and a phone number? My name is <span class="fill-in">[Your Name]</span>, and my number is <span class="fill-in">[Your Number]</span>.<br><br>
+   729→And do you have a cancellation policy for large groups? We'll confirm final numbers by Wednesday the 25th."
+   730→          </div>
+   731→          <div class="script-note">If they require a credit card to hold the reservation, that is standard. Ask about the cancellation window &mdash; usually 24&ndash;48 hours for groups.</div>
+   732→          <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
+   733→            <button class="copy-btn" onclick="copyScript('script-initial', this)">Copy script text</button>
+   734→          </div>
+   735→        </div>
+   736→      </div>
+   737→
+   738→      <div class="script-card">
+   739→        <div class="script-head">
+   740→          <h3>Fully Booked Fallback</h3>
+   741→          <div class="when">If your first choice is unavailable</div>
+   742→        </div>
+   743→        <div class="script-body">
+   744→          <div class="script-text">
+   745→"Oh, that's too bad. Is there any chance of a cancellation? Could you put us on a waitlist?<br><br>
+   746→And do you know if any of your other locations might have availability that evening?"
+   747→          </div>
+   748→          <div class="script-note">Fallback order: Chambar (604-879-7119) &rarr; Nuba (604-688-1655) &rarr; Earls (604-684-4990) &rarr; CRAFT (604-709-2337). You can also check OpenTable for real-time availability at all four.</div>
+   749→        </div>
+   750→      </div>
+   751→
+   752→      <div class="script-card">
+   753→        <div class="script-head">
+   754→          <h3>Confirmation Call &mdash; Wed March 25</h3>
+   755→          <div class="when">Call 2 days before</div>
+   756→        </div>
+   757→        <div class="script-body">
+   758→          <div class="script-text" id="script-confirm">
+   759→"Hi, I have a reservation under <span class="fill-in">[Your Name]</span>, a group of <span class="fill-in">[final number]</span> on Friday, March 27th. I'm calling to confirm and to share our dietary needs.<br><br>
+   760→We have: <span class="fill-in">[list specific: e.g., one guest with a severe tree nut allergy, two vegetarians, one gluten-sensitive but not celiac]</span>.<br><br>
+   761→Can the kitchen flag those for our table? Great. And just to confirm the time is <span class="fill-in">[time]</span>?<br><br>
+   762→Wonderful. We'll see you Friday."
+   763→          </div>
+   764→          <div class="script-note">Do not rely on the restaurant remembering details from the original booking. State dietary restrictions again, clearly and specifically.</div>
+   765→          <div style="margin-top:14px;">
+   766→            <button class="copy-btn" onclick="copyScript('script-confirm', this)">Copy script text</button>
+   767→          </div>
+   768→        </div>
+   769→      </div>
+   770→
+   771→      <div class="script-card">
+   772→        <div class="script-head">
+   773→          <h3>Guest Invite Message</h3>
+   774→          <div class="when">Send this week &mdash; March 13&ndash;14</div>
+   775→        </div>
+   776→        <div class="script-body">
+   777→          <div class="script-text" id="script-invite">
+   778→"Hey! Organizing a group dinner in Vancouver on Friday March 27th. Details below &mdash; let me know if you're in.<br><br>
+   779→Venue: <span class="fill-in">[Restaurant Name]</span>, <span class="fill-in">[Address]</span><br>
+   780→Time: <span class="fill-in">[6:30 or 7:00 PM]</span><br>
+   781→Transit: <span class="fill-in">[Nearest station and walk time]</span><br><br>
+   782→Reply with: yes/no/maybe, and any dietary restrictions or allergies I should know about. Need final numbers by March 20."
+   783→          </div>
+   784→          <div style="margin-top:14px;">
+   785→            <button class="copy-btn" onclick="copyScript('script-invite', this)">Copy invite text</button>
+   786→          </div>
+   787→        </div>
+   788→      </div>
+   789→
+   790→    </section>
+   791→  </div>
+   792→
+   793→  <!-- TRANSIT TAB -->
+   794→  <div class="tab-panel" id="panel-transit">
+   795→    <section>
+   796→      <div class="section-label">Transit Directions by Area</div>
+   797→      <p style="font-size:0.87rem; color:var(--muted); margin-bottom:18px;">Directions below route guests to <strong id="transit-venue-label">your chosen venue</strong>. Select a venue first for venue-specific routing.</p>
+   798→
+   799→      <div class="transit-directions">
+   800→        <div class="direction-card">
+   801→          <div class="direction-from">From North Vancouver / West Vancouver</div>
+   802→          <div class="direction-steps">
+   803→            Take the <strong>SeaBus</strong> from Lonsdale Quay to Waterfront Station (12 min).
+   804→            <br>From Waterfront: <span id="transit-from-waterfront">walk or take 1 stop on Expo Line depending on venue.</span>
+   805→          </div>
+   806→        </div>
+   807→        <div class="direction-card">
+   808→          <div class="direction-from">From Burnaby / New Westminster</div>
+   809→          <div class="direction-steps">
+   810→            Take the <strong>Expo Line westbound</strong> toward Waterfront.
+   811→            <br>Get off at: <span id="transit-burnaby-stop">venue-specific stop shown after venue selection.</span>
+   812→            <br>Estimated travel time from Metrotown: 20&ndash;25 min.
+   813→          </div>
+   814→        </div>
+   815→<div class="direction-card">
+   816→          <div class="direction-from">From Coquitlam / Port Moody / Port Coquitlam</div>
+   817→          <div class="direction-steps">
+   818→            Take the <strong>Millennium Line westbound</strong> to Waterfront or Commercial&ndash;Broadway, then transfer if needed.
+   819→            <br>Get off at: <span id="transit-coq-stop">venue-specific stop shown after venue selection.</span>
+   820→            <br>Estimated travel time from Coquitlam Central: 45&ndash;55 min.
+   821→          </div>
+   822→        </div>
+   823→        <div class="direction-card">
+   824→          <div class="direction-from">From Richmond / YVR Airport</div>
+   825→          <div class="direction-steps">
+   826→            Take the <strong>Canada Line northbound</strong> toward Waterfront.
+   827→            <br>Get off at: <span id="transit-richmond-stop">venue-specific stop shown after venue selection.</span>
+   828→            <br>Estimated travel time from Brighouse (Richmond Centre): 25&ndash;30 min.
+   829→          </div>
+   830→        </div>
+   831→        <div class="direction-card">
+   832→          <div class="direction-from">From Surrey / Langley / Delta</div>
+   833→          <div class="direction-steps">
+   834→            Take the <strong>Expo Line westbound</strong> from King George or Surrey Central.
+   835→            <br>Get off at: <span id="transit-surrey-stop">venue-specific stop shown after venue selection.</span>
+   836→            <br>Estimated travel time from King George: 50&ndash;60 min.
+   837→          </div>
+   838→        </div>
+   839→        <div class="direction-card">
+   840→          <div class="direction-from">From South Vancouver / Marpole / Kerrisdale</div>
+   841→          <div class="direction-steps">
+   842→            Take the <strong>Canada Line northbound</strong> from Langara or Marine Drive.
+   843→            <br>Get off at: <span id="transit-south-stop">venue-specific stop shown after venue selection.</span>
+   844→            <br>Estimated travel time from Marine Drive: 15&ndash;20 min.
+   845→          </div>
+   846→        </div>
+   847→        <div class="direction-card">
+   848→          <div class="direction-from">From East Vancouver / Mount Pleasant</div>
+   849→          <div class="direction-steps">
+   850→            Take any <strong>Expo or Millennium Line</strong> bus west, or walk/bike if close.
+   851→            <br>All three downtown core stations (Waterfront, Granville, Burrard) are near the venues.
+   852→            <br>Estimated travel time from Commercial&ndash;Broadway: 10&ndash;15 min.
+   853→          </div>
+   854→        </div>
+   855→        <div class="direction-card">
+   856→          <div class="direction-from">Parking note</div>
+   857→          <div class="direction-steps">
+   858→            All four venues are in high-density downtown or near-downtown areas. Street parking is limited on Friday evenings. Impark and EasyPark lots are available within 5 min walk of all venues. Transit is strongly preferred.
+   859→          </div>
+   860→        </div>
+   861→      </div>
+   862→    </section>
+   863→  </div>
+   864→
+   865→  <!-- SHARE TAB -->
+   866→  <div class="tab-panel" id="panel-share">
+   867→    <section>
+   868→      <div class="section-label">Shareable Invite Message</div>
+   869→      <p style="font-size:0.87rem; color:var(--muted); margin-bottom:18px;">Edit the fields below, then copy and send to your group. Works in text, email, or any messaging app.</p>
+   870→      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:20px; flex-wrap:wrap;">
+   871→        <div>
+   872→          <label style="font-size:0.73rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:5px;">Time</label>
+   873→          <input type="text" id="share-time" value="7:00 PM" style="background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px 12px; font-size:0.87rem; width:100%; font-family:inherit; outline:none;">
+   874→        </div>
+   875→        <div>
+   876→          <label style="font-size:0.73rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:5px;">Your Name</label>
+   877→          <input type="text" id="share-name" value="" placeholder="e.g. Alex" style="background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px 12px; font-size:0.87rem; width:100%; font-family:inherit; outline:none;">
+   878→        </div>
+   879→      </div>
+   880→      <button class="btn" onclick="generateShare()" style="margin-bottom:18px;">Generate Message</button>
+   881→      <div class="share-block">
+   882→        <div class="share-text" id="share-output">Click "Generate Message" to build the shareable invite based on your venue selection and guest data above.</div>
+   883→      </div>
+   884→      <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+   885→        <button class="copy-btn" onclick="copyShare(this)">Copy message</button>
+   886→        <button class="btn-ghost" onclick="generateShare()">Regenerate</button>
+   887→      </div>
+   888→    </section>
+   889→  </div>
+   890→
+   891→</div>
+   892→
+   893→<script>
+   894→// ---- STATE ----
+   895→const STATE_KEY = 'van-dinner-2026';
+   896→let state = {
+   897→  checks: {},
+   898→  guests: [],
+   899→  venue: null
+   900→};
+   901→
+   902→function loadState() {
+   903→  try {
+   904→    const s = localStorage.getItem(STATE_KEY);
+   905→    if (s) state = Object.assign(state, JSON.parse(s));
+   906→  } catch(e) {}
+   907→}
+   908→
+   909→function saveState() {
+   910→  try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch(e) {}
+   911→}
+   912→
+   913→// ---- VENUE DATA ----
+   914→const VENUES = {
+   915→  chambar: {
+   916→    name: 'Chambar',
+   917→    address: '568 Beatty St, Vancouver',
+   918→    phone: '604-879-7119',
+   919→    station: 'Stadium-Chinatown',
+   920→    walk: '4 min walk south on Beatty St',
+   921→    line: 'Expo Line or Millennium Line',
+   922→  },
+   923→  nuba: {
+   924→    name: 'Nuba Gastown',
+   925→    address: '207 W Hastings St, Vancouver',
+   926→    phone: '604-688-1655',
+   927→    station: 'Waterfront',
+   928→    walk: '7 min walk east along W Hastings',
+   929→    line: 'Expo Line, Canada Line, Millennium Line, or SeaBus',
+   930→  },
+   931→  earls: {
+   932→    name: 'Earls Kitchen + Bar (Yaletown)',
+   933→    address: '1095 Mainland St, Vancouver',
+   934→    phone: '604-684-4990',
+   935→    station: 'Yaletown-Roundhouse',
+   936→    walk: '5 min walk north on Mainland St',
+   937→    line: 'Canada Line',
+   938→  },
+   939→  craft: {
+   940→    name: 'CRAFT Beer Market (Olympic Village)',
+   941→    address: '85 W 1st Ave, Vancouver',
+   942→    phone: '604-709-2337',
+   943→    station: 'Olympic Village',
+   944→    walk: '8 min walk east along W 1st Ave',
+   945→    line: 'Canada Line (2 stops from Waterfront)',
+   946→  }
+   947→};
+   948→
+   949→const TRANSIT_DETAILS = {
+   950→  chambar: {
+   951→    waterfront: 'take the Expo Line 1 stop east to Stadium-Chinatown Station, then walk 4 min south on Beatty St.',
+   952→    burnaby: 'Stadium-Chinatown Station (Expo Line westbound). Walk 4 min south on Beatty St.',
+   953→    coq: 'Stadium-Chinatown Station (Millennium Line westbound). Walk 4 min south on Beatty St.',
+   954→    richmond: 'transfer at Waterfront to Expo Line eastbound, 1 stop to Stadium-Chinatown. Walk 4 min.',
+   955→    surrey: 'Stadium-Chinatown Station (Expo Line westbound). Walk 4 min south on Beatty St.',
+   956→    south: 'transfer at Waterfront to Expo Line eastbound, 1 stop to Stadium-Chinatown. Walk 4 min.',
+   957→  },
+   958→  nuba: {
+   959→    waterfront: 'walk 7 min east along W Hastings St. Nuba is on the left.',
+   960→    burnaby: 'Waterfront Station (Expo Line, last stop). Walk 7 min east along W Hastings St.',
+   961→    coq: 'Waterfront Station (Millennium Line, last stop). Walk 7 min east along W Hastings St.',
+   962→    richmond: 'Waterfront Station (Canada Line, last stop). Walk 7 min east along W Hastings St.',
+   963→    surrey: 'Waterfront Station (Expo Line, last stop). Walk 7 min east along W Hastings St.',
+   964→    south: 'Waterfront Station (Canada Line, last stop). Walk 7 min east along W Hastings St.',
+   965→  },
+   966→  earls: {
+   967→    waterfront: 'take Canada Line southbound 1 stop to Yaletown-Roundhouse, walk 5 min north on Mainland St.',
+   968→    burnaby: 'transfer at Commercial-Broadway or Waterfront to Canada Line, exit Yaletown-Roundhouse. Walk 5 min.',
+   969→    coq: 'transfer at Commercial-Broadway to Canada Line southbound, exit Yaletown-Roundhouse. Walk 5 min.',
+   970→    richmond: 'Yaletown-Roundhouse Station (Canada Line northbound, 2 stops from Bridgeport). Walk 5 min.',
+   971→    surrey: 'transfer at Waterfront or Commercial-Broadway to CanadaLine southbound, exit Yaletown-Roundhouse.',
+   972→    south: 'Yaletown-Roundhouse Station (Canada Line northbound). Walk 5 min north on Mainland St.',
+   973→  },
+   974→  craft: {
+   975→    waterfront: 'take Canada Line southbound 2 stops to Olympic Village Station, walk 8 min east along W 1st Ave.',
+   976→    burnaby: 'transfer to Canada Line, exit Olympic Village (2 stops south of Waterfront). Walk 8 min east.',
+   977→    coq: 'transfer at Commercial-Broadway to Canada Line southbound, exit Olympic Village. Walk 8 min east.',
+   978→    richmond: 'Olympic Village Station (Canada Line northbound, 3 stops from Bridgeport). Walk 8 min.',
+   979→    surrey: 'transfer to Canada Line at Waterfront, exit Olympic Village (2 stops south). Walk 8 min east.',
+   980→    south: 'Olympic Village Station (Canada Line northbound, 1 stop from Broadway-City Hall). Walk 8 min east.',
+   981→  },
+   982→};
+   983→
+   984→// ---- TABS ----
+   985→function switchTab(id) {
+   986→  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+   987→  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+   988→  document.getElementById('panel-' + id).classList.add('active');
+   989→  document.querySelectorAll('.tab-btn').forEach(b => {
+   990→    if (b.getAttribute('onclick') === "switchTab('" + id + "')") b.classList.add('active');
+   991→  });
+   992→}
+   993→
+   994→// ---- COUNTDOWN ----
+   995→function updateCountdown() {
+   996→  const dinner = new Date('2026-03-27T19:00:00-08:00');
+   997→  const now = new Date();
+   998→  const diff = Math.ceil((dinner - now) / (1000 * 60 * 60 * 24));
+   999→  document.getElementById('countdown-days').textContent = Math.max(0, diff);
+  1000→}
+  1001→
+  1002→// ---- PROGRESS CHECKS ----
+  1003→function toggleCheck(n) {
+  1004→  state.checks[n] = !state.checks[n];
+  1005→  renderChecks();
+  1006→  saveState();
+  1007→}
+  1008→
+  1009→function renderChecks() {
+  1010→  for (let i = 1; i <= 5; i++) {
+  1011→    const el = document.getElementById('chk-' + i);
+  1012→    const step = document.getElementById('step-' + i);
+  1013→    if (state.checks[i]) {
+  1014→      el.classList.add('checked');
+  1015→      step.classList.add('done');
+  1016→      step.classList.remove('active-step');
+  1017→    } else {
+  1018→      el.classList.remove('checked');
+  1019→      step.classList.remove('done');
+  1020→    }
+  1021→  }
+  1022→}
+  1023→
+  1024→// ---- GUEST MANAGEMENT ----
+  1025→const DIETARY_OPTIONS = [
+  1026→  'None', 'Vegetarian', 'Vegan', 'Gluten-Free', 'Halal', 'Dairy-Free',
+  1027→  'Nut Allergy (severe)', 'Shellfish Allergy', 'Other'
+  1028→];
+  1029→const RSVP_OPTIONS = ['Pending', 'Yes', 'No', 'Maybe'];
+  1030→
+  1031→function addGuest(data) {
+  1032→  const id = Date.now() + Math.random();
+  1033→  const guest = data || { id, name: '', area: '', phone: '', rsvp: 'Pending', dietary: 'None' };
+  1034→  if (!data) { guest.id = id; state.guests.push(guest); saveState(); }
+  1035→  renderGuests();
+  1036→  updateStats();
+  1037→}
+  1038→
+  1039→function removeGuest(id) {
+  1040→  state.guests = state.guests.filter(g => g.id !== id);
+  1041→  saveState();
+  1042→  renderGuests();
+  1043→  updateStats();
+  1044→}
+  1045→
+  1046→function updateGuest(id, field, value) {
+  1047→  const g = state.guests.find(g => g.id === id);
+  1048→  if (g) { g[field] = value; saveState(); updateStats(); }
+  1049→}
+  1050→
+  1051→function renderGuests() {
+  1052→  const tbody = document.getElementById('guest-tbody');
+  1053→  tbody.innerHTML = '';
+  1054→  state.guests.forEach((g, i) => {
+  1055→    const tr = document.createElement('tr');
+  1056→    tr.innerHTML = `
+  1057→      <td style="color:var(--muted); font-size:0.8rem;">${i + 1}</td>
+  1058→      <td><input type="text" value="${g.name || ''}" placeholder="Name" onchange="updateGuest(${g.id}, 'name', this.value)" oninput="updateGuest(${g.id}, 'name', this.value)"></td>
+  1059→      <td><input type="text" value="${g.area || ''}" placeholder="e.g. North Van, Burnaby" onchange="updateGuest(${g.id}, 'area', this.value)" oninput="updateGuest(${g.id}, 'area', this.value)"></td>
+  1060→      <td><input type="tel" value="${g.phone || ''}" placeholder="604-..." onchange="updateGuest(${g.id}, 'phone', this.value)" oninput="updateGuest(${g.id}, 'phone', this.value)"></td>
+  1061→      <td>
+  1062→        <select onchange="updateGuest(${g.id}, 'rsvp', this.value)">
+  1063→          ${RSVP_OPTIONS.map(o => `<option value="${o}" ${g.rsvp === o ? 'selected' : ''}>${o}</option>`).join('')}
+  1064→        </select>
+  1065→      </td>
+  1066→      <td>
+  1067→        <select onchange="updateGuest(${g.id}, 'dietary', this.value)">
+  1068→          ${DIETARY_OPTIONS.map(o => `<option value="${o}" ${g.dietary === o ? 'selected' : ''}>${o}</option>`).join('')}
+  1069→        </select>
+  1070→      </td>
+  1071→      <td><button class="icon-btn" onclick="removeGuest(${g.id})" title="Remove">x</button></td>
+  1072→    `;
+  1073→    tbody.appendChild(tr);
+  1074→  });
+  1075→}
+  1076→
+  1077→function updateStats() {
+  1078→  const confirmed = state.guests.filter(g => g.rsvp === 'Yes').length;
+  1079→  const pending = state.guests.filter(g => g.rsvp === 'Pending' || g.rsvp === 'Maybe').length;
+  1080→  const dietary = state.guests.filter(g => g.dietary && g.dietary !== 'None').length;
+  1081→
+  1082→  document.getElementById('stat-confirmed').textContent = confirmed;
+  1083→  document.getElementById('stat-pending').textContent = pending;
+  1084→  document.getElementById('stat-dietary').textContent = dietary;
+  1085→  document.getElementById('stat-venue').textContent = state.venue ? VENUES[state.venue].name.split(' ')[0] : '--';
+  1086→
+  1087→  // Dietary breakdown
+  1088→  const counts = {};
+  1089→  DIETARY_OPTIONS.forEach(o => counts[o] = 0);
+  1090→  state.guests.forEach(g => { if (g.dietary) counts[g.dietary] = (counts[g.dietary] || 0) + 1; });
+  1091→
+  1092→  document.getElementById('dc-veg').textContent = counts['Vegetarian'] || 0;
+  1093→  document.getElementById('dc-gf').textContent = counts['Gluten-Free'] || 0;
+  1094→  document.getElementById('dc-vegan').textContent = counts['Vegan'] || 0;
+  1095→  document.getElementById('dc-halal').textContent = counts['Halal'] || 0;
+  1096→  document.getElementById('dc-dairy').textContent = counts['Dairy-Free'] || 0;
+  1097→  document.getElementById('dc-allergy').textContent = (counts['Nut Allergy (severe)'] || 0) + (counts['Shellfish Allergy'] || 0);
+  1098→}
+  1099→
+  1100→// ---- VENUE SELECTION ----
+  1101→function selectVenue(id) {
+  1102→  state.venue = id;
+  1103→  saveState();
+  1104→  document.querySelectorAll('.venue-card').forEach(c => c.classList.remove('selected'));
+  1105→  document.getElementById('venue-' + id).classList.add('selected');
+  1106→  updateStats();
+  1107→  updateTransit();
+  1108→  updateScriptVenue();
+  1109→}
+  1110→
+  1111→function updateTransit() {
+  1112→  if (!state.venue) return;
+  1113→  const v = VENUES[state.venue];
+  1114→  const t = TRANSIT_DETAILS[state.venue];
+  1115→  document.getElementById('transit-venue-label').textContent = v.name;
+  1116→  document.getElementById('transit-from-waterfront').textContent = t.waterfront;
+  1117→  document.getElementById('transit-burnaby-stop').textContent = t.burnaby;
+  1118→  document.getElementById('transit-coq-stop').textContent = t.coq;
+  1119→  document.getElementById('transit-richmond-stop').textContent = t.richmond;
+  1120→  document.getElementById('transit-surrey-stop').textContent = t.surrey;
+  1121→  document.getElementById('transit-south-stop').textContent = t.south;
+  1122→}
+  1123→
+  1124→function updateScriptVenue() {
+  1125→  if (!state.venue) return;
+  1126→  const v = VENUES[state.venue];
+  1127→  document.getElementById('script-venue-name').textContent = v.name;
+  1128→  document.getElementById('script-venue-phone').textContent = v.phone;
+  1129→}
+  1130→
+  1131→// ---- SHARE MESSAGE ----
+  1132→function generateShare() {
+  1133→  const time = document.getElementById('share-time').value || '7:00 PM';
+  1134→  const name = document.getElementById('share-name').value;
+  1135→  const v = state.venue ? VENUES[state.venue] : null;
+  1136→
+  1137→  let venue_line = v ? `${v.name} — ${v.address}` : '[Venue TBD]';
+  1138→  let transit_line = v ? `Nearest station: ${v.station} (${v.walk})` : '[Transit directions TBD]';
+  1139→
+  1140→  const confirmed = state.guests.filter(g => g.rsvp === 'Yes').map(g => g.name).filter(Boolean);
+  1141→  const total = state.guests.length;
+  1142→
+  1143→  let msg = `Hey! You're invited to a group dinner in Vancouver.
+  1144→
+  1145→Date: Friday, March 27, 2026
+  1146→Time: ${time}
+  1147→Venue: ${venue_line}
+  1148→Transit: ${transit_line}
+  1149→
+  1150→Please reply with:
+  1151→  - Yes / No / Maybe
+  1152→  - Any dietary restrictions or allergies
+  1153→
+  1154→Need your answer by Friday March 20 so I can confirm numbers with the restaurant.
+  1155→
+  1156→See you there!${name ? '\n— ' + name : ''}`;
+  1157→
+  1158→  document.getElementById('share-output').textContent = msg;
+  1159→}
+  1160→
+  1161→// ---- COPY ----
+  1162→function copyScript(id, btn) {
+  1163→  const el = document.getElementById(id);
+  1164→  const text = el ? el.innerText : '';
+  1165→  navigator.clipboard.writeText(text).then(() => {
+  1166→    btn.textContent = 'Copied!';
+  1167→    btn.classList.add('copied');
+  1168→    setTimeout(() => { btn.textContent = 'Copy script text'; btn.classList.remove('copied'); }, 2000);
+  1169→  }).catch(() => {
+  1170→    btn.textContent = 'Copy failed';
+  1171→    setTimeout(() => { btn.textContent = 'Copy script text'; }, 2000);
+  1172→  });
+  1173→}
+  1174→
+  1175→function copyShare(btn) {
+  1176→  const text = document.getElementById('share-output').textContent;
+  1177→  navigator.clipboard.writeText(text).then(() => {
+  1178→    btn.textContent = 'Copied!';
+  1179→    btn.classList.add('copied');
+  1180→    setTimeout(() => { btn.textContent = 'Copy message'; btn.classList.remove('copied'); }, 2000);
+  1181→  }).catch(() => {
+  1182→    btn.textContent = 'Select and copy manually';
+  1183→    setTimeout(() => { btn.textContent = 'Copy message'; }, 2000);
+  1184→  });
+  1185→}
+  1186→
+  1187→// ---- INIT ----
+  1188→loadState();
+  1189→updateCountdown();
+  1190→renderChecks();
+  1191→renderGuests();
+  1192→updateStats();
+  1193→if (state.venue) {
+  1194→  document.getElementById('venue-' + state.venue).classList.add('selected');
+  1195→  updateTransit();
+  1196→  updateScriptVenue();
+  1197→}
+  1198→
+  1199→// Add a few empty guest rows if none exist
+  1200→if (state.guests.length === 0) {
+  1201→  for (let i = 0; i < 3; i++) {
+  1202→    state.guests.push({ id: i + 1, name: '', area: '', phone: '', rsvp: 'Pending', dietary: 'None' });
+  1203→  }
+  1204→  saveState();
+  1205→  renderGuests();
+  1206→  updateStats();
+  1207→}
+  1208→</script>
+  1209→</body>
+  1210→</html>
+  1211→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

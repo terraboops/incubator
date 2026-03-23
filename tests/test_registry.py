@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from incubator.core.registry import AgentConfig, Registry, load_registry
+from trellis.core.registry import AgentConfig, Registry, load_registry
 
 
 def test_load_registry(tmp_path: Path):

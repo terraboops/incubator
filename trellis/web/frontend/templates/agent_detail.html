@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon, agent_icon %}
+{% block title %}{% if is_new %}New Agent{% else %}{{ agent.name }}{% endif %} — trellis{% endblock %}
+{% block content %}
+
+<div class="flex items-center gap-3 mb-6">
+    <a href="/agents" class="text-[0.82rem] text-[#8a8074] hover:text-[#3b3530] transition-colors">Agents</a>
+    <span class="text-[#b0a898]">/</span>
+    {% if is_new %}
+    <span class="text-[#a690cc]">{{ icon('sparkles', 20) }}</span>
+    <h1 class="text-[1.2rem] font-medium text-[#3b3530]">New Agent</h1>
+    {% else %}
+
+    <span class="text-[#a690cc]">{{ agent_icon(agent.name, 20) }}</span>
+    <h1 class="text-[1.2rem] font-medium text-[#3b3530]">{{ agent.name }}</h1>
+    <span class="badge {% if agent.status == 'active' %}badge-release{% else %}badge-killed{% endif %} ml-1">
+        {{ agent.status }}
+    </span>
+    {% endif %}
+</div>
+
+{% if is_new %}
+<!-- Wizard suggestion banner -->
+<div class="rounded-xl mb-5" style="background: #eee8f6; border: 1px solid #d8cceb;">
+    <div class="flex items-center gap-3 px-4 py-3">
+        <span class="flex-shrink-0 text-[#7b5ea8]">{{ icon('sparkles', 18) }}</span>
+        <div class="flex-1">
+            <span class="text-[0.8rem] text-[#544d43]">Try the new <a href="/agents/wizard" class="font-medium text-[#7b5ea8] underline underline-offset-2">Agent Wizard</a> for a guided setup.</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Time budget notice -->
+{% if deadline_count is defined and deadline_count > 2 %}
+<div class="rounded-xl mb-5" style="background: #f5f0ea; border: 1px solid #e0d8cc;">
+    <div class="flex items-start gap-3 px-4 py-3">
+        <span class="flex-shrink-0 mt-0.5 text-[#8a8074]">{{ icon('clock', 18) }}</span>
+        <div>
+            <div class="text-[0.8rem] font-semibold text-[#544d43]">Taking longer than usual</div>
+            <div class="text-[0.75rem] mt-0.5 text-[#8a8074]">
+                This agent ran out of time <b>{{ deadline_count }}</b> times recently.
+                This is fine for complex ideas — work is saved and continued next cycle.
+                If you'd like to give it more time, increase <code class="text-[0.7rem]">cycle_time_minutes</code>.
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<form method="post" action="{% if is_new %}/agents/new{% else %}/agents/{{ agent.name }}{% endif %}" class="space-y-5">
+
+    {% if is_new %}
+    <!-- Name (only on create) -->
+    <div class="card p-5">
+        <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-4">Identity</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Name</label>
+                <input type="text" name="name" value="{{ agent.name }}" required placeholder="my-agent"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                <p class="text-[0.7rem] text-[#b0a898] mt-1">Lowercase slug, e.g. market-researcher</p>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Description</label>
+                <input type="text" name="description" value="{{ agent.description }}" placeholder="What this agent does"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Description (edit mode) -->
+    <div class="card p-5">
+        <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Description</label>
+        <input type="text" name="description" value="{{ agent.description }}"
+               class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+    </div>
+    {% endif %}
+
+    <!-- Core config -->
+    <div class="card p-5">
+        <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-4">Core</h2>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Model</label>
+                <select name="model"
+                        class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                    {% for m in models %}
+                    <option value="{{ m }}" {% if agent.model == m %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Status</label>
+                <select name="status"
+                        class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                    <option value="active" {% if agent.status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="disabled" {% if agent.status == 'disabled' %}selected{% endif %}>Disabled</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Max Turns</label>
+                <input type="number" name="max_turns" value="{{ agent.max_turns }}" min="1" max="1000"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Budget (USD)</label>
+                <input type="number" name="max_budget_usd" value="{{ agent.max_budget_usd }}" min="0" max="100" step="0.01"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Parallelism</label>
+                <input type="number" name="max_concurrent" value="{{ agent.max_concurrent }}" min="1" max="10"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Max copies running at once per cycle</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Behavior -->
+    <div class="card p-5">
+        <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-4">Behavior</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Permission Mode</label>
+                <select name="permission_mode"
+                        class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                    {% for pm in permission_modes %}
+                    <option value="{{ pm }}" {% if agent.permission_mode == pm %}selected{% endif %}>{{ pm }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Thinking</label>
+                <select name="thinking_type"
+                        class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                    <option value="" {% if not agent.thinking %}selected{% endif %}>None</option>
+                    <option value="adaptive" {% if agent.thinking and agent.thinking.type == 'adaptive' %}selected{% endif %}>Adaptive</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Phase</label>
+                <input type="text" name="phase" value="{{ agent.phase or '' }}"
+                       list="phase-options" placeholder="e.g. ideation"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                <datalist id="phase-options">
+                    <option value="ideation">
+                    <option value="implementation">
+                    <option value="validation">
+                    <option value="release">
+                    <option value="competitive">
+                    <option value="research">
+                    <option value="*">
+                </datalist>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Pipeline phase or role family (e.g. "competitive" for competitive-watcher). Use * for agents that run against all ideas.</p>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Cadence</label>
+                <input type="text" name="cadence" value="{{ agent.cadence or '' }}" placeholder="0 */6 * * *"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Cron schedule (watchers only)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tools -->
+    <div class="card p-5">
+        <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-3">Tools</h2>
+        <input type="text" name="tools" value="{{ agent.tools | join(', ') }}"
+               class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+        <div class="flex flex-wrap gap-1.5 mt-2">
+            {% for t in all_tools %}
+            <button type="button" onclick="toggleTool('{{ t }}')"
+                    class="text-[0.7rem] px-2 py-0.5 rounded-lg border border-[#eae6df] text-[#8a8074] hover:bg-[#f2efe8] transition-colors cursor-pointer">
+                {{ t }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Security -->
+    <div class="card p-5">
+        <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-1">Security</h2>
+        <p class="text-[0.7rem] text-[#b0a898] mb-4">
+            Sandbox restrictions enforced by <a href="https://github.com/always-further/nono" class="underline" target="_blank">nono</a> at the OS kernel level (Seatbelt on macOS, Landlock on Linux). Requires <code class="text-[0.68rem]">pip install nono-py</code> and <code class="text-[0.68rem]">brew install always-further/tap/nono</code>.
+        </p>
+
+        <!-- Row 1: Toggles -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="sandbox_enabled" value="true"
+                           {% if agent.sandbox_enabled %}checked{% endif %}
+                           class="rounded">
+                    <span class="text-[0.82rem] text-[#3b3530]">Sandbox enabled</span>
+                </label>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5 ml-5">Kernel-enforced isolation</p>
+            </div>
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="sandbox_ssh" value="true"
+                           {% if agent.sandbox_ssh %}checked{% endif %}
+                           class="rounded">
+                    <span class="text-[0.82rem] text-[#3b3530]">SSH agent</span>
+                </label>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5 ml-5">Git push/pull over SSH</p>
+            </div>
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="sandbox_rollback" value="true"
+                           {% if agent.sandbox_rollback %}checked{% endif %}
+                           class="rounded">
+                    <span class="text-[0.82rem] text-[#3b3530]">Rollback</span>
+                </label>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5 ml-5">Content-addressable snapshots</p>
+            </div>
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="sandbox_verify_attestations" value="true"
+                           {% if agent.sandbox_verify_attestations %}checked{% endif %}
+                           class="rounded">
+                    <span class="text-[0.82rem] text-[#3b3530]">Verify attestations</span>
+                </label>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5 ml-5">Require signed instruction files (CI → Sigstore)</p>
+            </div>
+        </div>
+
+        <!-- Row 1b: Base Profile -->
+        <div class="mb-4">
+            <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Base Profile</label>
+            <select name="sandbox_profile" class="px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530]">
+                <option value="claude-code" {% if agent.sandbox_profile == 'claude-code' %}selected{% endif %}>claude-code</option>
+                <option value="custom" {% if agent.sandbox_profile == 'custom' %}selected{% endif %}>custom</option>
+            </select>
+        </div>
+
+        <!-- Row 2: Credentials & Network -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Proxy Credentials</label>
+                <input type="text" name="sandbox_proxy_credentials"
+                       value="{{ (agent.sandbox_proxy_credentials or ['anthropic']) | join(', ') }}"
+                       placeholder="anthropic, github"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Agent never sees raw tokens</p>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Allowed Hosts</label>
+                <input type="text" name="sandbox_allowed_hosts"
+                       value="{{ (agent.sandbox_allowed_hosts or []) | join(', ') }}"
+                       placeholder="api.anthropic.com, github.com"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Network allowlist via nono proxy</p>
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Allowed Ports</label>
+                <input type="text" name="sandbox_allowed_ports"
+                       value="{{ (agent.sandbox_allowed_ports or []) | join(', ') }}"
+                       placeholder="3000, 8080"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Local port binding for dev servers</p>
+            </div>
+        </div>
+
+        <!-- Row 3: Filesystem & Commands -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Extra Read Paths</label>
+                <input type="text" name="sandbox_extra_read_paths"
+                       value="{{ (agent.sandbox_extra_read_paths or []) | join(', ') }}"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Extra Write Paths</label>
+                <input type="text" name="sandbox_extra_write_paths"
+                       value="{{ (agent.sandbox_extra_write_paths or []) | join(', ') }}"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+            </div>
+            <div>
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Allowed Commands</label>
+                <input type="text" name="sandbox_allowed_commands"
+                       value="{{ (agent.sandbox_allowed_commands or []) | join(', ') }}"
+                       placeholder="rm, docker"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Override destructive command blocks</p>
+            </div>
+        </div>
+
+        <!-- Row 4: Credential Store Mappings (Advanced) -->
+        <details class="mt-2">
+            <summary class="text-[0.78rem] font-medium text-[#8a8074] cursor-pointer select-none">Credential Store Mappings</summary>
+            <div class="mt-2">
+                <textarea name="sandbox_credential_maps" rows="3"
+                          class="w-full px-3 py-2 rounded-xl text-[0.78rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono resize-y"
+                          placeholder="op://Development/OpenAI/credential -> OPENAI_API_KEY&#10;apple-password://github.com -> GH_TOKEN"
+                >{{ (agent.sandbox_credential_maps or []) | join('\n') }}</textarea>
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">1Password or Apple Passwords URIs mapped to env vars (one per line)</p>
+            </div>
+        </details>
+    </div>
+
+    <!-- System Prompt -->
+    <div class="card p-5">
+        <div class="flex items-start justify-between mb-3">
+            <div>
+                <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-0.5">System Prompt</h2>
+                <p class="text-[0.7rem] text-[#b0a898]">
+                    The agent-specific system prompt. The global prompt (editable in <a href="/settings" class="underline">Settings</a>) is prepended automatically.
+                </p>
+            </div>
+            {% if agent.prompt_path %}
+            <span class="text-[0.65rem] font-mono text-[#b0a898] bg-[#f7f5f0] px-2 py-0.5 rounded-md mt-0.5 shrink-0">
+                {{ agent.prompt_path }}
+            </span>
+            {% endif %}
+        </div>
+        <textarea name="prompt_py" rows="16"
+                  class="w-full font-mono text-[0.78rem] leading-relaxed bg-[#faf9f6] border border-[#eae6df] rounded-xl p-4 resize-y text-[#544d43]"
+                  spellcheck="false"
+                  placeholder="Enter the system prompt for this agent...">{{ agent.prompt_py or '' }}</textarea>
+    </div>
+
+    <!-- Advanced -->
+    <details>
+        <summary class="flex items-center gap-2 text-[0.85rem] font-medium text-[#3b3530] py-1 mb-1 cursor-pointer">
+            <span class="chevron">&#x25B6;</span>
+            Advanced
+        </summary>
+        <div class="space-y-4 mt-2">
+            <div class="card p-5">
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Setting Sources</label>
+                <input type="text" name="setting_sources"
+                       value="{{ (agent.setting_sources or []) | join(', ') }}"
+                       placeholder="project"
+                       class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono">
+                <p class="text-[0.68rem] text-[#b0a898] mt-0.5">Comma-separated. Use "project" to load CLAUDE.md from the agent's .claude dir.</p>
+            </div>
+            <div class="card p-5">
+                <label class="block text-[0.78rem] font-medium text-[#8a8074] mb-1">Environment Variables</label>
+                <textarea name="env_text" rows="3" placeholder="KEY=value&#10;ANOTHER_KEY=value"
+                          class="w-full px-3 py-2 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono resize-y">{% if agent.env %}{% for k, v in agent.env.items() %}{{ k }}={{ v }}{% if not loop.last %}
+{% endif %}{% endfor %}{% endif %}</textarea>
+            </div>
+        </div>
+    </details>
+
+    <!-- CLAUDE.md -->
+    <div class="card p-5">
+        <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-1">CLAUDE.md</h2>
+        <p class="text-[0.75rem] text-[#8a8074] mb-3">
+            {% if agent.claude_home %}
+            Loaded from <code class="text-[0.72rem]">{{ agent.claude_home }}/CLAUDE.md</code>
+            {% else %}
+            Will be created at <code class="text-[0.72rem]">agents/&lt;name&gt;/.claude/CLAUDE.md</code>
+            {% endif %}
+        </p>
+        <textarea name="claude_md" rows="10"
+                  class="w-full px-4 py-3 rounded-xl text-[0.85rem] bg-white border border-[#eae6df] text-[#3b3530] font-mono leading-relaxed resize-y"
+                  placeholder="# My Agent&#10;&#10;Instructions for this agent...">{{ agent.claude_md }}</textarea>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-3">
+        <button type="submit" class="btn btn-primary">
+            {% if is_new %}Create Agent{% else %}Save Configuration{% endif %}
+        </button>
+        <a href="/agents" class="text-[0.82rem] text-[#8a8074] hover:text-[#3b3530] transition-colors">Cancel</a>
+        {% if not is_new %}
+        <div class="ml-auto">
+            <button type="button" onclick="confirmDelete()" class="btn btn-danger text-[0.8rem]">Delete Agent</button>
+        </div>
+        {% endif %}
+    </div>
+</form>
+
+{% if not is_new %}
+<form id="delete-form" method="post" action="/agents/{{ agent.name }}/delete" class="hidden"></form>
+
+<!-- Associated Ideas -->
+{% if associated_ideas %}
+<div class="mt-8 mb-6">
+    <h2 class="text-[0.95rem] font-medium text-[#3b3530] mb-3">Associated Ideas</h2>
+    <div class="flex flex-wrap gap-2">
+        {% for idea_id, idea_title in associated_ideas.items() %}
+        <a href="/ideas/{{ idea_id }}" class="card-flat px-4 py-2 inline-flex items-center gap-2 hover:shadow-sm transition-shadow">
+            <span class="text-[0.82rem] text-[#3b3530]">{{ idea_title }}</span>
+            <span class="text-[0.68rem] text-[#b0a898] font-mono">{{ idea_id }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Agent Run Logs -->
+<div class="mt-6 mb-6">
+    <h2 class="text-[0.95rem] font-medium text-[#3b3530] mb-3">Run History</h2>
+    {% if agent_logs %}
+    <div class="space-y-2">
+        {% for log in agent_logs %}
+        <a href="/ideas/{{ log.idea_id }}/logs/{{ log.filename }}" class="card p-4 block group hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="text-[0.82rem] font-medium text-[#3b3530] group-hover:text-[#1a1714]">{{ log.idea_title }}</span>
+                    <span class="text-[0.68rem] text-[#b0a898] font-mono">{{ log.idea_id }}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    {% if log.run_status == 'DEADLINE' %}
+                    <span class="text-[0.65rem] font-mono font-medium px-1.5 py-0.5 rounded" style="background: #fef3c7; color: #92400e;">DEADLINE</span>
+                    {% elif log.run_status == 'OK' %}
+                    <span class="text-[0.65rem] font-mono font-medium px-1.5 py-0.5 rounded" style="background: #ecfdf5; color: #065f46;">OK</span>
+                    {% endif %}
+                    <span class="text-[0.7rem] text-[#8a8074] font-mono">{{ log.model }}</span>
+                    <span class="text-[0.72rem] text-[#8a8074]">{{ log.transcript_len }} messages</span>
+                    <span class="text-[0.68rem] text-[#b0a898] font-mono">{{ log.timestamp[:16] }}</span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-flat p-6 text-center">
+        <p class="text-[0.82rem] text-[#8a8074]">No runs yet. This agent hasn't processed any ideas.</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<script>
+function toggleTool(tool) {
+    const input = document.querySelector('input[name="tools"]');
+    const tools = input.value.split(',').map(t => t.trim()).filter(Boolean);
+    const idx = tools.indexOf(tool);
+    if (idx >= 0) {
+        tools.splice(idx, 1);
+    } else {
+        tools.push(tool);
+    }
+    input.value = tools.join(', ');
+}
+
+function confirmDelete() {
+    if (confirm('Delete this agent? This removes it from the registry.')) {
+        document.getElementById('delete-form').submit();
+    }
+}
+</script>
+{% endblock %}

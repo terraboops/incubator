@@ -11,7 +11,7 @@ import pytest
 
 def test_load_presets_returns_dict_from_file(tmp_path: Path):
     """_load_presets reads pool/presets.json and returns parsed dict."""
-    from incubator.web.api.routes.ideas import _load_presets
+    from trellis.web.api.routes.ideas import _load_presets
 
     presets_data = {
         "full-pipeline": {
@@ -29,7 +29,7 @@ def test_load_presets_returns_dict_from_file(tmp_path: Path):
     mock_settings = MagicMock()
     mock_settings.project_root = tmp_path
 
-    with patch("incubator.web.api.routes.ideas.get_settings", return_value=mock_settings):
+    with patch("trellis.web.api.routes.ideas.get_settings", return_value=mock_settings):
         result = _load_presets()
 
     assert result == presets_data
@@ -39,12 +39,12 @@ def test_load_presets_returns_dict_from_file(tmp_path: Path):
 
 def test_load_presets_returns_empty_dict_when_missing(tmp_path: Path):
     """_load_presets returns {} when presets.json doesn't exist."""
-    from incubator.web.api.routes.ideas import _load_presets
+    from trellis.web.api.routes.ideas import _load_presets
 
     mock_settings = MagicMock()
     mock_settings.project_root = tmp_path  # no pool/ dir
 
-    with patch("incubator.web.api.routes.ideas.get_settings", return_value=mock_settings):
+    with patch("trellis.web.api.routes.ideas.get_settings", return_value=mock_settings):
         result = _load_presets()
 
     assert result == {}
@@ -52,14 +52,14 @@ def test_load_presets_returns_empty_dict_when_missing(tmp_path: Path):
 
 def test_load_presets_returns_empty_dict_when_pool_dir_exists_but_no_file(tmp_path: Path):
     """_load_presets returns {} when pool/ exists but presets.json doesn't."""
-    from incubator.web.api.routes.ideas import _load_presets
+    from trellis.web.api.routes.ideas import _load_presets
 
     (tmp_path / "pool").mkdir()
 
     mock_settings = MagicMock()
     mock_settings.project_root = tmp_path
 
-    with patch("incubator.web.api.routes.ideas.get_settings", return_value=mock_settings):
+    with patch("trellis.web.api.routes.ideas.get_settings", return_value=mock_settings):
         result = _load_presets()
 
     assert result == {}
@@ -67,8 +67,8 @@ def test_load_presets_returns_empty_dict_when_pool_dir_exists_but_no_file(tmp_pa
 
 def test_get_registered_roles():
     """_get_registered_roles returns set of agent names from registry."""
-    from incubator.web.api.routes.ideas import _get_registered_roles
-    from incubator.core.registry import Registry, AgentConfig
+    from trellis.web.api.routes.ideas import _get_registered_roles
+    from trellis.core.registry import Registry, AgentConfig
 
     registry = Registry(agents={
         "ideation": AgentConfig(name="ideation", description="test"),
@@ -78,8 +78,8 @@ def test_get_registered_roles():
     mock_settings = MagicMock()
     mock_settings.registry_path = Path("/fake/registry.yaml")
 
-    with patch("incubator.web.api.routes.ideas.get_settings", return_value=mock_settings), \
-         patch("incubator.web.api.routes.ideas.load_registry", return_value=registry):
+    with patch("trellis.web.api.routes.ideas.get_settings", return_value=mock_settings), \
+         patch("trellis.web.api.routes.ideas.load_registry", return_value=registry):
         result = _get_registered_roles()
 
     assert result == {"ideation", "validation"}

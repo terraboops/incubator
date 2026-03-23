@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 
 import pytest
 
-from incubator.core.agent import BaseAgent
+from trellis.core.agent import BaseAgent
 
 
 class StubAgent(BaseAgent):
@@ -56,6 +56,6 @@ def test_max_turns_override_respected(agent):
 
 def test_llm_decides_context_injected(agent):
     """LLM-decides gating context is available for injection."""
-    from incubator.core.agent import LLM_DECIDES_CONTEXT
+    from trellis.core.agent import LLM_DECIDES_CONTEXT
     assert "<self-assessment>" in LLM_DECIDES_CONTEXT
     assert "needs_review" in LLM_DECIDES_CONTEXT

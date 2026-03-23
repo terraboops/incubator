@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vancouver Dinner — Complete Action Guide (Cycle 5 Refined)</title>
+<style>
+  :root {
+    --bg: #f9f8f5;
+    --surface: #ffffff;
+    --surface2: #f3f4f0;
+    --forest: #1c3a28;
+    --cedar: #2d5a3d;
+    --fern: #4a8c5c;
+    --sage: #7ab58a;
+    --amber: #c97a0a;
+    --gold: #e8a830;
+    --rust: #b54a20;
+    --ocean: #1a3a5c;
+    --sky: #2a6a9c;
+    --text: #1a1a1a;
+    --subtle: #5a6a7a;
+    --border: rgba(0,0,0,0.09);
+    --green: #15803d;
+    --red: #b91c1c;
+    --purple: #6d28d9;
+    --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1510;
+      --surface: #141f18;
+      --surface2: #1a2820;
+      --text: #eef4ee;
+      --subtle: #8fa898;
+      --border: rgba(255,255,255,0.08);
+      --forest: #2d5a3d;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.65; }
+
+  header {
+    background: linear-gradient(140deg, #0e2218 0%, #122840 60%, #0e1a10 100%);
+    padding: 64px 40px 56px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -30%;
+    right: -10%;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(74,140,92,0.18) 0%, transparent 65%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .hc { max-width: 1100px; margin: 0 auto; position: relative; z-index: 1; }
+  .badge {
+    display: inline-block;
+    background: rgba(74,140,92,0.2);
+    border: 1px solid rgba(74,140,92,0.4);
+    color: #7ab58a;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.73rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    font-weight: 700;
+  }
+  header h1 { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 900; color: #fff; margin-bottom: 12px; line-height: 1.1; }
+  header p { color: #a0c8b0; font-size: 1rem; max-width: 620px; margin-bottom: 28px; }
+  .meta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .meta-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 30px;
+    padding: 7px 16px;
+    color: #fff;
+    font-size: 0.82rem;
+  }
+  .meta-chip-warn {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(201,122,10,0.2);
+    border: 1px solid rgba(201,122,10,0.4);
+    border-radius: 30px;
+    padding: 7px 16px;
+    color: #fbbf24;
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 48px 24px 100px; }
+
+  .sh {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 8px;
+    margin-top: 56px;
+  }
+  .sh h2 { font-size: 1.3rem; font-weight: 800; color: var(--forest); white-space: nowrap; }
+  @media (prefers-color-scheme: dark) { .sh h2 { color: var(--sage); } }
+  .sh::after { content: ''; flex: 1; height: 2px; background: linear-gradient(90deg, var(--fern), transparent); border-radius: 2px; }
+  .ss { color: var(--subtle); font-size: 0.9rem; margin-bottom: 28px; }
+
+  /* URGENCY */
+  .urgency-bar {
+    background: linear-gradient(135deg, rgba(185,28,28,0.08), rgba(185,28,28,0.04));
+    border: 1px solid rgba(185,28,28,0.25);
+    border-left: 5px solid #b91c1c;
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-top: 40px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .urgency-bar .icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 2px; }
+  .urgency-bar h3 { font-size: 1rem; font-weight: 800; color: var(--red); margin-bottom: 6px; }
+  .urgency-bar p { font-size: 0.88rem; color: var(--subtle); }
+  .urgency-bar p strong { color: var(--text); }
+
+  /* EVENTS ALERT — NEW IN CYCLE 5 */
+  .events-alert {
+    background: linear-gradient(135deg, rgba(201,122,10,0.1), rgba(185,28,28,0.06));
+    border: 2px solid rgba(201,122,10,0.35);
+    border-radius: 20px;
+    padding: 28px 32px;
+    margin-bottom: 36px;
+  }
+  .ea-title {
+    font-size: 1rem;
+    font-weight: 900;
+    color: var(--amber);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .ea-subtitle { font-size: 0.82rem; color: var(--subtle); margin-bottom: 20px; font-style: italic; }
+  .ea-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .ea-event {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    border-left: 4px solid var(--amber);
+  }
+  .ea-event h4 { font-size: 0.88rem; font-weight: 800; margin-bottom: 4px; color: var(--text); }
+  .ea-event p { font-size: 0.8rem; color: var(--subtle); line-height: 1.5; }
+  .ea-event .ev-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-bottom: 6px; }
+  .ev-red { background: rgba(185,28,28,0.12); color: var(--red); }
+  .ev-amber { background: rgba(201,122,10,0.12); color: var(--amber); }
+  .ev-blue { background: rgba(42,106,156,0.12); color: var(--sky); }
+  .ea-impact {
+    background: rgba(185,28,28,0.06);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.84rem;
+    color: var(--text);
+    border: 1px solid rgba(185,28,28,0.15);
+  }
+  .ea-impact strong { color: var(--red); }
+
+  /* VENUE DECISION */
+  .decision-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+  .decision-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+    position: relative;
+  }
+  .decision-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+  .dc-header {
+    padding: 20px 22px 16px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .dc-rank {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .rank-1 { background: linear-gradient(135deg, #c97a0a, #e8a830); color: #fff; }
+  .rank-2 { background: linear-gradient(135deg, #4a8c5c, #7ab58a); color: #fff; }
+  .rank-3 { background: linear-gradient(135deg, #2a6a9c, #5090c0); color: #fff; }
+  .rank-4 { background: linear-gradient(135deg, #6d28d9, #8b5cf6); color: #fff; }
+  .dc-name { font-size: 1.05rem; font-weight: 800; margin-bottom: 3px; }
+  .dc-sub { font-size: 0.78rem; color: var(--subtle); }
+  .dc-score { font-size: 1.4rem; font-weight: 900; color: var(--green); text-align: right; flex-shrink: 0; }
+  .dc-score span { font-size: 0.75rem; font-weight: 400; color: var(--subtle); display: block; }
+  .dc-body { padding: 0 22px 20px; }
+  .dc-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 0.86rem; }
+  .dc-label { color: var(--subtle); font-size: 0.78rem; min-width: 90px; }
+  .dc-value { color: var(--text); }
+  .dc-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .tag-sm { padding: 3px 9px; border-radius: 9px; font-size: 0.71rem; font-weight: 700; }
+  .t-green { background: rgba(21,128,61,0.1); color: var(--green); }
+  .t-amber { background: rgba(201,122,10,0.1); color: var(--amber); }
+  .t-blue { background: rgba(42,106,156,0.1); color: var(--sky); }
+  .t-purple { background: rgba(109,40,217,0.1); color: var(--purple); }
+  .t-red { background: rgba(185,28,28,0.1); color: var(--red); }
+  .dc-use-if {
+    margin-top: 12px;
+    background: rgba(21,128,61,0.06);
+    border-left: 3px solid var(--fern);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    color: var(--subtle);
+  }
+  .dc-use-if strong { color: var(--text); }
+  .dc-events-note {
+    margin-top: 10px;
+    background: rgba(201,122,10,0.07);
+    border-left: 3px solid var(--amber);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.79rem;
+    color: var(--subtle);
+  }
+  .dc-events-note strong { color: var(--amber); }
+
+  /* SCRIPTS */
+  .script-box {
+    background: #0f1a14;
+    border: 1px solid rgba(74,140,92,0.25);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  @media (prefers-color-scheme: light) { .script-box { background: #1a2a1e; } }
+  .script-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px;
+    background: rgba(74,140,92,0.12);
+    border-bottom: 1px solid rgba(74,140,92,0.2);
+  }
+  .script-label { font-size: 0.73rem; font-weight: 800; color: #7ab58a; letter-spacing: 1.5px; text-transform: uppercase; }
+  .script-type { font-size: 0.7rem; color: #4a8c5c; background: rgba(74,140,92,0.15); padding: 2px 8px; border-radius: 6px; font-weight: 700; }
+  .script-body {
+    padding: 22px 24px;
+    font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: #c8e6c9;
+    line-height: 1.75;
+    white-space: pre-wrap;
+  }
+  .script-body .placeholder { color: #ffd54f; font-weight: 700; }
+  .script-body .note { color: #7ab58a; font-style: italic; font-size: 0.8rem; }
+  .script-note {
+    padding: 10px 20px;
+    background: rgba(255,255,255,0.03);
+    border-top: 1px solid rgba(74,140,92,0.1);
+    font-size: 0.78rem;
+    color: #4a8c5c;
+  }
+
+  /* TRANSIT */
+  .transit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  .transit-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    border-left: 4px solid transparent;
+  }
+  .tc-expo { border-left-color: #2563eb; }
+  .tc-canada { border-left-color: #15803d; }
+  .tc-mill { border-left-color: #d97706; }
+  .tc-seabus { border-left-color: #64748b; }
+  .tc-bus { border-left-color: #7c3aed; }
+  .tc-east { border-left-color: #dc2626; }
+  .tc-drive { border-left-color: #9ca3af; }
+  .tc-title { font-weight: 800; font-size: 0.92rem; margin-bottom: 4px; }
+  .tc-route { font-size: 0.82rem; color: var(--subtle); margin-bottom: 8px; }
+  .tc-detail { font-size: 0.8rem; color: var(--text); margin-bottom: 4px; }
+  .tc-time { display: inline-block; font-weight: 700; color: var(--fern); font-size: 0.85rem; background: rgba(74,140,92,0.1); padding: 3px 10px; border-radius: 8px; margin-top: 6px; }
+  .tc-note { font-size: 0.75rem; color: var(--subtle); margin-top: 6px; font-style: italic; }
+  .tc-warning { font-size: 0.75rem; color: var(--amber); margin-top: 6px; font-weight: 600; }
+  .tc-alert { font-size: 0.75rem; color: var(--red); margin-top: 6px; font-weight: 700; background: rgba(185,28,28,0.08); padding: 4px 8px; border-radius: 6px; }
+
+  /* BUDGET TABLE */
+  .budget-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 40px; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); min-width: 600px; font-size: 0.87rem; }
+  th { background: var(--forest); color: #fff; padding: 12px 18px; text-align: left; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 1px; }
+  td { padding: 12px 18px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(74,140,92,0.03); }
+  .tr-highlight td { background: rgba(21,128,61,0.05); font-weight: 600; }
+  .tr-total td { background: var(--surface2); font-weight: 800; border-top: 2px solid var(--border); }
+
+  /* TIMELINE */
+  .tl { position: relative; padding-left: 40px; }
+  .tl::before { content: ''; position: absolute; left: 14px; top: 8px; bottom: 8px; width: 2px; background: var(--border); }
+  .tl-item { position: relative; padding-bottom: 32px; }
+  .tl-item:last-child { padding-bottom: 0; }
+  .tl-dot { position: absolute; left: -31px; top: 5px; width: 16px; height: 16px; border-radius: 50%; border: 2px solid; background: var(--bg); }
+  .tl-dot.urgent { border-color: var(--red); background: rgba(185,28,28,0.15); }
+  .tl-dot.soon { border-color: var(--amber); background: rgba(201,122,10,0.15); }
+  .tl-dot.later { border-color: var(--green); background: rgba(21,128,61,0.15); }
+  .tl-dot.event { border-color: var(--green); background: var(--green); }
+  .tl-when { font-size: 0.72rem; font-weight: 800; color: var(--subtle); text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 3px; }
+  .tl-what { font-size: 0.95rem; font-weight: 800; margin-bottom: 4px; color: var(--text); }
+  .tl-how { font-size: 0.82rem; color: var(--subtle); }
+
+  /* INFO BOXES */
+  .info-box { border-radius: var(--radius); padding: 18px 22px; margin-bottom: 16px; font-size: 0.87rem; }
+  .ib-warn { background: rgba(201,122,10,0.07); border: 1px solid rgba(201,122,10,0.25); border-left: 4px solid var(--amber); }
+  .ib-good { background: rgba(21,128,61,0.06); border: 1px solid rgba(21,128,61,0.22); border-left: 4px solid var(--green); }
+  .ib-info { background: rgba(42,106,156,0.06); border: 1px solid rgba(42,106,156,0.22); border-left: 4px solid var(--sky); }
+  .ib-red { background: rgba(185,28,28,0.06); border: 1px solid rgba(185,28,28,0.2); border-left: 4px solid var(--red); }
+  .info-box h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 5px; }
+  .ib-warn h4 { color: var(--amber); }
+  .ib-good h4 { color: var(--green); }
+  .ib-info h4 { color: var(--sky); }
+  .ib-red h4 { color: var(--red); }
+  .info-box p { color: var(--subtle); line-height: 1.55; }
+  .info-box p strong { color: var(--text); }
+
+  /* DIETARY TABLE */
+  .dietary-table { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px;}
+  .dietary-table table { min-width: 700px; }
+  .yes { color: #15803d; font-weight: 700; }
+  .no { color: #b91c1c; font-weight: 700; }
+  .partial { color: #c97a0a; font-weight: 700; }
+
+  /* BACKUP */
+  .backup-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-bottom: 40px;
+  }
+  .backup-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+  .bc-letter { width: 32px; height: 32px; border-radius: 8px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.9rem; margin-bottom: 10px; color: var(--subtle); }
+  .bc-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 5px; }
+  .bc-desc { font-size: 0.8rem; color: var(--subtle); }
+
+  /* ONLINE BOOKING SECTION */
+  .booking-platforms {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .platform-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .platform-name { font-weight: 800; font-size: 0.9rem; margin-bottom: 3px; }
+  .platform-venues { font-size: 0.78rem; color: var(--subtle); margin-bottom: 8px; }
+  .platform-link { font-size: 0.8rem; color: var(--sky); font-weight: 600; }
+
+  footer { text-align: center; padding: 36px; color: var(--subtle); font-size: 0.78rem; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hc">
+    <div class="badge">Complete Action Guide — Cycle 5 Refined</div>
+    <h1>Vancouver Group Dinner<br><span style="color:#7ab58a;">Everything You Need to Execute</span></h1>
+    <p>All decisions made. All scripts written. All transit routes mapped. March 27, 2026 — 5–10 people, Greater Vancouver Area.</p>
+    <div class="meta-row">
+      <div class="meta-chip">Friday, March 27, 2026</div>
+      <div class="meta-chip">5–10 Guests, GVA</div>
+      <div class="meta-chip">Today: March 13 — 14 days out</div>
+      <div class="meta-chip-warn">3 Major Events That Night — See Below</div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- URGENCY -->
+  <div class="urgency-bar" style="margin-top:40px;">
+    <div class="icon">!</div>
+    <div>
+      <h3>Book today. Three events make March 27 busier than expected.</h3>
+      <p>Vancouver International Auto Show (Convention Centre), Blossoms After Dark (Yaletown), and Monster Jam (PNE) all run that evening. Prior research missed all three. <strong>Restaurants near these events will be fuller and transit more crowded</strong> — this makes reserving early more important, not less.</p>
+    </div>
+  </div>
+
+  <!-- EVENTS ALERT — NEW IN CYCLE 5 -->
+  <div class="events-alert">
+    <div class="ea-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      March 27 Is Not a Quiet Friday — Prior Research Was Wrong
+    </div>
+    <p class="ea-subtitle">Cycles 1–4 stated "no special events on March 27." New research confirms three concurrent major events that evening. This affects transit, parking, and restaurant availability in specific neighborhoods.</p>
+    <div class="ea-grid">
+      <div class="ea-event">
+        <span class="ev-tag ev-red">Direct Impact — Waterfront/Gastown</span>
+        <h4>Vancouver International Auto Show</h4>
+        <p><strong>Where:</strong> Vancouver Convention Centre, 1055 Canada Pl — directly adjacent to Waterfront Station.<br>
+        <strong>Hours:</strong> 10am–9pm on March 27.<br>
+        <strong>Impact:</strong> Show closes 9pm, dumping thousands of attendees into Waterfront Station simultaneously with dinner guests heading home. Expo, Canada, and Millennium Lines will be crowded 9–10:30pm. Street parking near Waterfront/Gastown will be sold out by 5pm and priced at premium.</p>
+      </div>
+      <div class="ea-event">
+        <span class="ev-tag ev-amber">Direct Impact — Yaletown</span>
+        <h4>Blossoms After Dark</h4>
+        <p><strong>Where:</strong> David Lam Park, Yaletown (3 min walk from MeeT Yaletown, 5 min from Homer Street Cafe).<br>
+        <strong>Hours:</strong> 6:30pm–10pm on March 27–28.<br>
+        <strong>Impact:</strong> Yaletown-Roundhouse Station and surrounding streets will be busy with festival foot traffic during prime dinner hours. Yaletown restaurants will be fuller than a typical March Friday.</p>
+      </div>
+      <div class="ea-event">
+        <span class="ev-tag ev-blue">Low Impact — East Side</span>
+        <h4>Monster Jam</h4>
+        <p><strong>Where:</strong> PNE Forum (East Vancouver).<br>
+        <strong>Hours:</strong> Evening on March 27.<br>
+        <strong>Impact:</strong> Primarily affects PNE area and Hastings corridor. Low impact on Gastown, Yaletown, or Main Street dining.</p>
+      </div>
+    </div>
+    <div class="ea-impact">
+      <strong>What this changes:</strong> Torafuku (Main Street-Science World) becomes relatively more attractive — it is the only top-4 venue genuinely away from both the Auto Show and Blossoms After Dark. If choosing Gastown (Nuba), plan to depart the restaurant by 8:45pm to avoid the 9pm Auto Show exodus at Waterfront Station. If choosing Yaletown (MeeT, Homer Street), book for 6pm if possible to seat before the festival crowd arrives. Parking near Convention Centre or Yaletown will cost substantially more than on a typical Friday — budget $25–40 for Auto Show night.
+    </div>
+  </div>
+
+  <!-- ONLINE BOOKING CONFIRMED -->
+  <div class="info-box ib-good" style="margin-bottom:8px;">
+    <h4>Online booking confirmed — no need to call first if you prefer</h4>
+    <p><strong>Nuba Gastown</strong> is on both OpenTable (4.5 stars, 777 reviews) and Resy. <strong>Homer Street Cafe</strong> is on OpenTable and Tock. <strong>MeeT Yaletown</strong> is on OpenTable (eatmeet.ca/reservations). <strong>Torafuku</strong> accepts online reservations at torafuku.ca. For groups of 8+, calling or emailing is still better than an online form — but online booking is confirmed to exist for all four venues if you prefer to check availability first.</p>
+  </div>
+
+  <!-- SECTION 1: VENUE DECISION -->
+  <div class="sh"><h2>Step 1 — Choose Your Venue</h2></div>
+  <p class="ss">Four verified, group-ready options. Rankings updated for March 27 event context. Read the event impact note on each card.</p>
+
+  <div class="decision-grid">
+
+    <div class="decision-card">
+      <div class="dc-header">
+        <div><div class="dc-rank rank-1">1</div></div>
+        <div style="flex:1;padding-left:14px;">
+          <div class="dc-name">Nuba Gastown</div>
+          <div class="dc-sub">Lebanese Mezze · 207 W Hastings St</div>
+        </div>
+        <div class="dc-score">50<span>/60</span></div>
+      </div>
+      <div class="dc-body">
+        <div class="dc-row"><span class="dc-label">Phone</span><span class="dc-value">604-688-1655</span></div>
+        <div class="dc-row"><span class="dc-label">Email</span><span class="dc-value">nubagastown@gmail.com</span></div>
+        <div class="dc-row"><span class="dc-label">Online</span><span class="dc-value">OpenTable · Resy · Groups 8+: email</span></div>
+        <div class="dc-row"><span class="dc-label">Hours</span><span class="dc-value">11:30am–10:30pm Friday</span></div>
+        <div class="dc-row"><span class="dc-label">Budget</span><span class="dc-value">~$35–55/person with drinks</span></div>
+        <div class="dc-row"><span class="dc-label">Transit</span><span class="dc-value">10 min walk from Waterfront Station</span></div>
+        <div class="dc-tags">
+          <span class="tag-sm t-green">Halal-Certified</span>
+          <span class="tag-sm t-green">Vegan Menu</span>
+          <span class="tag-sm t-green">GF Options</span>
+          <span class="tag-sm t-blue">Sharing Plates</span>
+        </div>
+        <div class="dc-use-if"><strong>Best for:</strong> Mixed dietary restrictions (vegan, halal, GF). Best all-around choice. Warm underground atmosphere.</div>
+        <div class="dc-events-note"><strong>March 27 note:</strong> Auto Show at Convention Centre (5 min walk) closes at 9pm. Plan to finish dinner and board your train before 9pm, or expect a crowded Waterfront Station from 9–10:30pm. Book the 6:30–7pm window.</div>
+      </div>
+    </div>
+
+    <div class="decision-card">
+      <div class="dc-header">
+        <div><div class="dc-rank rank-4">2</div></div>
+        <div style="flex:1;padding-left:14px;">
+          <div class="dc-name">Torafuku</div>
+          <div class="dc-sub">Pan-Asian · 958 Main St · Michelin</div>
+        </div>
+        <div class="dc-score">47<span>/60</span></div>
+      </div>
+      <div class="dc-body">
+        <div class="dc-row"><span class="dc-label">Phone</span><span class="dc-value">778-903-2006</span></div>
+        <div class="dc-row"><span class="dc-label">Email</span><span class="dc-value">letseat@torafuku.ca</span></div>
+        <div class="dc-row"><span class="dc-label">Hours</span><span class="dc-value">11:30am–10:30pm Friday</span></div>
+        <div class="dc-row"><span class="dc-label">Budget</span><span class="dc-value">~$55–75/person with drinks</span></div>
+        <div class="dc-row"><span class="dc-label">Transit</span><span class="dc-value">Main Street-Science World Station (Expo)</span></div>
+        <div class="dc-row"><span class="dc-label">Group Booking</span><span class="dc-value">Groups of 7 or more: phone or email direct (do not use OpenTable for groups). CC hold may be required depending on timing. Table duration for 7+: 2.5 hours. Ask about the seasonal group tasting menu when booking — simplifies ordering for a mixed group.</span></div>
+        <div class="dc-tags">
+          <span class="tag-sm t-amber">Michelin-Recognized</span>
+          <span class="tag-sm t-green">Vegan Options</span>
+          <span class="tag-sm t-blue">East Van Location</span>
+        </div>
+        <div class="dc-use-if"><strong>Best for:</strong> Guests concentrated in East Van, Surrey, Burnaby (Expo Line riders). Michelin quality at a lower price than Homer Street. Away from both Auto Show and Blossoms After Dark.</div>
+        <div class="dc-events-note"><strong>March 27 note:</strong> Least affected by evening events. Main Street-Science World is away from both the Convention Centre and Yaletown festival. Transit home will be normal. Best choice if transit comfort on the way home matters.</div>
+      </div>
+    </div>
+
+    <div class="decision-card">
+      <div class="dc-header">
+        <div><div class="dc-rank rank-2">3</div></div>
+        <div style="flex:1;padding-left:14px;">
+          <div class="dc-name">MeeT in Yaletown</div>
+          <div class="dc-sub">100% Vegan · 1165 Mainland St</div>
+        </div>
+        <div class="dc-score">46<span>/60</span></div>
+      </div>
+      <div class="dc-body">
+        <div class="dc-row"><span class="dc-label">Phone</span><span class="dc-value">604-696-1165</span></div>
+        <div class="dc-row"><span class="dc-label">Email</span><span class="dc-value">info@eatmeet.ca</span></div>
+        <div class="dc-row"><span class="dc-label">Online</span><span class="dc-value">OpenTable · eatmeet.ca/reservations</span></div>
+        <div class="dc-row"><span class="dc-label">Hours</span><span class="dc-value">11:30am–11pm Friday</span></div>
+        <div class="dc-row"><span class="dc-label">Budget</span><span class="dc-value">~$30–45/person with drinks</span></div>
+        <div class="dc-row"><span class="dc-label">Transit</span><span class="dc-value">5 min walk from Yaletown-Roundhouse</span></div>
+        <div class="dc-tags">
+          <span class="tag-sm t-green">100% Vegan</span>
+          <span class="tag-sm t-purple">Peanut-Free Facility</span>
+          <span class="tag-sm t-green">Dedicated GF Fryers</span>
+        </div>
+        <div class="dc-use-if"><strong>Best for:</strong> Multiple vegans, celiac guests, or severe allergies. Safest kitchen of the four. Lowest price point.</div>
+        <div class="dc-events-note"><strong>March 27 note:</strong> Blossoms After Dark at David Lam Park (3 min walk, 6:30–10pm) will bring extra foot traffic to Yaletown. Book an early slot (6pm) or a late slot (9pm). The 7–8:30pm window will be most competitive for walk-ins near the park.</div>
+      </div>
+    </div>
+
+    <div class="decision-card">
+      <div class="dc-header">
+        <div><div class="dc-rank rank-3">4</div></div>
+        <div style="flex:1;padding-left:14px;">
+          <div class="dc-name">Homer Street Cafe</div>
+          <div class="dc-sub">New Canadian · 898 Homer St · Michelin</div>
+        </div>
+        <div class="dc-score">44<span>/60</span></div>
+      </div>
+      <div class="dc-body">
+        <div class="dc-row"><span class="dc-label">Phone</span><span class="dc-value">604-428-4299</span></div>
+        <div class="dc-row"><span class="dc-label">Email</span><span class="dc-value">info@homerstreetcafebar.com</span></div>
+        <div class="dc-row"><span class="dc-label">Online</span><span class="dc-value">OpenTable · Tock (exploretock.com)</span></div>
+        <div class="dc-row"><span class="dc-label">Hours</span><span class="dc-value">11:30am–11pm Friday</span></div>
+        <div class="dc-row"><span class="dc-label">Budget</span><span class="dc-value">~$60–90/person with drinks</span></div>
+        <div class="dc-row"><span class="dc-label">Transit</span><span class="dc-value">7 min walk from Yaletown-Roundhouse</span></div>
+        <div class="dc-tags">
+          <span class="tag-sm t-blue">Private Room up to 12</span>
+          <span class="tag-sm t-blue">Semi-Private up to 18</span>
+          <span class="tag-sm t-amber">Michelin-Recognized</span>
+          <span class="tag-sm t-green">GF Options</span>
+        </div>
+        <div class="dc-use-if"><strong>Best for:</strong> Impressions, celebrations, budget is secondary. Private dining room for 8–12 is excellent for a contained group dinner. Primarily meat-forward menu.</div>
+        <div class="dc-events-note"><strong>March 27 note:</strong> Same Yaletown crowding as MeeT — Blossoms After Dark at David Lam Park means the neighborhood is animated. Book the semi-private room specifically to isolate your group from walk-in overflow. Ask about the private room (up to 12) when booking.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="info-box ib-warn">
+    <h4>Ranking changes from Cycle 4</h4>
+    <p>Torafuku has been elevated from 4th to tied-2nd specifically because March 27 events (Auto Show, Blossoms After Dark) don't affect Main Street-Science World. Homer Street has been slightly down-scored — its semi-private room remains excellent, but Yaletown is genuinely busier that evening than a normal Friday. If transit convenience on the way home is a priority, Torafuku or Nuba (leaving before 9pm) are the most comfortable choices.</p>
+  </div>
+
+  <div class="info-box ib-warn">
+    <h4>Venues to skip</h4>
+    <p><strong>Brix &amp; Mortar</strong> — downgraded in Cycle 2 (1137 Hamilton St, Yaletown, 604-915-9463). A "Night in New Orleans" special event previously listed for March 27 was unverified and is treated as fabricated. Fine as a standard dinner spot but not a top recommendation. <strong>MeeT Gastown (375 Water St)</strong> — closed since November 2025. Use Yaletown location only.</p>
+  </div>
+
+  <!-- DIETARY MATRIX -->
+  <div class="sh"><h2>Step 2 — Collect Dietary Restrictions First</h2></div>
+  <p class="ss">Send this survey before calling any restaurant. You need to know restrictions before picking the venue.</p>
+
+  <div class="script-box">
+    <div class="script-header">
+      <span class="script-label">Template A — Dietary Survey</span>
+      <span class="script-type">iMessage / Group Chat</span>
+    </div>
+    <div class="script-body">Hey everyone — marking the calendar for <span class="placeholder">[Friday March 27]</span> for a group dinner in Vancouver. Trying to finalize a restaurant this week so we can get a reservation locked in.
+
+Before I book, I need to know your dietary restrictions so we end up somewhere that works for everyone. Please reply with:
+
+1. Any allergies (nuts, shellfish, gluten, dairy, eggs, etc.)
+2. Diet type (omnivore, vegetarian, vegan, halal, kosher)
+3. Anything you strongly dislike or avoid
+
+If you have no restrictions at all, just reply "no restrictions" so I know I've heard from you.
+
+Please reply by <span class="placeholder">[tomorrow, March 14]</span> — I want to call the restaurant this week.
+<span class="note">// Keep this short. People read short messages. Deadline creates urgency.</span></div>
+    <div class="script-note">Send to the full guest list. Wait 24 hours, then send one follow-up to non-responders before booking.</div>
+  </div>
+
+  <div class="dietary-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Restriction</th>
+          <th>Nuba Gastown</th>
+          <th>Torafuku</th>
+          <th>MeeT Yaletown</th>
+          <th>Homer Street</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Vegan</strong></td>
+          <td class="yes">Strong menu</td>
+          <td class="partial">Some options</td>
+          <td class="yes">100% Vegan</td>
+          <td class="partial">2–3 options</td>
+        </tr>
+        <tr>
+          <td><strong>Vegetarian</strong></td>
+          <td class="yes">Excellent</td>
+          <td class="yes">Good</td>
+          <td class="yes">Entire menu</td>
+          <td class="partial">Limited</td>
+        </tr>
+        <tr>
+          <td><strong>Gluten-Free</strong></td>
+          <td class="yes">Multiple dishes</td>
+          <td class="partial">Some dishes</td>
+          <td class="yes">Dedicated GF fryers</td>
+          <td class="yes">Multiple dishes</td>
+        </tr>
+        <tr>
+          <td><strong>Halal</strong></td>
+          <td class="yes">Certified Halal</td>
+          <td class="no">Not halal</td>
+          <td class="partial">No meat/alcohol — not formally certified. If certification required, use Nuba.</td>
+          <td class="no">Not halal</td>
+        </tr>
+        <tr>
+          <td><strong>Peanut-Free</strong></td>
+          <td class="partial">Disclose at booking</td>
+          <td class="partial">Disclose at booking</td>
+          <td class="yes">Peanut-free facility</td>
+          <td class="partial">Disclose at booking</td>
+        </tr>
+        <tr>
+          <td><strong>Celiac / Severe GF</strong></td>
+          <td class="partial">GF options, shared kitchen</td>
+          <td class="partial">Disclose carefully</td>
+          <td class="yes">Dedicated fryers</td>
+          <td class="partial">GF options, shared kitchen</td>
+        </tr>
+        <tr>
+          <td><strong>Meat-Focused Omnivore</strong></td>
+          <td class="yes">Strong meat/chicken dishes</td>
+          <td class="yes">Pan-Asian protein focus</td>
+          <td class="partial">Vegan comfort food — satisfying but no meat</td>
+          <td class="yes">Rotisserie, excellent</td>
+        </tr>
+        <tr>
+          <td><strong>Non-alcoholic drinks</strong></td>
+          <td class="yes">Good selection</td>
+          <td class="yes">Good selection</td>
+          <td class="yes">Strong NA menu</td>
+          <td class="yes">Good selection</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="info-box ib-info">
+    <h4>Decision shortcut based on dietary replies</h4>
+    <p>
+      <strong>Any guest requires formal halal certification</strong> → Nuba Gastown only (certified halal).<br>
+      <strong>Multiple vegans or celiac guests</strong> → MeeT Yaletown (dedicated GF fryers, peanut-free facility).<br>
+      <strong>Mostly omnivores, no major restrictions</strong> → Torafuku (Michelin, away from events) or Homer Street Cafe (private room).<br>
+      <strong>Mixed group, tight budget</strong> → Nuba Gastown at ~$35–55/person covers everyone.
+    </p>
+  </div>
+
+  <!-- SCRIPTS -->
+  <div class="sh"><h2>Step 3 — Contact the Restaurant</h2></div>
+  <p class="ss">Best time to call is 2pm–5pm any weekday. Avoid calling during lunch service (11:30am–1:30pm). Online booking is available for all four venues.</p>
+
+  <div class="script-box">
+    <div class="script-header">
+      <span class="script-label">Script B — Phone Call</span>
+      <span class="script-type">Call: Primary Contact</span>
+    </div>
+    <div class="script-body">"Hi, I'm calling to make a group reservation for Friday March 27th. We'll have between <span class="placeholder">[8 and 10]</span> people — I'd like to reserve for 10 to be safe.
+
+We'd prefer around <span class="placeholder">[6:30 or 7pm]</span> but I'm flexible on the time if that doesn't work.
+
+We do have some dietary restrictions in the group — <span class="placeholder">[e.g. two vegans, one person with a gluten intolerance, and one person who eats halal]</span>. Can you accommodate that?
+
+[Wait for confirmation]
+
+Great. Can I give you a name and contact number? And do you need a credit card to hold the reservation for a group this size?"
+<span class="note">// Have your dietary list in front of you. Be specific — "gluten intolerant" vs "celiac" matters to kitchens.</span>
+<span class="note">// 6:30pm is better than 7pm this particular Friday — it seats you before the Auto Show exodus.</span>
+<span class="note">// If they ask for a deposit or CC hold, this is standard for groups of 8+. It's fine.</span></div>
+    <div class="script-note">If 6:30 and 7pm are gone, ask about 8pm — getting out before 9pm matters less from a later seating. If your count drops to 5, just ask for a table for 5 — no group booking terms apply, no deposit required.</div>
+  </div>
+
+  <div class="script-box">
+    <div class="script-header">
+      <span class="script-label">Script C — Email</span>
+      <span class="script-type">Email: Backup / Same-Day</span>
+    </div>
+    <div class="script-body">Subject: Group Reservation Inquiry — Friday March 27, 5–10 guests
+
+Hi,
+
+I'd like to make a reservation for a group dinner on Friday March 27th. Party size will be between <span class="placeholder">[8 and 10]</span> — I'll book for 10.
+
+Preferred time: <span class="placeholder">[6:30pm]</span> (flexible by 30–60 minutes if needed).
+
+Dietary restrictions in the group:
+<span class="placeholder">— 2 guests: vegan
+— 1 guest: gluten-free (intolerance, not celiac)
+— 1 guest: halal
+— Remaining guests: no restrictions</span>
+
+Can you confirm availability and let me know if you need a credit card or deposit to hold the booking?
+
+Thank you,
+<span class="placeholder">[Your Name]</span>
+<span class="placeholder">[Phone number]</span></div>
+    <div class="script-note">Nuba: nubagastown@gmail.com / Homer Street: info@homerstreetcafebar.com / MeeT: info@eatmeet.ca / Torafuku: letseat@torafuku.ca</div>
+  </div>
+
+  <div class="script-box">
+    <div class="script-header">
+      <span class="script-label">Script D — Headcount Confirmation</span>
+      <span class="script-type">Call: 48 Hours Before (March 25)</span>
+    </div>
+    <div class="script-body">"Hi, I have a reservation under <span class="placeholder">[your name]</span> for Friday March 27th at <span class="placeholder">[6:30 or 7pm]</span>. I'm calling to confirm the final headcount.
+
+We'll be <span class="placeholder">[8]</span> people — I originally booked for 10, so we're slightly fewer.
+
+Our dietary restrictions are still the same: <span class="placeholder">[repeat the list]</span>.
+
+Is there anything you need from us before Friday — any pre-ordering, or a deposit that we haven't provided yet?
+
+Great — we'll see you Friday evening."
+<span class="note">// This call matters. Restaurants reassign group tables if they haven't heard in 48h.</span></div>
+    <div class="script-note">If headcount increases back to 10, call even earlier — reducing is easy, adding is hard on short notice.</div>
+  </div>
+
+  <!-- GUEST MESSAGES -->
+  <div class="sh"><h2>Step 4 — Guest Communication Templates</h2></div>
+  <p class="ss">Three messages to send at the right moments. Fill in placeholders and send.</p>
+
+  <div class="script-box">
+    <div class="script-header">
+      <span class="script-label">Template E — Reservation Confirmed</span>
+      <span class="script-type">iMessage / Group Chat — After Booking</span>
+    </div>
+    <div class="script-body">We're confirmed for dinner on <strong>Friday March 27th at <span class="placeholder">[6:30pm]</span></strong>.
+
+Restaurant: <span class="placeholder">[Nuba Gastown]</span>
+Address: <span class="placeholder">[207 W Hastings St, Vancouver]</span>
+Maps: <span class="placeholder">[https://maps.app.goo.gl/...]</span>
+
+Please aim to arrive by <strong><span class="placeholder">[6:25pm]</span></strong> — restaurants often give away group tables if everyone isn't there within 15 minutes.
+
+Note: The Vancouver Auto Show at the Convention Centre and a festival in Yaletown are both happening that evening. Transit will be busier than usual heading home — leave a few extra minutes for stations.
+
+Transit from your area:
+- <span class="placeholder">[From Richmond: Canada Line to Waterfront or Yaletown-Roundhouse]</span>
+- <span class="placeholder">[From Burnaby: Millennium Line to Waterfront]</span>
+- <span class="placeholder">[From Surrey: Expo Line to Waterfront — aim to board before 9pm (Auto Show exits)]</span>
+- <span class="placeholder">[From North Van: Bus to Lonsdale Quay, SeaBus to Waterfront]</span>
+
+See you all there.
+<span class="note">// Customize the transit list for your actual guests' neighborhoods.</span></div>
+    <div class="script-note">Send within 24 hours of confirming the reservation. Give people time to sort transit.</div>
+  </div>
+
+  <div class="script-box">
+    <div class="script-header">
+      <span class="script-label">Template F — Day-Of Reminder</span>
+      <span class="script-type">iMessage / Group Chat — Morning of March 27</span>
+    </div>
+    <div class="script-body">Tonight at <span class="placeholder">[6:30pm]</span> — <span class="placeholder">[Nuba Gastown]</span>, <span class="placeholder">[207 W Hastings St]</span>.
+
+Aim to arrive by <span class="placeholder">[6:25pm]</span>.
+
+Google Maps: <span class="placeholder">[link]</span>
+
+Heads up: Auto Show at the Convention Centre ends at 9pm — if you're on SkyTrain heading home from Waterfront, aim to board before 9 or wait until 9:30 for the crowd to clear.
+
+North Shore guests: last SeaBus back is around 12:15am.
+
+See you soon.</div>
+    <div class="script-note">Keep the day-of reminder short. The Auto Show note is genuinely useful for guests on the Expo/Canada/Millennium lines homebound via Waterfront.</div>
+  </div>
+
+  <!-- TRANSIT -->
+  <div class="sh"><h2>Step 5 — Transit by Region</h2></div>
+  <p class="ss">March 27 note: Auto Show at Convention Centre closes 9pm — Waterfront Station will be heavily congested 9–10:30pm. Plan departure timing accordingly.</p>
+
+  <div class="transit-grid">
+    <div class="transit-card tc-expo">
+      <div class="tc-title">Surrey / Langley / Delta</div>
+      <div class="tc-route">Expo Line</div>
+      <div class="tc-detail">Take Expo Line westbound to <strong>Waterfront Station</strong>. From Waterfront, walk 10 min north/east to Gastown, or take Canada Line 1 stop south to Yaletown-Roundhouse for Yaletown venues.</div>
+      <span class="tc-time">40–55 min to Waterfront</span>
+      <div class="tc-alert">Auto Show closes 9pm at Convention Centre (next to Waterfront). Trains home will be packed 9–10:30pm. Either leave dinner by 8:45pm or plan to wait until 10pm at the restaurant before boarding.</div>
+    </div>
+
+    <div class="transit-card tc-mill">
+      <div class="tc-title">Burnaby / Coquitlam / Port Moody</div>
+      <div class="tc-route">Millennium Line</div>
+      <div class="tc-detail">Take Millennium Line westbound to <strong>Waterfront Station</strong>. Direct service, no transfer required.</div>
+      <span class="tc-time">25–40 min to Waterfront</span>
+      <div class="tc-alert">Same Auto Show impact as above — Waterfront Station congested 9–10:30pm on the return journey.</div>
+    </div>
+
+    <div class="transit-card tc-canada">
+      <div class="tc-title">Richmond / YVR Airport</div>
+      <div class="tc-route">Canada Line</div>
+      <div class="tc-detail">Take Canada Line northbound. For <strong>Yaletown venues</strong>, exit at Yaletown-Roundhouse. For <strong>Gastown venues</strong>, continue to Waterfront.</div>
+      <span class="tc-time">20–35 min to Yaletown-Roundhouse</span>
+      <div class="tc-note">Canada Line runs directly under both dinner zones. Minimal impact from Auto Show since Canada Line is underground and runs frequently.</div>
+    </div>
+
+    <div class="transit-card tc-seabus">
+      <div class="tc-title">North Vancouver / West Vancouver</div>
+      <div class="tc-route">Bus + SeaBus</div>
+      <div class="tc-detail">Bus to <strong>Lonsdale Quay</strong>, then <strong>SeaBus</strong> to Waterfront Terminal. SeaBus runs every 15 min on Friday evenings. Walk 8 min to Gastown restaurants.</div>
+      <span class="tc-time">15–35 min from Lonsdale Quay</span>
+      <div class="tc-warning">Last SeaBus Friday night: approximately 12:15 AM. Plan accordingly.</div>
+      <div class="tc-alert">Return SeaBus departure from Waterfront may have a queue 9–10:30pm due to Auto Show. Arrive at the terminal a few minutes earlier than usual.</div>
+    </div>
+
+    <div class="transit-card tc-bus">
+      <div class="tc-title">Kitsilano / Point Grey / UBC</div>
+      <div class="tc-route">Bus</div>
+      <div class="tc-detail">Bus 99-B (express) eastbound toward downtown, then walk or connect to Waterfront or Yaletown. No SkyTrain from Kits — bus is the only transit option.</div>
+      <span class="tc-time">25–40 min to downtown core</span>
+      <div class="tc-note">Not significantly affected by Auto Show or Blossoms After Dark. Normal Friday bus service applies.</div>
+    </div>
+
+    <div class="transit-card tc-east">
+      <div class="tc-title">East Vancouver / Commercial Drive</div>
+      <div class="tc-route">Expo or Millennium Line</div>
+      <div class="tc-detail">Short ride west to Waterfront. If choosing Torafuku, exit at <strong>Main Street-Science World</strong> — no need to go to Waterfront.</div>
+      <span class="tc-time">5–20 min</span>
+      <div class="tc-note">Torafuku guests have the simplest transit of any group — they never need to go near Waterfront Station at all.</div>
+    </div>
+
+    <div class="transit-card tc-drive">
+      <div class="tc-title">Guests Who Drive</div>
+      <div class="tc-route">Parking</div>
+      <div class="tc-detail">Auto Show at Convention Centre will fill all nearby Gastown/Waterfront lots from midday. Yaletown has more availability but Blossoms After Dark adds foot traffic. Rideshare strongly recommended for Auto Show night.</div>
+      <span class="tc-time">Budget $25–40+ near Gastown</span>
+      <div class="tc-alert">Auto Show night parking: convention centre lots sold out by 5pm. ParkWhiz/SpotHero for pre-booking. Rideshare is cheaper and avoids the problem entirely.</div>
+    </div>
+
+  </div>
+
+  <!-- BUDGET -->
+  <div class="sh"><h2>Step 6 — Budget Estimate</h2></div>
+  <p class="ss">Add 18–20% for auto-gratuity (standard for groups of 6+). Parking is significantly higher on Auto Show night.</p>
+
+  <div class="budget-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Venue</th>
+          <th>Per Person (Food + Drinks)</th>
+          <th>For 8 People</th>
+          <th>For 10 People</th>
+          <th>Auto-Gratuity (18%)</th>
+          <th>Total for 10</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="tr-highlight">
+          <td>Nuba Gastown</td>
+          <td>$35–55</td>
+          <td>$280–440</td>
+          <td>$350–550</td>
+          <td>~$63–99</td>
+          <td><strong>~$413–650</strong></td>
+        </tr>
+        <tr>
+          <td>Torafuku</td>
+          <td>$55–75</td>
+          <td>$440–600</td>
+          <td>$550–750</td>
+          <td>~$99–135</td>
+          <td><strong>~$650–885</strong></td>
+        </tr>
+        <tr>
+          <td>MeeT Yaletown</td>
+          <td>$30–45</td>
+          <td>$240–360</td>
+          <td>$300–450</td>
+          <td>~$54–81</td>
+          <td><strong>~$355–530</strong></td>
+        </tr>
+        <tr>
+          <td>Homer Street Cafe</td>
+          <td>$60–90</td>
+          <td>$480–720</td>
+          <td>$600–900</td>
+          <td>~$108–162</td>
+          <td><strong>~$708–1,060</strong></td>
+        </tr>
+        <tr class="tr-total">
+          <td colspan="5">Parking note: Auto Show night premium applies near Waterfront/Gastown. Budget $25–40 for 4 hours near the Convention Centre area vs $15–20 on a normal Friday. Rideshare is the right call for drivers this particular evening.</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- EXECUTION TIMELINE -->
+  <div class="sh"><h2>Step 7 — Full Execution Timeline</h2></div>
+  <p class="ss">Do things in this order. March 27 events make urgency higher than a normal group dinner.</p>
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin-bottom:32px;">
+    <div class="tl">
+
+      <div class="tl-item">
+        <div class="tl-dot urgent"></div>
+        <div class="tl-when">Today — March 13 (afternoon)</div>
+        <div class="tl-what">Send dietary survey to guests (Template A)</div>
+        <div class="tl-how">Even a rough idea of restrictions today lets you call the right restaurant. Three events on March 27 mean restaurants will fill faster than a typical March Friday.</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot urgent"></div>
+        <div class="tl-when">Today — March 13, 2pm–5pm</div>
+        <div class="tl-what">Call Nuba Gastown (604-688-1655) or check OpenTable / Resy for the 6:30pm slot</div>
+        <div class="tl-how">6:30pm is better than 7pm this particular Friday — it gets your group seated and finished before the 9pm Auto Show exodus at Waterfront Station. If Nuba is full, check Torafuku (778-903-2006) next.</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot urgent"></div>
+        <div class="tl-when">Today — after the call</div>
+        <div class="tl-what">Email second-choice venue as backup</div>
+        <div class="tl-how">Email Homer Street (info@homerstreetcafebar.com) or Torafuku (letseat@torafuku.ca) in parallel. Ask specifically about the semi-private room at Homer Street — it isolates the group from walk-in Blossoms After Dark overflow.</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot soon"></div>
+        <div class="tl-when">March 14 — Morning</div>
+        <div class="tl-what">Review dietary replies and confirm venue choice</div>
+        <div class="tl-how">Any guest requiring formal halal → Nuba only. Multiple vegans or celiac → MeeT. No major restrictions + wants Michelin quality away from events → Torafuku. Private room for a contained group → Homer Street.</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot soon"></div>
+        <div class="tl-when">March 14–15</div>
+        <div class="tl-what">Confirm reservation + provide full dietary list</div>
+        <div class="tl-how">Call to confirm. Provide the full dietary list. CC hold or deposit is standard for groups of 8+. Get a booking reference number or confirmation email.</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot soon"></div>
+        <div class="tl-when">March 15–18</div>
+        <div class="tl-what">Send confirmed invitation to guests (Template E)</div>
+        <div class="tl-how">Include address, Google Maps link, arrival time, transit routes, and the brief heads-up about the Auto Show affecting Waterfront Station at 9pm.</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot later"></div>
+        <div class="tl-when">March 25</div>
+        <div class="tl-what">Call with final confirmed headcount (Script D)</div>
+        <div class="tl-how">Most restaurants need 48 hours notice for headcount changes. This call also reconfirms the reservation is active. Note: March 27 is the last day of BC school spring break (Vancouver School District: March 16–27). Some guests may be returning from travel that week — do not skip this call. If anyone has not confirmed by March 24, follow up directly before calling the restaurant.</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot later"></div>
+        <div class="tl-when">March 27 — Morning</div>
+        <div class="tl-what">Send day-of reminder (Template F)</div>
+        <div class="tl-how">Short message with address, time, and Google Maps link. Include the Auto Show note for SkyTrain guests. North Shore: last SeaBus ~12:15am.</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot event"></div>
+        <div class="tl-when">March 27 — 5–10 min early</div>
+        <div class="tl-what">Arrive early. Repeat dietary restrictions to your server.</div>
+        <div class="tl-how">Don't assume the kitchen was briefed at booking — repeat on arrival. Check the bill for auto-gratuity before adding more. If departing from Waterfront, consider whether you want to leave before 9pm or linger until 9:45+ after the rush passes.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BACKUP PLAN -->
+  <div class="sh"><h2>Backup Plan</h2></div>
+  <p class="ss">If your reservation falls through. Note that Auto Show and Blossoms After Dark make walk-in availability tighter than on a normal March Friday.</p>
+
+  <div class="backup-grid">
+    <div class="backup-card">
+      <div class="bc-letter">A</div>
+      <div class="bc-title">Book La Casita or Guu instead</div>
+      <div class="bc-desc">La Casita Gastown (604-646-2444, 101 Cordova St) and Guu Otokomae (604-685-8682, 375 Water St) are both solid group-friendly fallbacks in Gastown. Call directly — they take walk-ins more readily than the top four.</div>
+    </div>
+    <div class="backup-card">
+      <div class="bc-letter">B</div>
+      <div class="bc-title">Check OpenTable / Resy that morning</div>
+      <div class="bc-desc">Cancellations do open up same-day, even on busy nights. Check for slots after 8:30pm — these are easier to get and the evening will feel more relaxed with a later seating.</div>
+    </div>
+    <div class="backup-card">
+      <div class="bc-letter">C</div>
+      <div class="bc-title">Split into two tables of 5</div>
+      <div class="bc-desc">If no single table for 10 is available, Guu Otokomae and Nuba both have adjacent table layouts. Ask the host directly when you walk in.</div>
+    </div>
+    <div class="backup-card">
+      <div class="bc-letter">D</div>
+      <div class="bc-title">Book late (9:30pm)</div>
+      <div class="bc-desc">La Casita (open to 1am) and Belgard Kitchen (55 Dunlevy Ave, 604-699-1989) have genuine late-night availability. A 9:30pm seating actually avoids the Auto Show exodus at Waterfront entirely.</div>
+    </div>
+  </div>
+
+  <!-- CONFIRMED FACTS -->
+  <div class="sh"><h2>Verified Facts — Five Cycles</h2></div>
+  <p class="ss">Claims that have survived repeated scrutiny. Marked with what cycle confirmed or corrected them.</p>
+
+  <div class="info-box ib-good">
+    <h4>All four venue contact details verified (Cycles 1–5)</h4>
+    <p>
+      <strong>Nuba Gastown</strong> — 207 W Hastings St, 604-688-1655, nubagastown@gmail.com. Halal-certified,Open Friday 11:30am–10:30pm. On OpenTable and Resy. 10-min walk from Waterfront.<br><br>
+      <strong>MeeT Yaletown</strong> — 1165 Mainland St, 604-696-1165, info@eatmeet.ca. 100% vegan, peanut-free, dedicated GF fryers. Open Friday 11:30am–11pm. On OpenTable (eatmeet.ca/reservations). 5-min walk from Yaletown-Roundhouse.<br><br>
+      <strong>Homer Street Cafe</strong> — 898 Homer St, 604-428-4299, info@homerstreetcafebar.com. Michelin-recognized. Private room up to 12 or semi-private up to 18. Open Friday 11:30am–11pm. On OpenTable and Tock.<br><br>
+      <strong>Torafuku</strong> — 958 Main St, 778-903-2006, letseat@torafuku.ca. Michelin-recognized, pan-Asian. Open Friday 11:30am–10:30pm. Main Street-Science World Station (Expo Line). Groups of 7+: phone or email only (skip OpenTable for groups). CC hold may apply. 2.5-hour table for groups. Seasonal group tasting menu available — ask when booking.<br><br>
+      <strong>MeeT Gastown (375 Water St) — closed November 2025.</strong> Use Yaletown only.
+    </p>
+  </div>
+
+  <div class="info-box ib-red">
+    <h4>Prior cycles wrong: March 27 is NOT event-free (found in Cycle 5)</h4>
+    <p>Cycles 1–4 stated "no special events on March 27 confirmed." This was incorrect. Three concurrent events have been confirmed: <strong>Vancouver International Auto Show (Convention Centre, March 25–29, open 10am–9pm)</strong>, <strong>Blossoms After Dark (David Lam Park, Yaletown, March 27–28, 6:30–10pm)</strong>, and <strong>Monster Jam (PNE Forum, March 27–29)</strong>. The Canucks statement remains correct — no home game on March 27 — but "clear night" was wrong.</p>
+  </div>
+
+  <div class="info-box ib-good">
+    <h4>March 27 is a Friday — confirmed</h4>
+    <p>March 1, 2026 is a Sunday. Adding 26 days = Friday, March 27. Confirmed across all cycles.</p>
+  </div>
+
+  <div class="info-box ib-good">
+    <h4>Online booking platforms confirmed (Cycle 5)</h4>
+    <p>Nuba Gastown is on both <strong>OpenTable</strong> (4.5 stars, 777 reviews) and <strong>Resy</strong>. Homer Street Cafe is on <strong>OpenTable</strong> and <strong>Tock</strong>. MeeT Yaletown is on <strong>OpenTable</strong>. All four venues have online booking — call or email for groups of 8+ specifically.</p>
+  </div>
+
+  <div class="info-box ib-warn">
+    <h4>Brix &amp; Mortar — address and event both incorrect in older files</h4>
+    <p>research.html (Cycle 1) listed "1138 Homer St" — the correct address is <strong>1137 Hamilton St</strong> (a different street). The "Night in New Orleans" special event for March 27 was not verified. Brix &amp; Mortar is a real restaurant but is not a recommended venue for this dinner.</p>
+  </div>
+
+</main>
+
+<footer>
+  Vancouver Dinner Action Guide — Cycle 7 Refined · March 13, 2026<br>
+  Cycle 7 updates: Torafuku group booking policy confirmed and added (7+, phone/email, CC hold may apply, 2.5-hour table, seasonal tasting menu) · Spring break note added to March 25 headcount step (VSB break ends March 27) · Torafuku transit note added to dinner-brief<br>
+  Cycle 5: March 27 events confirmed (Auto Show closes 9pm, Blossoms After Dark, Monster Jam) · Cycle 6: Canucks no home game confirmed · Online booking platforms confirmed for all 4 venues
+</footer>
+
+</body>
+</html>

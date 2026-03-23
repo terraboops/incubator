@@ -4,8 +4,8 @@ on:
     branches: [main]
     paths:
       - 'agents/**/.claude/CLAUDE.md'
-      - 'incubator/agents/**/prompt.py'
-      - 'incubator/agents/global-system-prompt.md'
+      - 'trellis/agents/**/prompt.py'
+      - 'trellis/agents/global-system-prompt.md'
       - 'registry.yaml'
 
 jobs:

@@ -1,4 +1,4 @@
-"""Tests for incubator/tools/knowledge_io.py — Knowledge Objects foundation."""
+"""Tests for trellis/tools/knowledge_io.py — Knowledge Objects foundation."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from incubator.tools.knowledge_io import (
+from trellis.tools.knowledge_io import (
     delete_object,
     find_by_id,
     format_for_prompt,

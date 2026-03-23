@@ -1,11 +1,11 @@
-"""Tests for incubator/core/tool_policy.py — Bash blocklist and path scoping."""
+"""Tests for trellis/core/tool_policy.py — Bash blocklist and path scoping."""
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
 
-from incubator.core.tool_policy import make_tool_policy, make_role_policy
+from trellis.core.tool_policy import make_tool_policy, make_role_policy
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────

@@ -8,10 +8,10 @@ from unittest.mock import MagicMock, AsyncMock, patch, call
 
 import pytest
 
-from incubator.core.registry import AgentConfig, Registry
-from incubator.orchestrator.job_queue import JobQueue
-from incubator.orchestrator.pool import PoolManager
-from incubator.orchestrator.worker import RunResult, RunStatus
+from trellis.core.registry import AgentConfig, Registry
+from trellis.orchestrator.job_queue import JobQueue
+from trellis.orchestrator.pool import PoolManager
+from trellis.orchestrator.worker import RunResult, RunStatus
 
 
 def _make_pool_for_handle_result(tmp_path):
@@ -88,7 +88,7 @@ async def test_release_cap_terminates_at_cap(tmp_path):
 
     result = _make_release_result()
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     # Must have set phase="released" (terminal), NOT phase="submitted"
@@ -118,7 +118,7 @@ async def test_release_cap_loops_back_under_cap(tmp_path):
 
     result = _make_release_result()
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     calls = pm.blackboard.update_status.call_args_list
@@ -148,7 +148,7 @@ async def test_release_cap_default_is_one_cycle(tmp_path):
 
         result = _make_release_result()
 
-        with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+        with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
             await pm._handle_result(result, queue)
 
         calls = pm.blackboard.update_status.call_args_list
@@ -175,7 +175,7 @@ async def test_release_cap_custom_max_cycles(tmp_path):
 
     result = _make_release_result()
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     calls = pm.blackboard.update_status.call_args_list
@@ -190,7 +190,7 @@ async def test_release_cap_custom_max_cycles(tmp_path):
     pm.blackboard.is_ready.return_value = True
     pm.blackboard.get_gating_mode.return_value = "auto"
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     calls2 = pm.blackboard.update_status.call_args_list
@@ -211,7 +211,7 @@ async def test_release_cap_stage_results_behavior(tmp_path):
     pm.blackboard.is_ready.return_value = True
     pm.blackboard.get_gating_mode.return_value = "auto"
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(_make_release_result(), queue)
 
     loopback_calls = pm.blackboard.update_status.call_args_list
@@ -229,7 +229,7 @@ async def test_release_cap_stage_results_behavior(tmp_path):
     pm.blackboard.is_ready.return_value = True
     pm.blackboard.get_gating_mode.return_value = "auto"
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(_make_release_result(), queue)
 
     terminal_calls = pm.blackboard.update_status.call_args_list

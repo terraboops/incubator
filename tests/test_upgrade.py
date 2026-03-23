@@ -2,7 +2,7 @@ import json
 import shutil
 from pathlib import Path
 from typer.testing import CliRunner
-from incubator.cli import app
+from trellis.cli import app
 
 runner = CliRunner()
 

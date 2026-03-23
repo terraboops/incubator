@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from typer.testing import CliRunner
-from incubator.cli import app
+from trellis.cli import app
 
 runner = CliRunner()
 
@@ -12,7 +12,7 @@ def test_full_lifecycle(tmp_path, monkeypatch):
     assert result.exit_code == 0
 
     project = tmp_path / "testproject"
-    assert (project / ".incubator").exists()
+    assert (project / ".trellis").exists()
     assert (project / "registry.yaml").exists()
     assert (project / "agents" / "ideation" / "prompt.py").exists()
     assert (project / "agents" / "artifact-check" / "prompt.py").exists()
@@ -23,7 +23,7 @@ def test_full_lifecycle(tmp_path, monkeypatch):
 
     # Verify config discovery works
     monkeypatch.chdir(project)
-    from incubator.config import find_project_root
+    from trellis.config import find_project_root
     assert find_project_root() == project
 
     # Verify agent upgrade works

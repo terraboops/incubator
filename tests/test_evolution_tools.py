@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from incubator.tools.knowledge_io import (
+from trellis.tools.knowledge_io import (
     _now_iso,
     delete_object,
     find_by_id,

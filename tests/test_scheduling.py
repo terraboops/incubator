@@ -8,14 +8,14 @@ from unittest.mock import MagicMock, AsyncMock, patch
 
 import pytest
 
-from incubator.core.registry import AgentConfig, Registry
-from incubator.orchestrator.job_queue import (
+from trellis.core.registry import AgentConfig, Registry
+from trellis.orchestrator.job_queue import (
     Job, JobQueue, CadenceTracker, compute_priority,
     PRIORITY_DEFAULT, PRIORITY_EARLY_BOOST, MAX_BACKGROUND_PRIORITY,
     FEEDBACK_PRIORITY_FACTOR,
 )
-from incubator.orchestrator.pool import PoolManager, can_schedule
-from incubator.orchestrator.worker import RunResult, RunStatus
+from trellis.orchestrator.pool import PoolManager, can_schedule
+from trellis.orchestrator.worker import RunResult, RunStatus
 
 
 # ── JobQueue tests ───────────────────────────────────────────────────
@@ -289,7 +289,7 @@ async def test_handle_result_release_terminates_at_cap(tmp_path):
     result = RunResult(status=RunStatus.OK, role="release", idea_id="test-idea",
                        duration_seconds=10.0, cost_usd=0.05)
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     calls = pm.blackboard.update_status.call_args_list
@@ -313,7 +313,7 @@ async def test_handle_result_release_loops_under_cap(tmp_path):
     result = RunResult(status=RunStatus.OK, role="release", idea_id="test-idea",
                        duration_seconds=10.0, cost_usd=0.05)
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     calls = pm.blackboard.update_status.call_args_list
@@ -337,7 +337,7 @@ async def test_handle_result_error_allows_retry(tmp_path):
     result = RunResult(status=RunStatus.ERROR, role="ideation", idea_id="test-idea",
                        error="agent crashed")
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     # Error should update status with error info
@@ -367,7 +367,7 @@ async def test_handle_result_advances_phase(tmp_path):
     result = RunResult(status=RunStatus.OK, role="ideation", idea_id="test-idea",
                        duration_seconds=60.0, cost_usd=0.10)
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     calls = pm.blackboard.update_status.call_args_list
@@ -395,7 +395,7 @@ async def test_handle_result_kill_recommendation(tmp_path):
     result = RunResult(status=RunStatus.OK, role="ideation", idea_id="test-idea",
                        duration_seconds=30.0, cost_usd=0.05)
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     calls = pm.blackboard.update_status.call_args_list
@@ -423,7 +423,7 @@ async def test_handle_result_human_review_gating(tmp_path):
     result = RunResult(status=RunStatus.OK, role="ideation", idea_id="test-idea",
                        duration_seconds=30.0, cost_usd=0.05)
 
-    with patch("incubator.orchestrator.pool.PoolManager._broadcast_sync"):
+    with patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"):
         await pm._handle_result(result, queue)
 
     calls = pm.blackboard.update_status.call_args_list

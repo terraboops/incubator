@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon, agent_icon, phase_icon %}
+{% block title %}Agents — trellis{% endblock %}
+{% block content %}
+<div class="flex items-end justify-between mb-6">
+    <div class="flex items-center gap-3">
+        <span class="text-[#a690cc]">{{ icon('brain', 22) }}</span>
+        <div>
+            <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Agents</h1>
+            <p class="text-[0.8rem] text-[#8a8074]">The team that incubates your ideas.</p>
+        </div>
+    </div>
+    <div class="flex items-center gap-2">
+        <a href="/agents/wizard" class="btn btn-primary text-[0.78rem]">
+            {{ icon('sparkles', 14) }} Create with Wizard
+        </a>
+        <a href="/agents/plugins" class="btn btn-soft text-[0.78rem]">
+            {{ icon('package', 14) }} Browse Plugins
+        </a>
+    </div>
+</div>
+
+<!-- Migration banner (hidden by default, shown via JS if pending migrations exist) -->
+<div id="migration-banner" class="hidden rounded-xl mb-5" style="background: #fef3c7; border: 1px solid #fde68a;">
+    <div class="flex items-center gap-3 px-4 py-3">
+        <span class="flex-shrink-0 text-[#92400e]">{{ icon('alert-triangle', 18) }}</span>
+        <div class="flex-1">
+            <span class="text-[0.8rem] font-medium text-[#78350f]" id="migration-msg">Registry migrations available</span>
+            <p class="text-[0.72rem] text-[#92400e] mt-0.5">Run <code class="text-[0.68rem]">trellis migrate</code> or apply them here.</p>
+        </div>
+        <button onclick="applyMigrations()" id="migrate-btn"
+                class="text-[0.75rem] px-3 py-1.5 rounded-lg font-medium cursor-pointer transition-colors"
+                style="background: #92400e; color: white;">
+            Apply
+        </button>
+    </div>
+</div>
+
+<script>
+// Check for pending migrations on page load
+fetch('/api/migrations/check')
+    .then(r => r.json())
+    .then(data => {
+        if (!data.up_to_date) {
+            const banner = document.getElementById('migration-banner');
+            const msg = document.getElementById('migration-msg');
+            const count = data.pending.length;
+            msg.textContent = count + ' registry migration' + (count > 1 ? 's' : '') + ' available';
+            banner.classList.remove('hidden');
+        }
+    })
+    .catch(() => {}); // Silently ignore errors
+
+async function applyMigrations() {
+    const btn = document.getElementById('migrate-btn');
+    btn.textContent = 'Applying...';
+    btn.disabled = true;
+    try {
+        const resp = await fetch('/api/migrations/apply', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({auto_yes: true}),
+        });
+        const data = await resp.json();
+        document.getElementById('migration-banner').classList.add('hidden');
+        window.location.reload();
+    } catch (e) {
+        btn.textContent = 'Failed — run trellis migrate';
+        btn.disabled = false;
+    }
+}
+</script>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for agent in agents %}
+    <a href="/agents/{{ agent.name }}" class="card p-5 block group" id="agent-card-{{ agent.name }}">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="agent-ring idle" id="ring-{{ agent.name }}">
+                <span class="text-[#8a8074]">{{ agent_icon(agent.name, 18) }}</span>
+            </div>
+            <div>
+                <h3 class="text-[0.85rem] font-medium text-[#3b3530] group-hover:text-[#1a1714] transition-colors">{{ agent.name }}</h3>
+                <p class="text-[0.7rem] text-[#b0a898] leading-snug mt-0.5">{{ agent.description[:60] }}{% if agent.description|length > 60 %}…{% endif %}</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 text-[0.7rem] mt-auto pt-2 border-t border-[#f2efe8]">
+            <span class="text-[#8a8074]"><span class="text-[#b0a898]">model</span> <span class="font-mono">{{ agent.model.split('-')[-2:] | join('-') }}</span></span>
+            <span class="text-[#8a8074]"><span class="text-[#b0a898]">turns</span> {{ agent.max_turns }}</span>
+            {% if agent.get('cadence') %}
+            <span class="text-[#8a8074]"><span class="text-[#b0a898]">runs</span> {{ agent.cadence | cadence_label }}</span>
+            {% endif %}
+            {% if agent.get('knowledge_size', 0) > 0 %}
+            <span class="text-[#7b5ea8]">{{ (agent.knowledge_size / 1024) | round(1) }} KB</span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<script>
+window.addEventListener('trellis:event', function(e) {
+    const data = e.detail;
+    if (data.type !== 'agent_status') return;
+    const ring = document.getElementById('ring-' + data.agent);
+    if (ring) ring.className = 'agent-ring ' + data.status;
+});
+</script>
+{% endblock %}

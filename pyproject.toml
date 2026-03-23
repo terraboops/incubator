@@ -1,7 +1,8 @@
 [project]
-name = "incubator"
-version = "0.3.0"
-description = "Multi-agent idea incubation pipeline"
+name = "trellis"
+version = "1.0.0"
+description = "Agentic pipeline platform — design agent teams that take ideas from concept to launch"
+license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "claude-agent-sdk",
@@ -31,17 +32,17 @@ dev = [
 ]
 
 [project.scripts]
-incubator = "incubator.cli:app"
+trellis = "trellis.cli:app"
 
 [build-system]
 requires = ["setuptools>=75.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["incubator*"]
+include = ["trellis*"]
 
 [tool.setuptools.package-data]
-incubator = [
+trellis = [
     "defaults/**/*",
     "defaults/**/.*",
     "web/frontend/templates/**/*",

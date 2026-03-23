@@ -72,7 +72,7 @@ work rather than starting over. Each cycle through the pipeline is tracked in
 
 ## Evolution
 
-The `incubator evolve` command runs a retrospective across agent transcripts.
+The `trellis evolve` command runs a retrospective across agent transcripts.
 It identifies patterns (what worked, what failed) and updates
 `agents/<name>/knowledge/learnings.md`. These learnings are injected into
 future agent runs, creating a feedback loop.

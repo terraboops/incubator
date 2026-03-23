@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from incubator.orchestrator.job_queue import Job
-from incubator.orchestrator.worker import Worker, RunResult, RunStatus
+from trellis.orchestrator.job_queue import Job
+from trellis.orchestrator.worker import Worker, RunResult, RunStatus
 
 
 @pytest.fixture

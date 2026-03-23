@@ -1,4 +1,4 @@
-"""Tests for incubator/core/audit.py — PostToolUse audit hook."""
+"""Tests for trellis/core/audit.py — PostToolUse audit hook."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from incubator.core.audit import make_audit_hooks, _configure_audit_handler
+from trellis.core.audit import make_audit_hooks, _configure_audit_handler
 
 
 async def test_hook_returns_empty_dict(tmp_path):
@@ -26,16 +26,16 @@ async def test_hook_returns_empty_dict(tmp_path):
 
 async def test_bash_not_logged(tmp_path, caplog):
     # Reset handler config for test isolation
-    import incubator.core.audit as audit_mod
+    import trellis.core.audit as audit_mod
     audit_mod._audit_handler_configured = False
     # Remove existing handlers
-    logger = logging.getLogger("incubator.audit")
+    logger = logging.getLogger("trellis.audit")
     logger.handlers = []
 
     hooks = make_audit_hooks("implementation", "test-idea", tmp_path)
     hook_fn = hooks["PostToolUse"][0].hooks[0]
 
-    with caplog.at_level(logging.INFO, logger="incubator.audit"):
+    with caplog.at_level(logging.INFO, logger="trellis.audit"):
         await hook_fn(
             {"tool_name": "Bash", "tool_input": {"command": "npm install"}, "tool_response": ""},
             "id-2",
@@ -43,14 +43,14 @@ async def test_bash_not_logged(tmp_path, caplog):
         )
 
     # Bash should not produce log entries from our hook
-    bash_entries = [r for r in caplog.records if r.name == "incubator.audit"]
+    bash_entries = [r for r in caplog.records if r.name == "trellis.audit"]
     assert len(bash_entries) == 0
 
 
 async def test_read_logged_with_path(tmp_path):
-    import incubator.core.audit as audit_mod
+    import trellis.core.audit as audit_mod
     audit_mod._audit_handler_configured = False
-    logger = logging.getLogger("incubator.audit")
+    logger = logging.getLogger("trellis.audit")
     logger.handlers = []
 
     hooks = make_audit_hooks("ideation", "my-idea", tmp_path)
@@ -74,9 +74,9 @@ async def test_read_logged_with_path(tmp_path):
 
 
 async def test_web_search_logged_with_query(tmp_path):
-    import incubator.core.audit as audit_mod
+    import trellis.core.audit as audit_mod
     audit_mod._audit_handler_configured = False
-    logger = logging.getLogger("incubator.audit")
+    logger = logging.getLogger("trellis.audit")
     logger.handlers = []
 
     hooks = make_audit_hooks("ideation", "my-idea", tmp_path)

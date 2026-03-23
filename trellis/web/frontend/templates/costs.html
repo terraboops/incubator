@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}Costs — trellis{% endblock %}
+{% block content %}
+<div class="flex items-end justify-between mb-8">
+    <div class="flex items-center gap-3">
+        <span class="text-[#a690cc]">{{ icon('dollar-sign', 22) }}</span>
+        <div>
+            <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Costs</h1>
+            <p class="text-[0.8rem] text-[#8a8074]">Total spend across all ideas.</p>
+        </div>
+    </div>
+    <div class="text-right">
+        <span class="text-[1.8rem] font-light text-[#3b3530] font-mono leading-none">${{ "%.2f"|format(total_cost) }}</span>
+    </div>
+</div>
+
+{% if ideas %}
+<div class="space-y-2">
+    {% for idea in ideas|sort(attribute='cost', reverse=True) %}
+    <a href="/ideas/{{ idea.id }}" class="card px-5 py-4 flex items-center justify-between group block">
+        <div class="flex items-center gap-4 min-w-0">
+            <!-- Proportional bar -->
+            <div class="w-1 h-7 rounded-full flex-shrink-0" style="background: #a690cc; opacity: {{ [0.25, (idea.cost / total_cost if total_cost > 0 else 0)]|max }};"></div>
+            <span class="text-[0.85rem] font-medium text-[#3b3530] group-hover:text-[#1a1714] transition-colors truncate">{{ idea.title }}</span>
+        </div>
+        <span class="text-[0.85rem] font-mono text-[#544d43] flex-shrink-0 ml-4">${{ "%.2f"|format(idea.cost) }}</span>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card p-12 text-center">
+    <p class="text-[0.84rem] text-[#8a8074]">No spending yet.</p>
+</div>
+{% endif %}
+{% endblock %}

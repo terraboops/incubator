@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}New Idea — trellis{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto pt-4">
+    <div class="flex items-center gap-3 mb-1">
+        <span class="text-[#a690cc]">{{ icon('lightbulb', 22) }}</span>
+        <h1 class="text-[1.15rem] font-medium text-[#3b3530]">New Idea</h1>
+    </div>
+    <p class="text-[0.8rem] text-[#8a8074] mb-6 ml-[35px]">Describe your idea and the agents will take it from here.</p>
+
+    {% if presets %}
+    <!-- Preset selector -->
+    <div class="mb-6">
+        <label class="block text-[0.78rem] font-medium text-[#544d43] mb-2.5">Pipeline</label>
+        <div class="grid gap-2.5" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+            {% for key, p in presets.items() %}
+            <button type="button"
+                    data-preset="{{ key }}"
+                    onclick="selectPreset('{{ key }}')"
+                    class="preset-card text-left p-3.5 rounded-xl border-2 transition-all duration-150 cursor-pointer
+                           {% if key == 'full-pipeline' %}border-[#3b3530] bg-white{% else %}border-[#eae6df] bg-white hover:border-[#d5d0c8]{% endif %}">
+                <div class="text-[0.82rem] font-medium text-[#3b3530] mb-1">{{ p.label }}</div>
+                <div class="text-[0.72rem] text-[#8a8074] leading-snug mb-2.5">{{ p.description }}</div>
+                <div class="flex flex-wrap gap-1">
+                    {% for stage in p.get('stages', []) %}
+                    <span class="inline-block px-1.5 py-0.5 rounded text-[0.6rem] font-medium
+                        {% if stage == 'ideation' %}bg-emerald-50 text-emerald-700
+                        {% elif stage == 'implementation' %}bg-blue-50 text-blue-700
+                        {% elif stage == 'validation' %}bg-amber-50 text-amber-700
+                        {% elif stage == 'release' %}bg-violet-50 text-violet-700
+                        {% else %}bg-stone-100 text-stone-600{% endif %}">{{ stage }}</span>
+                    {% endfor %}
+                    {% for agent in p.get('post_ready', []) %}
+                    <span class="inline-block px-1.5 py-0.5 rounded text-[0.6rem] font-medium bg-stone-100 text-stone-500">{{ agent }}</span>
+                    {% endfor %}
+                </div>
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/ideas" class="space-y-5">
+        <input type="hidden" name="preset" id="preset-input" value="full-pipeline">
+        <div>
+            <label class="block text-[0.78rem] font-medium text-[#544d43] mb-1.5">Title</label>
+            <input type="text" name="title" required autofocus
+                   class="w-full px-4 py-2.5 rounded-xl text-[0.88rem] bg-white border border-[#eae6df] text-[#3b3530]"
+                   placeholder="A short, clear name for your idea">
+        </div>
+        <div>
+            <label class="block text-[0.78rem] font-medium text-[#544d43] mb-1.5">Description</label>
+            <textarea name="description" rows="6" required
+                      class="w-full px-4 py-2.5 rounded-xl text-[0.88rem] bg-white border border-[#eae6df] text-[#3b3530] leading-relaxed resize-y"
+                      placeholder="What problem does it solve? Who is it for? What does it look like when it's working?"></textarea>
+        </div>
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="btn btn-primary">Submit Idea</button>
+            <a href="/" class="text-[0.8rem] text-[#8a8074] hover:text-[#3b3530] transition-colors">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+function selectPreset(key) {
+    document.getElementById('preset-input').value = key;
+    document.querySelectorAll('.preset-card').forEach(function(card) {
+        if (card.dataset.preset === key) {
+            card.classList.remove('border-[#eae6df]', 'hover:border-[#d5d0c8]');
+            card.classList.add('border-[#3b3530]');
+        } else {
+            card.classList.remove('border-[#3b3530]');
+            card.classList.add('border-[#eae6df]', 'hover:border-[#d5d0c8]');
+        }
+    });
+}
+</script>
+{% endblock %}

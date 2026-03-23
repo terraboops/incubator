@@ -2,7 +2,7 @@
 
 ## How agents work
 
-Every agent is a Claude session managed by `BaseAgent` (`incubator/core/agent.py`).
+Every agent is a Claude session managed by `BaseAgent` (`trellis/core/agent.py`).
 When an agent runs, it:
 
 1. Receives a system prompt from `prompt.py` plus contextual injections (deadline
@@ -54,7 +54,7 @@ session loads automatically. Use this for:
 ## Knowledge and learnings
 
 Each agent type has a `knowledge/learnings.md` file that accumulates insights
-across runs. The evolution system (`incubator evolve`) analyzes agent transcripts
+across runs. The evolution system (`trellis evolve`) analyzes agent transcripts
 and updates these files.
 
 Per-idea knowledge is stored on the blackboard at

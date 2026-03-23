@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from incubator.core.blackboard import Blackboard
+from trellis.core.blackboard import Blackboard
 
 DEFAULT_PIPELINE = {
     "agents": ["ideation", "implementation", "validation", "release"],

@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from incubator.core.blackboard import Blackboard, slugify
-from incubator.core.phase import Phase
+from trellis.core.blackboard import Blackboard, slugify
+from trellis.core.phase import Phase
 
 
 @pytest.fixture
