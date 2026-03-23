@@ -11,7 +11,7 @@ research, build, test, and launch it — running autonomously with human
 checkpoints between phases. Custom pipelines, sandboxed execution, plugin
 marketplace, TLA+-verified scheduling.
 
-![Ideas pipeline](docs/screenshots/dashboard-ideas.png)
+![Ideas pipeline](docs/screenshots/trellis-ideas.png)
 
 ## Install
 
@@ -73,7 +73,7 @@ by priority. Each agent reads what previous agents wrote and adds its own work.
 - **Knowledge curation** — agents accumulate and self-curate learnings across runs
 - **Real-time dashboard** — WebSocket-powered activity feed, cost tracking, pool status
 
-![Agent team](docs/screenshots/dashboard-agents.png)
+![Agent team](docs/screenshots/trellis-agents.png)
 
 ## Agent customization
 
