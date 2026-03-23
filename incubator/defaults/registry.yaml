@@ -5,13 +5,18 @@ agents:
     max_turns: 50
     max_budget_usd: 0
     status: active
-    tools: [Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, Agent]
+    tools: [Read, Write, Edit, Glob, Grep, WebSearch, WebFetch]
     phase: ideation
     permission_mode: bypassPermissions
     thinking:
       type: adaptive
     setting_sources: [project]
     claude_home: agents/ideation/.claude
+    sandbox_enabled: false
+    sandbox_ssh: false
+    sandbox_proxy_credentials: [anthropic]
+    sandbox_allowed_hosts: []
+    sandbox_allowed_commands: []
 
   - name: implementation
     description: Software engineer that builds MVPs from validated specs
@@ -26,6 +31,12 @@ agents:
       type: adaptive
     setting_sources: [project]
     claude_home: agents/implementation/.claude
+    sandbox_enabled: false
+    sandbox_ssh: true
+    sandbox_rollback: true
+    sandbox_proxy_credentials: [anthropic, github]
+    sandbox_allowed_hosts: [github.com, api.github.com]
+    sandbox_allowed_commands: []
 
   - name: validation
     description: QA engineer that tests implementations against specs
@@ -40,6 +51,10 @@ agents:
       type: adaptive
     setting_sources: [project]
     claude_home: agents/validation/.claude
+    sandbox_enabled: false
+    sandbox_ssh: false
+    sandbox_proxy_credentials: [anthropic]
+    sandbox_allowed_hosts: []
 
   - name: release
     description: Release engineer that deploys software and creates launch materials
@@ -54,6 +69,12 @@ agents:
       type: adaptive
     setting_sources: [project]
     claude_home: agents/release/.claude
+    sandbox_enabled: false
+    sandbox_ssh: true
+    sandbox_rollback: true
+    sandbox_proxy_credentials: [anthropic, github]
+    sandbox_allowed_hosts: [github.com, api.github.com, pypi.org]
+    sandbox_allowed_commands: []
 
   - name: artifact-check
     description: Reviews artifacts for accessibility, clarity, and mechanical issues
@@ -68,6 +89,10 @@ agents:
     thinking:
       type: adaptive
     claude_home: agents/artifact-check/.claude
+    sandbox_enabled: false
+    sandbox_ssh: false
+    sandbox_proxy_credentials: [anthropic]
+    sandbox_allowed_hosts: []
 
   - name: competitive-watcher
     description: Monitors competitive landscape for active ideas
@@ -78,6 +103,10 @@ agents:
     tools: [Read, WebSearch, WebFetch]
     cadence: "0 */6 * * *"
     permission_mode: bypassPermissions
+    sandbox_enabled: false
+    sandbox_ssh: false
+    sandbox_proxy_credentials: [anthropic]
+    sandbox_allowed_hosts: []
 
   - name: research-watcher
     description: Monitors academic research for active ideas
@@ -88,6 +117,10 @@ agents:
     tools: [Read, WebSearch, WebFetch]
     cadence: "0 8 * * *"
     permission_mode: bypassPermissions
+    sandbox_enabled: false
+    sandbox_ssh: false
+    sandbox_proxy_credentials: [anthropic]
+    sandbox_allowed_hosts: []
 
   - name: prioritizer
     description: Scores idea priority based on impact, values alignment, and probability of success
@@ -97,3 +130,7 @@ agents:
     status: active
     tools: [Read, WebSearch]
     permission_mode: bypassPermissions
+    sandbox_enabled: false
+    sandbox_ssh: false
+    sandbox_proxy_credentials: [anthropic]
+    sandbox_allowed_hosts: []

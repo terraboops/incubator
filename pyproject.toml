@@ -5,6 +5,7 @@ description = "Multi-agent idea incubation pipeline"
 requires-python = ">=3.12"
 dependencies = [
     "claude-agent-sdk",
+    "nono-py",
     "python-telegram-bot>=21.0",
     "pydantic-settings>=2.0",
     "croniter",

@@ -119,3 +119,22 @@ monitoring, compliance checks, etc.
 | `claude_home` | string | Path to `.claude/` directory |
 | `cadence` | string | Cron expression for watcher agents |
 | `env` | object | Extra environment variables |
+
+### Sandbox fields
+
+See [security.md](security.md) for the full security model.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `sandbox_enabled` | bool | `false` | Enable nono kernel-level sandbox |
+| `sandbox_ssh` | bool | `false` | Pass `SSH_AUTH_SOCK` through (for git operations) |
+| `sandbox_rollback` | bool | `false` | Enable content-addressable snapshots (`--rollback`) |
+| `sandbox_profile` | string | `claude-code` | Base nono profile to inherit from |
+| `sandbox_proxy_credentials` | list | `["anthropic"]` | Credential names to proxy (agent never sees raw tokens) |
+| `sandbox_allowed_hosts` | list | `[]` | Allowed outbound hosts via nono proxy |
+| `sandbox_allowed_ports` | list | `[]` | Allowed local port bindings (for dev servers) |
+| `sandbox_allowed_commands` | list | `[]` | Override destructive command blocks |
+| `sandbox_extra_read_paths` | list | `[]` | Additional paths the agent may read |
+| `sandbox_extra_write_paths` | list | `[]` | Additional paths the agent may write |
+| `sandbox_credential_maps` | list | `[]` | 1Password/Apple Passwords URIs mapped to env vars |
+| `sandbox_verify_attestations` | bool | `false` | Require Sigstore-signed instruction files |

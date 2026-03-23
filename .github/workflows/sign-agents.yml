@@ -1,0 +1,22 @@
+name: Sign Agent Instructions
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agents/**/.claude/CLAUDE.md'
+      - 'incubator/agents/**/prompt.py'
+      - 'incubator/agents/global-system-prompt.md'
+      - 'registry.yaml'
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write  # Required for keyless Sigstore signing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: always-further/agent-sign@v1
+        with:
+          verify: true
+          commit: true

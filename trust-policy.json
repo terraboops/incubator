@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "includes": [
+    "agents/*/.claude/CLAUDE.md",
+    "incubator/agents/*/prompt.py",
+    "incubator/agents/global-system-prompt.md",
+    "registry.yaml"
+  ],
+  "publishers": [{
+    "name": "incubator-ci",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "repository": "<owner>/incubator",
+    "workflow": ".github/workflows/sign-agents.yml",
+    "ref_pattern": "refs/heads/main"
+  }],
+  "enforcement": "deny"
+}
