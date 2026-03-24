@@ -1,6 +1,6 @@
 [project]
 name = "trellis"
-version = "1.0.0"
+version = "1.0.1"
 description = "Agentic pipeline platform — design agent teams that take ideas from concept to launch"
 license = "Apache-2.0"
 requires-python = ">=3.12"
