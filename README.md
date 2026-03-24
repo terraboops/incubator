@@ -207,6 +207,7 @@ pytest -v
 - [Architecture](docs/architecture.md) — blackboard pattern, pool scheduler, phase transitions
 - [Self-hosting](docs/self-hosting.md) — daemon mode, launchd, systemd, reverse proxy
 - [Security](docs/security.md) — sandbox, credential proxy, tool policy, audit, attestation
+- [Troubleshooting](docs/troubleshooting.md) — common issues, diagnostics, copy-paste prompts for Claude Code
 
 ## Support Trellis
 
