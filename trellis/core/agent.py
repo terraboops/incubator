@@ -69,6 +69,20 @@ def _read_keychain_credential(service: str) -> str | None:
     return None
 
 
+def _credential_is_fresh(credential: str | None) -> bool:
+    """Return True if credential JSON contains a non-expired OAuth token."""
+    if not credential:
+        return False
+    try:
+        import time
+
+        d = json.loads(credential)
+        exp = d.get("claudeAiOauth", {}).get("expiresAt", 0)
+        return bool(exp) and exp > time.time() * 1000
+    except Exception:
+        return False
+
+
 def _ensure_agent_auth(agent_config: Path, project_root: Path) -> None:
     """Mirror the parent process's keychain credential for the agent's config dir.
 
@@ -82,15 +96,18 @@ def _ensure_agent_auth(agent_config: Path, project_root: Path) -> None:
     if parent_dir == agent_dir:
         return  # same dir, nothing to do
 
-    # Try to read parent credential: plain name first, then hashed
-    credential = _read_keychain_credential(KEYCHAIN_SERVICE_PLAIN)
-    if credential is None:
-        credential = _read_keychain_credential(_keychain_service_hashed(parent_dir))
-    if credential is None:
+    # Try to read parent credential: hashed parent entry first (most specific/fresh),
+    # then fall back to plain (which may be stale from a different session).
+    # Skip any entry whose OAuth token is already expired.
+    hashed_parent_svc = _keychain_service_hashed(parent_dir)
+    credential = _read_keychain_credential(hashed_parent_svc)
+    if not _credential_is_fresh(credential):
+        credential = _read_keychain_credential(KEYCHAIN_SERVICE_PLAIN)
+    if not _credential_is_fresh(credential):
         logger.warning(
-            "Could not read parent keychain credential (tried '%s' and '%s')",
+            "Could not find a fresh parent keychain credential (tried '%s' and '%s')",
+            hashed_parent_svc,
             KEYCHAIN_SERVICE_PLAIN,
-            _keychain_service_hashed(parent_dir),
         )
         return
 

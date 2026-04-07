@@ -85,6 +85,12 @@ def build_nono_flags(
     for cred in config.sandbox_proxy_credentials:
         flags.append(f"--proxy-credential {cred}")
 
+    # Claude binary auth endpoints — always required in any sandboxed agent.
+    # Without these, the nono proxy intercepts and blocks auth traffic, causing
+    # immediate 403 "Failed to authenticate" errors before any API call.
+    for host in ("api.anthropic.com", "claude.ai"):
+        flags.append(f"--proxy-allow {host}")
+
     # Proxy host allowlist
     for host in config.sandbox_allowed_hosts:
         flags.append(f"--proxy-allow {host}")
