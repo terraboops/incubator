@@ -510,6 +510,7 @@ class BaseAgent(ABC):
                 project_root=self.project_root,
                 blackboard_dir=self.blackboard.base_dir,
                 workspace_dir=self.project_root / "workspace",
+                claude_config_dir=env.get("CLAUDE_CONFIG_DIR"),
             )
             env["NONO_FLAGS"] = nono_flags
 

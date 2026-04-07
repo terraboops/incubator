@@ -28,6 +28,7 @@ def build_nono_flags(
     project_root: Path,
     blackboard_dir: Path,
     workspace_dir: Path | None = None,
+    claude_config_dir: str | None = None,
 ) -> str:
     """Build the NONO_FLAGS string with all paths and permissions as CLI flags.
 
@@ -41,6 +42,11 @@ def build_nono_flags(
 
     # All agents can read the project root
     flags.append(f"--read {project_root}")
+
+    # Agent's claude config dir needs write access for session files, history, etc.
+    # It is typically inside project_root (read-only), so we must explicitly allow it.
+    if claude_config_dir:
+        flags.append(f"--allow {claude_config_dir}")
 
     # Blackboard dir: read/write for specific idea, read-only for global
     if idea_id and idea_id != "__all__":
