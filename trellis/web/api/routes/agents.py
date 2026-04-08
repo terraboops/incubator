@@ -20,6 +20,21 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 setup_filters(templates)
 
+
+def _agent_claude_dir(agent_name: str, settings):
+    """Resolve the .claude dir for an agent, respecting claude_home from registry."""
+    from pathlib import Path
+
+    registry = load_registry(settings.registry_path)
+    config = registry.get_agent(agent_name)
+    if config and config.claude_home:
+        p = Path(config.claude_home)
+        if not p.is_absolute():
+            p = settings.project_root / p
+        return p.resolve()
+    return (settings.project_root / "agents" / agent_name / ".claude").resolve()
+
+
 # Shared constants for templates
 ALL_TOOLS = [
     "Read",
@@ -286,18 +301,26 @@ Guidelines:
     return JSONResponse(config)
 
 
-@router.get("/plugins", response_class=HTMLResponse)
-async def plugins_marketplace(request: Request):
-    return templates.TemplateResponse("plugins.html", {"request": request})
+@router.get("/{agent_name}/plugins", response_class=HTMLResponse)
+async def plugins_marketplace(request: Request, agent_name: str):
+    settings = get_settings()
+    registry = load_registry(settings.registry_path)
+    config = registry.get_agent(agent_name)
+    if not config:
+        return HTMLResponse("Agent not found", status_code=404)
+    return templates.TemplateResponse(
+        "plugins.html", {"request": request, "agent_name": agent_name}
+    )
 
 
-@router.get("/plugins/api")
-async def plugins_api():
-    """Read real marketplace data from the Claude Code plugin cache."""
+@router.get("/{agent_name}/plugins/api")
+async def plugins_api(agent_name: str):
+    """Read marketplace data from the agent's Claude Code plugin cache."""
     import json as _json
     from pathlib import Path
 
-    claude_dir = Path.home() / ".claude" / "plugins"
+    settings = get_settings()
+    claude_dir = _agent_claude_dir(agent_name, settings) / "plugins"
     result_marketplaces = []
     result_plugins = []
 
@@ -356,11 +379,12 @@ async def plugins_api():
                 )
 
     # Also check settings for extraKnownMarketplaces that aren't installed yet
-    settings_path = Path.home() / ".claude" / "settings.json"
+    agent_settings = get_settings()
+    settings_path = _agent_claude_dir(agent_name, agent_settings) / "settings.json"
     if settings_path.exists():
         try:
-            settings = _json.loads(settings_path.read_text())
-            for name, conf in settings.get("extraKnownMarketplaces", {}).items():
+            agent_settings_json = _json.loads(settings_path.read_text())
+            for name, conf in agent_settings_json.get("extraKnownMarketplaces", {}).items():
                 if name not in known:
                     source = conf.get("source", {})
                     result_marketplaces.append(
@@ -386,17 +410,19 @@ class AddMarketplaceRequest(BaseModel):
     source: str
 
 
-@router.post("/plugins/api/add-marketplace")
-async def add_marketplace_api(req: AddMarketplaceRequest):
-    """Add a marketplace source to settings.json extraKnownMarketplaces."""
+@router.post("/{agent_name}/plugins/api/add-marketplace")
+async def add_marketplace_api(agent_name: str, req: AddMarketplaceRequest):
+    """Add a marketplace source to the agent's settings.json extraKnownMarketplaces."""
     import json as _json
-    from pathlib import Path
 
     source = req.source.strip()
     if not source:
         return JSONResponse({"error": "Source is required"}, status_code=400)
 
-    settings_path = Path.home() / ".claude" / "settings.json"
+    settings = get_settings()
+    agent_dir = _agent_claude_dir(agent_name, settings)
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    settings_path = agent_dir / "settings.json"
     settings = {}
     if settings_path.exists():
         try:

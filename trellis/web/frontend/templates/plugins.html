@@ -3,15 +3,21 @@
 {% block title %}Plugins — trellis{% endblock %}
 {% block content %}
 
+<div class="flex items-center gap-3 mb-1">
+    <a href="/agents" class="text-[0.82rem] text-[#8a8074] hover:text-[#3b3530] transition-colors">Agents</a>
+    <span class="text-[#b0a898]">/</span>
+    <a href="/agents/{{ agent_name }}" class="text-[0.82rem] text-[#8a8074] hover:text-[#3b3530] transition-colors">{{ agent_name }}</a>
+    <span class="text-[#b0a898]">/</span>
+    <span class="text-[0.82rem] text-[#3b3530]">Plugins</span>
+</div>
 <div class="flex items-end justify-between mb-6">
     <div class="flex items-center gap-3">
         <span class="text-[#a690cc]">{{ icon('package', 22) }}</span>
         <div>
-            <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Plugins</h1>
-            <p class="text-[0.8rem] text-[#8a8074]">Browse Claude Code plugin marketplaces. Install plugins to extend agent capabilities.</p>
+            <h1 class="text-[1.15rem] font-medium text-[#3b3530] mb-0.5">Plugins for {{ agent_name }}</h1>
+            <p class="text-[0.8rem] text-[#8a8074]">Browse and install plugins into this agent's <code class="text-[0.75rem]">.claude</code> directory.</p>
         </div>
     </div>
-    <a href="/agents" class="btn btn-soft text-[0.78rem]">{{ icon('brain', 14) }} Agents</a>
 </div>
 
 <!-- Marketplaces -->
@@ -56,14 +62,13 @@
             How plugins work with trellis agents
         </summary>
         <div class="card p-5 mt-2 prose text-[0.8rem]">
-            <p>Plugins extend Claude Code with MCP servers, hooks, skills, and LSP servers. In trellis, plugins are installed at the <strong>user level</strong> via Claude Code and are available to all agents.</p>
+            <p>Plugins extend Claude Code with MCP servers, hooks, skills, and LSP servers. In trellis, plugins are installed <strong>per-agent</strong> into the agent's own <code>.claude</code> directory.</p>
             <h3>Installing a plugin</h3>
-            <p>From Claude Code, run:</p>
-            <pre><code>/plugin install plugin-name@marketplace-name</code></pre>
+            <p>From Claude Code with <code>CLAUDE_CONFIG_DIR</code> pointed at the agent:</p>
+            <pre><code>CLAUDE_CONFIG_DIR=agents/{{ agent_name }}/.claude claude /plugin install plugin-name@marketplace-name</code></pre>
             <h3>Adding a marketplace</h3>
-            <pre><code>/plugin marketplace add owner/repo</code></pre>
-            <h3>Marketplace format</h3>
-            <p>A marketplace is a repo with <code>.claude-plugin/marketplace.json</code> listing plugins.</p>
+            <p>Use the "Add Marketplace" button above, or from Claude Code:</p>
+            <pre><code>CLAUDE_CONFIG_DIR=agents/{{ agent_name }}/.claude claude /plugin marketplace add owner/repo</code></pre>
         </div>
     </details>
 </section>
@@ -101,12 +106,13 @@ var allPlugins = [];
 var marketplaces = [];
 var categories = {};
 var currentCat = 'all';
+var agentName = '{{ agent_name }}';
 
 function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.textContent; }
 
 async function loadData() {
     try {
-        var resp = await fetch('/agents/plugins/api');
+        var resp = await fetch('/agents/' + encodeURIComponent(agentName) + '/plugins/api');
         var data = await resp.json();
         marketplaces = data.marketplaces || [];
         allPlugins = data.plugins || [];
@@ -276,10 +282,11 @@ function applyFilters() {
         mp.textContent = p.marketplace || '';
         var cmd = document.createElement('code');
         cmd.className = 'text-[0.65rem] text-[#8a8074] bg-[#f7f5f0] px-2 py-0.5 rounded cursor-pointer';
+        var installCmd = 'CLAUDE_CONFIG_DIR=agents/' + agentName + '/.claude claude /plugin install ' + (p.name || '') + '@' + (p.marketplace || '');
         cmd.textContent = '/plugin install ' + (p.name || '') + '@' + (p.marketplace || '');
-        cmd.title = 'Click to copy';
+        cmd.title = 'Click to copy full install command';
         cmd.onclick = function() {
-            navigator.clipboard.writeText(cmd.textContent);
+            navigator.clipboard.writeText(installCmd);
             cmd.textContent = 'Copied!';
             setTimeout(function() {
                 cmd.textContent = '/plugin install ' + (p.name || '') + '@' + (p.marketplace || '');
@@ -306,7 +313,7 @@ async function addMarketplace() {
     btn.disabled = true;
     btn.textContent = 'Adding...';
     try {
-        var resp = await fetch('/agents/plugins/api/add-marketplace', {
+        var resp = await fetch('/agents/' + encodeURIComponent(agentName) + '/plugins/api/add-marketplace', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({source: source})

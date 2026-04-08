@@ -344,6 +344,23 @@
         </div>
     </details>
 
+    <!-- Plugins -->
+    {% if not is_new %}
+    <div class="card p-5">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-0.5">Plugins</h2>
+                <p class="text-[0.7rem] text-[#b0a898]">
+                    MCP servers, hooks, and skills installed into this agent's <code class="text-[0.68rem]">.claude</code> dir.
+                </p>
+            </div>
+            <a href="/agents/{{ agent.name }}/plugins" class="btn btn-soft text-[0.78rem]">
+                {{ icon('package', 14) }} Browse & Install
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- CLAUDE.md -->
     <div class="card p-5">
         <h2 class="text-[0.88rem] font-medium text-[#3b3530] mb-1">CLAUDE.md</h2>
