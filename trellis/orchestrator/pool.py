@@ -382,6 +382,23 @@ class PoolManager:
             serviced[result.role] = now.isoformat()
             stage_results = status.get("stage_results", {})
             stage_results[result.role] = recommendation
+
+            # Session tracking
+            session_ids = status.get("session_ids", [])
+            if result.session_id:
+                session_ids.append(
+                    {
+                        "agent": result.role,
+                        "session_id": result.session_id,
+                        "at": now.isoformat(),
+                    }
+                )
+
+            # Sandbox failure tracking
+            sandbox_failure_count = status.get("sandbox_failure_count", 0)
+            if result.sandbox_failure:
+                sandbox_failure_count += 1
+
             self.blackboard.update_status(
                 result.idea_id,
                 last_serviced_by=serviced,
@@ -389,6 +406,8 @@ class PoolManager:
                 total_cost_usd=status.get("total_cost_usd", 0) + result.cost_usd,
                 iter_counts=iter_counts,
                 iteration_count=sum(iter_counts.values()),  # backward compat
+                session_ids=session_ids,
+                sandbox_failure_count=sandbox_failure_count,
             )
 
             # Apply gating inline

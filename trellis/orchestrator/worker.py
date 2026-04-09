@@ -38,6 +38,8 @@ class RunResult:
     duration_seconds: float = 0.0
     cost_usd: float = 0.0
     error: str | None = None
+    sandbox_failure: bool = False
+    session_id: str | None = None
 
     @property
     def is_deadline(self) -> bool:
@@ -125,6 +127,8 @@ class Worker:
                     idea_id=idea_id,
                     duration_seconds=elapsed,
                     cost_usd=result.cost_usd,
+                    sandbox_failure=result.sandbox_failure,
+                    session_id=result.session_id,
                 )
             except asyncio.TimeoutError:
                 elapsed = time.monotonic() - start_time

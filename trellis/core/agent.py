@@ -184,6 +184,9 @@ class AgentResult:
     cost_usd: float = 0.0
     error: str | None = None
     transcript: list[dict] = field(default_factory=list)
+    sandbox_failure: bool = False
+    session_id: str | None = None
+    stop_reason: str | None = None
 
 
 class BaseAgent(ABC):
@@ -279,6 +282,7 @@ class BaseAgent(ABC):
                 "result": message.result,
                 "stop_reason": message.stop_reason,
                 "cost_usd": message.total_cost_usd,
+                "session_id": getattr(message, "session_id", None),
                 "usage": message.usage
                 if isinstance(getattr(message, "usage", None), dict)
                 else None,
@@ -343,7 +347,14 @@ class BaseAgent(ABC):
             pass
 
     def _save_transcript(
-        self, idea_id: str, transcript: list[dict], prompt: str, system_prompt: str
+        self,
+        idea_id: str,
+        transcript: list[dict],
+        prompt: str,
+        system_prompt: str,
+        *,
+        sandbox_failure: bool = False,
+        process_stderr: list[str] | None = None,
     ) -> None:
         """Save the full agent transcript to the blackboard.
 
@@ -359,6 +370,13 @@ class BaseAgent(ABC):
             )
             return
 
+        # Extract session_id from the result entry
+        session_id = None
+        for entry in reversed(transcript):
+            if entry.get("role") == "result" and entry.get("session_id"):
+                session_id = entry["session_id"]
+                break
+
         log_dir = self.blackboard.idea_dir(idea_id) / "agent-logs"
         log_dir.mkdir(exist_ok=True)
 
@@ -370,6 +388,9 @@ class BaseAgent(ABC):
             "idea_id": idea_id,
             "model": self.config.model,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "session_id": session_id,
+            "sandbox_failure": sandbox_failure,
+            "process_stderr": process_stderr or [],
             "system_prompt": system_prompt,
             "user_prompt": prompt,
             "max_turns": self.config.max_turns,
@@ -855,20 +876,54 @@ class BaseAgent(ABC):
                             message.stop_reason,
                             cost,
                         )
-                        self._save_transcript(idea_id, transcript, prompt, system_prompt)
+                        self._save_transcript(
+                            idea_id,
+                            transcript,
+                            prompt,
+                            system_prompt,
+                            sandbox_failure=sandbox_failure,
+                            process_stderr=process_stderr,
+                        )
                         self._clear_live_log(idea_id)
                         return AgentResult(
                             success=True,
                             output="\n".join(output_parts),
                             cost_usd=cost,
                             transcript=transcript,
+                            sandbox_failure=sandbox_failure,
+                            session_id=getattr(message, "session_id", None),
+                            stop_reason=message.stop_reason,
                         )
         except Exception as e:
             logger.exception("Agent '%s' failed on '%s'", self.config.name, idea_id)
-            self._save_transcript(idea_id, transcript, prompt, system_prompt)
+            self._save_transcript(
+                idea_id,
+                transcript,
+                prompt,
+                system_prompt,
+                sandbox_failure=sandbox_failure,
+                process_stderr=process_stderr,
+            )
             self._clear_live_log(idea_id)
-            return AgentResult(success=False, error=str(e), transcript=transcript)
+            return AgentResult(
+                success=False,
+                error=str(e),
+                transcript=transcript,
+                sandbox_failure=sandbox_failure,
+            )
 
-        self._save_transcript(idea_id, transcript, prompt, system_prompt)
+        self._save_transcript(
+            idea_id,
+            transcript,
+            prompt,
+            system_prompt,
+            sandbox_failure=sandbox_failure,
+            process_stderr=process_stderr,
+        )
         self._clear_live_log(idea_id)
-        return AgentResult(success=True, output="\n".join(output_parts), transcript=transcript)
+        return AgentResult(
+            success=True,
+            output="\n".join(output_parts),
+            transcript=transcript,
+            sandbox_failure=sandbox_failure,
+        )
