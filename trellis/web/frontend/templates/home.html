@@ -38,8 +38,8 @@
         {% set phase = idea.phase.replace('_review', '') %}
         {% set phase_idx = stages.index(phase) if phase in stages else -1 %}
         {% set completed_idx = phase_idx - 1 if phase_idx > 0 else -1 %}
-        {% if phase in ['ready', 'released'] %}{% set completed_idx = 3 %}{% set phase_idx = 4 %}{% endif %}
-        {% if phase_idx >= 0 or phase in ['ready', 'released'] %}
+        {% if phase in ['ready', 'released'] %}{% set completed_idx = stages|length - 1 %}{% set phase_idx = stages|length %}{% endif %}
+        {% if stages and (phase_idx >= 0 or phase in ['submitted', 'ready', 'released', 'killed', 'paused']) %}
         <div class="flex items-center gap-0 mb-3 mt-1">
             {% for stage in stages %}
             {% set idx = loop.index0 %}
