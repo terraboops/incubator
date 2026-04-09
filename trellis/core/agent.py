@@ -345,7 +345,20 @@ class BaseAgent(ABC):
     def _save_transcript(
         self, idea_id: str, transcript: list[dict], prompt: str, system_prompt: str
     ) -> None:
-        """Save the full agent transcript to the blackboard."""
+        """Save the full agent transcript to the blackboard.
+
+        Skips saving when the transcript has no real messages (e.g. auth
+        failures that produce only a system init + immediate error).
+        """
+        real_messages = [e for e in transcript if e.get("role") not in ("system", None)]
+        if not real_messages:
+            logger.info(
+                "Skipping empty transcript for agent '%s' on '%s'",
+                self.config.name,
+                idea_id,
+            )
+            return
+
         log_dir = self.blackboard.idea_dir(idea_id) / "agent-logs"
         log_dir.mkdir(exist_ok=True)
 

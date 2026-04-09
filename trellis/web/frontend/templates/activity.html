@@ -113,6 +113,58 @@ function makeEl(tag, classes, textContent) {
     return el;
 }
 
+function getToolPreview(input) {
+    if (!input) return '';
+    try {
+        var inp = typeof input === 'string' ? JSON.parse(input) : input;
+        if (inp.file_path) return inp.file_path;
+        if (inp.command) return String(inp.command).slice(0, 80);
+        if (inp.pattern) return String(inp.pattern).slice(0, 60);
+        var keys = Object.keys(inp);
+        if (keys.length) return String(inp[keys[0]]).slice(0, 60);
+    } catch(_) {}
+    return String(input).slice(0, 60);
+}
+
+function renderToolNode(b, timestamp) {
+    var node = makeEl('div', 'tree-node');
+
+    // Trigger row
+    var trigger = makeEl('div', 'tool-trigger');
+    trigger.onclick = function() {
+        trigger.classList.toggle('open');
+        body.classList.toggle('open');
+    };
+    var chev = makeEl('span', 'tool-chevron', '\u25B6');
+    var icon = makeEl('span', 'tool-icon purple', b.name ? b.name.charAt(0).toUpperCase() : 'T');
+    var name = makeEl('span', 'tool-name', b.name);
+    trigger.appendChild(chev);
+    trigger.appendChild(icon);
+    trigger.appendChild(name);
+
+    var preview = getToolPreview(b.input);
+    if (preview) {
+        trigger.appendChild(makeEl('span', 'tool-preview', preview));
+    }
+    if (timestamp) {
+        var ts = makeEl('span', 'text-[0.6rem] text-[#c5bfb4] font-mono ml-auto', timestamp);
+        trigger.appendChild(ts);
+    }
+    node.appendChild(trigger);
+
+    // Body
+    var body = makeEl('div', 'tool-body');
+    try {
+        var inp = typeof b.input === 'string' ? JSON.parse(b.input) : b.input;
+        body.textContent = JSON.stringify(inp, null, 2);
+    } catch(_) {
+        body.textContent = String(b.input || '');
+    }
+    node.appendChild(body);
+
+    return node;
+}
+
 function renderLive(panel, data) {
     var entriesEl = panel.querySelector('.live-entries');
     var emptyEl = panel.querySelector('.live-empty');
@@ -173,38 +225,73 @@ function renderLive(panel, data) {
 
     for (var i = 0; i < entries.length; i++) {
         var e = entries[i];
+        var ts = e.timestamp ? e.timestamp.slice(11, 19) : '';
+
         if (e.role === 'assistant') {
             var blocks = e.blocks || [];
+            var toolBlocks = [];
             for (var j = 0; j < blocks.length; j++) {
                 var b = blocks[j];
-                if (b.type === 'text' && b.text) {
-                    var preview = b.text.length > 300 ? b.text.slice(0, 300) + '…' : b.text;
-                    var row = makeEl('div', 'rounded-lg bg-[#f7f5f0] border border-[#eae6df] px-3 py-2 text-[#3b3530] whitespace-pre-wrap leading-relaxed', preview);
-                    entriesEl.appendChild(row);
+
+                if (b.type === 'thinking' && b.thinking) {
+                    // Thinking: muted collapsible
+                    var details = document.createElement('details');
+                    details.className = 'transcript-thinking mb-1';
+                    var summary = document.createElement('summary');
+                    var chevSpan = makeEl('span', 'chevron', '\u25B6');
+                    var thinkIcon = makeEl('span', 'tool-icon muted', '\uD83E\uDDE0');
+                    summary.appendChild(chevSpan);
+                    summary.appendChild(document.createTextNode(' '));
+                    summary.appendChild(thinkIcon);
+                    summary.appendChild(document.createTextNode(' Thinking\u2026'));
+                    details.appendChild(summary);
+                    var pre = makeEl('pre', null);
+                    pre.textContent = b.thinking;
+                    details.appendChild(pre);
+                    entriesEl.appendChild(details);
+                } else if (b.type === 'text' && b.text) {
+                    // Text: clean message card
+                    var card = makeEl('div', 'card px-4 py-3 mb-1');
+                    var msg = makeEl('div', 'transcript-msg');
+                    msg.textContent = b.text.length > 400 ? b.text.slice(0, 400) + '\u2026' : b.text;
+                    card.appendChild(msg);
+                    entriesEl.appendChild(card);
                 } else if (b.type === 'tool_use') {
-                    var row = makeEl('div', 'rounded-lg bg-[#f0ebf8] border border-[#e0d8f0] px-3 py-2 text-[#7b5ea8]');
-                    var nameSpan = makeEl('span', 'font-semibold', b.name);
-                    row.appendChild(nameSpan);
-                    if (b.input) {
-                        try {
-                            var inp = typeof b.input === 'string' ? JSON.parse(b.input) : b.input;
-                            var detail = '';
-                            if (inp.filename) detail = ' → ' + inp.filename;
-                            else {
-                                var keys = Object.keys(inp);
-                                if (keys.length) detail = ' ' + String(inp[keys[0]]).slice(0, 60);
-                            }
-                            if (detail) row.appendChild(makeEl('span', 'text-[#a690cc]', detail));
-                        } catch(_) {}
-                    }
-                    entriesEl.appendChild(row);
-                } else if (b.type === 'thinking' && b.thinking) {
-                    var preview = b.thinking.length > 120 ? b.thinking.slice(0, 120) + '…' : b.thinking;
-                    entriesEl.appendChild(makeEl('div', 'rounded-lg bg-[#f5f3ee] border border-[#eae6df] px-3 py-2 text-[#b0a898] italic', preview));
+                    toolBlocks.push(b);
                 }
             }
+
+            // Tool calls: render as tree
+            if (toolBlocks.length > 0) {
+                var tree = makeEl('div', 'transcript-tree mb-1');
+                for (var k = 0; k < toolBlocks.length; k++) {
+                    tree.appendChild(renderToolNode(toolBlocks[k], ts));
+                }
+                entriesEl.appendChild(tree);
+            }
+
         } else if (e.role === 'result') {
-            entriesEl.appendChild(makeEl('div', 'rounded-lg bg-[#eef6ee] border border-[#d6e8d6] px-3 py-2 text-[#4a7c59] font-medium', 'Done — ' + (e.stop_reason || 'completed')));
+            // Result: completion card
+            var res = makeEl('div', 'transcript-result mb-1');
+            res.appendChild(makeEl('span', 'result-dot'));
+            var reason = (e.stop_reason || 'completed').replace(/_/g, ' ');
+            reason = reason.charAt(0).toUpperCase() + reason.slice(1);
+            var label = reason;
+            if (e.result && e.result.length > 0) {
+                label += ' \u2014 ' + (e.result.length > 120 ? e.result.slice(0, 120) + '\u2026' : e.result);
+            }
+            res.appendChild(makeEl('span', 'result-label', label));
+            if (e.cost_usd) {
+                res.appendChild(makeEl('span', 'result-meta', '$' + e.cost_usd.toFixed(2)));
+            }
+            if (ts) {
+                res.appendChild(makeEl('span', 'text-[0.6rem] text-[#c5bfb4] font-mono', ts));
+            }
+            entriesEl.appendChild(res);
+
+        } else if (e.role === 'system') {
+            // System: thin dashed divider
+            entriesEl.appendChild(makeEl('div', 'transcript-system'));
         }
     }
 

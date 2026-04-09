@@ -38,55 +38,84 @@
 </details>
 
 <!-- Transcript -->
-<div class="space-y-2 mt-6">
+<div class="mt-6 space-y-1">
     {% for entry in log.transcript %}
-    <div class="card px-5 py-4 border-l-[3px]
-        {% if entry.role == 'assistant' %}border-l-[#a690cc]
-        {% elif entry.role == 'result' %}border-l-[#6b9e78]
-        {% elif entry.role == 'system' %}border-l-[#ddd6ca]
-        {% else %}border-l-[#eae6df]{% endif %}">
 
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-[0.65rem] font-medium uppercase tracking-wider
-                {% if entry.role == 'assistant' %}text-[#7b5ea8]
-                {% elif entry.role == 'result' %}text-[#4a7a55]
-                {% elif entry.role == 'system' %}text-[#b0a898]
-                {% else %}text-[#8a8074]{% endif %}">
-                {{ entry.role }}
+    {% if entry.role == 'assistant' and entry.get('blocks') %}
+        {# -- Gather tool_use blocks to render as tree -- #}
+        {% set tool_blocks = entry.blocks | selectattr('type', 'equalto', 'tool_use') | list %}
+        {% set text_blocks = entry.blocks | selectattr('type', 'equalto', 'text') | list %}
+        {% set think_blocks = entry.blocks | selectattr('type', 'equalto', 'thinking') | list %}
+
+        {# -- Thinking blocks: muted collapsible -- #}
+        {% for block in think_blocks %}
+        <details class="transcript-thinking mb-1">
+            <summary>
+                <span class="chevron">&#x25B6;</span>
+                <span class="tool-icon muted">&#x1f9e0;</span>
+                Thinking&hellip;
+            </summary>
+            <pre>{{ block.thinking }}</pre>
+        </details>
+        {% endfor %}
+
+        {# -- Text blocks: clean message cards -- #}
+        {% for block in text_blocks %}
+        <div class="card px-5 py-3 mb-1">
+            <div class="transcript-msg">{{ block.text }}</div>
+        </div>
+        {% endfor %}
+
+        {# -- Tool calls: tree with connector lines -- #}
+        {% if tool_blocks %}
+        <div class="transcript-tree mb-1">
+            {% for block in tool_blocks %}
+            <div class="tree-node">
+                <div class="tool-trigger" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open');">
+                    <span class="tool-chevron">&#x25B6;</span>
+                    <span class="tool-icon purple">{{ block.name[0] | upper }}</span>
+                    <span class="tool-name">{{ block.name }}</span>
+                    {% if block.input %}
+                    <span class="tool-preview">
+                        {%- if block.input is mapping -%}
+                            {%- set keys = block.input.keys() | list -%}
+                            {%- if 'file_path' in block.input %}{{ block.input.file_path }}
+                            {%- elif 'command' in block.input %}{{ block.input.command[:80] }}
+                            {%- elif 'pattern' in block.input %}{{ block.input.pattern[:60] }}
+                            {%- elif keys | length > 0 %}{{ block.input[keys[0]] | string | truncate(60) }}
+                            {%- endif -%}
+                        {%- else -%}
+                            {{ block.input | string | truncate(60) }}
+                        {%- endif -%}
+                    </span>
+                    {% endif %}
+                    <span class="text-[0.6rem] text-[#c5bfb4] font-mono ml-auto">{{ entry.timestamp[11:19] if entry.timestamp else '' }}</span>
+                </div>
+                <div class="tool-body">{{ block.input | tojson_pretty if block.input is mapping else block.input }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+    {% elif entry.role == 'result' %}
+        <div class="transcript-result mb-1">
+            <span class="result-dot"></span>
+            <span class="result-label">
+                {{ entry.get('stop_reason', 'completed') | replace('_', ' ') | title }}
+                {% if entry.result and entry.result | length > 0 %}
+                    &mdash; {{ entry.result | truncate(120) }}
+                {% endif %}
             </span>
-            {% if entry.get('stop_reason') %}
-            <span class="text-[0.62rem] text-[#b0a898] font-mono">{{ entry.stop_reason }}</span>
-            {% endif %}
-            {% if entry.get('cost_usd') %}
-            <span class="text-[0.62rem] text-[#8a8074] font-mono">${{ "%.2f" | format(entry.cost_usd) }}</span>
-            {% endif %}
-            <span class="text-[0.6rem] text-[#c5bfb4] font-mono ml-auto">{{ entry.timestamp[11:19] if entry.timestamp else '' }}</span>
+            <span class="result-meta">
+                {% if entry.get('cost_usd') %}${{ "%.2f" | format(entry.cost_usd) }}{% endif %}
+            </span>
+            <span class="text-[0.6rem] text-[#c5bfb4] font-mono">{{ entry.timestamp[11:19] if entry.timestamp else '' }}</span>
         </div>
 
-        {% if entry.role == 'assistant' and entry.get('blocks') %}
-            {% for block in entry.blocks %}
-                {% if block.type == 'text' %}
-                <div class="text-[0.82rem] text-[#3b3530] leading-relaxed whitespace-pre-wrap mb-2">{{ block.text }}</div>
-                {% elif block.type == 'tool_use' %}
-                <div class="bg-[#f7f5f0] border border-[#eae6df] rounded-lg p-3 mb-2">
-                    <span class="text-[0.68rem] font-mono font-medium text-[#7b5ea8]">{{ block.name }}</span>
-                    {% if block.input %}
-                    <pre class="text-[0.7rem] text-[#6d6354] font-mono whitespace-pre-wrap overflow-x-auto max-h-48 overflow-y-auto mt-1.5">{{ block.input | tojson_pretty if block.input is mapping else block.input }}</pre>
-                    {% endif %}
-                </div>
-                {% elif block.type == 'thinking' %}
-                <details class="mb-2">
-                    <summary class="text-[0.68rem] text-[#b0a898] cursor-pointer">Thinking…</summary>
-                    <pre class="text-[0.7rem] text-[#8a8074] whitespace-pre-wrap mt-1 max-h-48 overflow-y-auto">{{ block.thinking }}</pre>
-                </details>
-                {% endif %}
-            {% endfor %}
-        {% elif entry.role == 'result' %}
-            <div class="text-[0.82rem] text-[#3b3530] leading-relaxed whitespace-pre-wrap">{{ entry.result or '(no output)' }}</div>
-        {% elif entry.role == 'system' %}
-            <div class="text-[0.78rem] text-[#8a8074]">{{ entry.get('subtype', 'system message') }}</div>
-        {% endif %}
-    </div>
+    {% elif entry.role == 'system' %}
+        <div class="transcript-system" title="{{ entry.get('subtype', 'system') }}"></div>
+
+    {% endif %}
     {% endfor %}
 </div>
 {% endblock %}
