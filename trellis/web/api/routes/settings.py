@@ -88,15 +88,26 @@ def _gather_agent_prompts() -> list[dict]:
     return prompts
 
 
+def _values_path() -> Path:
+    return get_settings().project_root / "values.md"
+
+
+def _read_values() -> str:
+    path = _values_path()
+    return path.read_text() if path.exists() else ""
+
+
 @router.get("/", response_class=HTMLResponse)
 async def settings_view(request: Request):
     settings = get_settings()
     global_prompt = _read_global_prompt()
+    values = _read_values()
     return templates.TemplateResponse(
         "settings.html",
         {
             "request": request,
             "global_prompt": global_prompt,
+            "values": values,
             "settings": settings,
             "saved": request.query_params.get("saved"),
         },
@@ -108,6 +119,13 @@ async def save_global_prompt(global_prompt: str = Form(...)):
     path = _global_prompt_path()
     path.write_text(global_prompt)
     return RedirectResponse(url="/settings?saved=global", status_code=303)
+
+
+@router.post("/values", response_class=HTMLResponse)
+async def save_values(values: str = Form(...)):
+    path = _values_path()
+    path.write_text(values)
+    return RedirectResponse(url="/settings?saved=values", status_code=303)
 
 
 @router.post("/system")

@@ -127,6 +127,31 @@
     </form>
 </section>
 
+<!-- ── Values ── -->
+<section class="mb-8">
+    <div class="card p-6">
+        <div class="flex items-start justify-between mb-4">
+            <div>
+                <h2 class="text-[0.92rem] font-medium text-[#3b3530] mb-0.5">Values</h2>
+                <p class="text-[0.75rem] text-[#b0a898]">Core values injected into every agent's system prompt. Used by validation, scoring, and any agent that needs to evaluate ideas against your principles.</p>
+            </div>
+            <span class="text-[0.65rem] font-mono text-[#b0a898] bg-[#f7f5f0] px-2 py-0.5 rounded-md mt-0.5">values.md</span>
+        </div>
+        <form method="POST" action="/settings/values">
+            <textarea
+                name="values"
+                rows="10"
+                class="w-full font-mono text-[0.8rem] leading-relaxed bg-[#faf9f6] border border-[#eae6df] rounded-xl p-4 resize-y text-[#544d43] placeholder-[#c5bfb3]"
+                spellcheck="false"
+                placeholder="What matters to you? e.g.&#10;- Progressive and inclusive&#10;- Feasible for a small team&#10;- Community-centered, not extractive&#10;- Environmentally conscious&#10;- Financially sustainable"
+            >{{ values }}</textarea>
+            <div class="flex justify-end mt-3">
+                <button type="submit" class="btn btn-primary">Save Values</button>
+            </div>
+        </form>
+    </div>
+</section>
+
 <!-- ── Global System Prompt ── -->
 <section class="mb-8">
     <div class="card p-6">

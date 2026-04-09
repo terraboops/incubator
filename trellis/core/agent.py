@@ -687,14 +687,19 @@ class BaseAgent(ABC):
             "evolution": ev_server,
         }
 
-        # Build the system prompt: global prefix + agent-specific prompt
-        global_prompt_path = self.project_root / "trellis" / "agents" / "global-system-prompt.md"
+        # Build the system prompt: global prefix + values + agent-specific prompt
         global_prompt = ""
+        global_prompt_path = self.project_root / "global-system-prompt.md"
         if global_prompt_path.exists():
             global_prompt = global_prompt_path.read_text().strip() + "\n\n"
 
+        values = ""
+        values_path = self.project_root / "values.md"
+        if values_path.exists():
+            values = "## Values\n" + values_path.read_text().strip() + "\n\n"
+
         agent_prompt = self.config.system_prompt_override or self.get_system_prompt(idea_id)
-        system_prompt = global_prompt + agent_prompt
+        system_prompt = global_prompt + values + agent_prompt
 
         # Inject deadline awareness if running within a pool window
         if deadline:
