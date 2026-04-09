@@ -811,8 +811,28 @@ class PoolManager:
 
     async def _run_worker(self, worker: Worker, job: Job) -> RunResult | None:
         """Run a single worker assignment."""
+        from trellis.otel import get_tracer
+
+        tracer = get_tracer()
         timeout = self.settings.job_timeout_minutes * 60
-        return await worker.execute(job, timeout)
+        with tracer.start_as_current_span("agent.run") as span:
+            span.set_attribute("agent.name", job.role)
+            span.set_attribute("idea.id", job.idea_id)
+            span.set_attribute("job.kind", job.kind)
+            span.set_attribute("worker.id", worker.worker_id)
+            result = await worker.execute(job, timeout)
+            if result:
+                span.set_attribute("cost.usd", result.cost_usd)
+                span.set_attribute("duration.seconds", result.duration_seconds)
+                span.set_attribute("status", result.status.value)
+                span.set_attribute("sandbox.failure", result.sandbox_failure)
+                if result.session_id:
+                    span.set_attribute("session.id", result.session_id)
+                if result.sandbox_failure:
+                    span.add_event("sandbox.denied", {"stderr": result.error or ""})
+                if result.error:
+                    span.record_exception(RuntimeError(result.error))
+            return result
 
     async def _rescore_priorities(self) -> None:
         """Re-score priorities for all active ideas."""

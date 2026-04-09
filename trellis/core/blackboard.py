@@ -33,6 +33,11 @@ class Blackboard:
         self.base_dir = base_dir
         self.template_dir = base_dir / "_template"
 
+    def _tracer(self):
+        from trellis.otel import get_tracer
+
+        return get_tracer()
+
     def create_idea(self, title: str, description: str) -> str:
         slug = slugify(title)
         idea_dir = self.base_dir / slug
@@ -85,10 +90,13 @@ class Blackboard:
         self.write_file(idea_id, "status.json", json.dumps(status, indent=2))
 
     def update_status(self, idea_id: str, **fields: object) -> None:
-        status = self.get_status(idea_id)
-        status.update(fields)
-        status["updated_at"] = datetime.now(timezone.utc).isoformat()
-        self.write_file(idea_id, "status.json", json.dumps(status, indent=2))
+        with self._tracer().start_as_current_span("blackboard.update_status") as span:
+            span.set_attribute("idea.id", idea_id)
+            span.set_attribute("fields", ",".join(fields.keys()))
+            status = self.get_status(idea_id)
+            status.update(fields)
+            status["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self.write_file(idea_id, "status.json", json.dumps(status, indent=2))
 
     def read_file(self, idea_id: str, filename: str) -> str:
         path = self.base_dir / idea_id / filename
@@ -97,9 +105,13 @@ class Blackboard:
         return path.read_text()
 
     def write_file(self, idea_id: str, filename: str, content: str) -> None:
-        path = self.base_dir / idea_id / filename
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
+        with self._tracer().start_as_current_span("blackboard.write_file") as span:
+            span.set_attribute("idea.id", idea_id)
+            span.set_attribute("filename", filename)
+            span.set_attribute("content.bytes", len(content))
+            path = self.base_dir / idea_id / filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
 
     def append_file(self, idea_id: str, filename: str, content: str) -> None:
         path = self.base_dir / idea_id / filename

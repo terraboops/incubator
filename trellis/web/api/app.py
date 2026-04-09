@@ -164,6 +164,11 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="Trellis Dashboard", lifespan=lifespan)
 
+    # OTEL instrumentation (no-op if not configured)
+    from trellis.otel import instrument_fastapi
+
+    instrument_fastapi(app)
+
     # Mount static files
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
