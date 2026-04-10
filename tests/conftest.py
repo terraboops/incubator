@@ -10,6 +10,20 @@ from trellis.config import Settings
 from trellis.core.blackboard import Blackboard
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--browser", action="store_true", default=False, help="Run Playwright browser tests"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--browser"):
+        skip_browser = pytest.mark.skip(reason="Need --browser flag to run Playwright tests")
+        for item in items:
+            if "browser" in item.keywords:
+                item.add_marker(skip_browser)
+
+
 @pytest.fixture
 def trellis_project(tmp_path: Path) -> Path:
     """Scaffold a minimal Trellis project in tmp_path for E2E tests."""

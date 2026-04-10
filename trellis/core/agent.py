@@ -187,6 +187,7 @@ class AgentResult:
     sandbox_failure: bool = False
     session_id: str | None = None
     stop_reason: str | None = None
+    sandbox_suggestions: list[dict] = field(default_factory=list)
 
 
 class BaseAgent(ABC):
@@ -310,6 +311,60 @@ class BaseAgent(ABC):
         "permission denied",
         "sandbox",
     )
+
+    @staticmethod
+    def parse_sandbox_suggestions(stderr_lines: list[str]) -> list[dict]:
+        """Parse nono stderr lines into actionable sandbox config suggestions."""
+        import re
+
+        suggestions: list[dict] = []
+        seen: set[tuple[str, str]] = set()
+
+        for line in stderr_lines:
+            low = line.lower()
+            # nono: denied read /some/path
+            m = re.search(r"nono:\s*denied\s+(read|write)\s+(/\S+)", low)
+            if m:
+                action, path = m.group(1), m.group(2)
+                field = (
+                    "sandbox_extra_read_paths" if action == "read" else "sandbox_extra_write_paths"
+                )
+                key = (field, path)
+                if key not in seen:
+                    seen.add(key)
+                    suggestions.append({"type": field, "value": path, "stderr_line": line.strip()})
+                continue
+
+            # nono: denied connect some.host:443
+            m = re.search(r"nono:\s*denied\s+connect\s+(\S+)", low)
+            if m:
+                host = m.group(1).split(":")[0]
+                key = ("sandbox_allowed_hosts", host)
+                if key not in seen:
+                    seen.add(key)
+                    suggestions.append(
+                        {
+                            "type": "sandbox_allowed_hosts",
+                            "value": host,
+                            "stderr_line": line.strip(),
+                        }
+                    )
+                continue
+
+            # operation not permitted: /some/path
+            m = re.search(r"operation not permitted[:\s]+(/\S+)", low)
+            if m:
+                path = m.group(1)
+                key = ("sandbox_extra_write_paths", path)
+                if key not in seen:
+                    seen.add(key)
+                    suggestions.append(
+                        {
+                            "type": "sandbox_extra_write_paths",
+                            "value": path,
+                            "stderr_line": line.strip(),
+                        }
+                    )
 
     def _write_live_log(
         self,
@@ -885,6 +940,7 @@ class BaseAgent(ABC):
                             process_stderr=process_stderr,
                         )
                         self._clear_live_log(idea_id)
+                        suggestions = self.parse_sandbox_suggestions(process_stderr)
                         return AgentResult(
                             success=True,
                             output="\n".join(output_parts),
@@ -893,6 +949,7 @@ class BaseAgent(ABC):
                             sandbox_failure=sandbox_failure,
                             session_id=getattr(message, "session_id", None),
                             stop_reason=message.stop_reason,
+                            sandbox_suggestions=suggestions,
                         )
         except Exception as e:
             logger.exception("Agent '%s' failed on '%s'", self.config.name, idea_id)

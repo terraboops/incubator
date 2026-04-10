@@ -69,6 +69,7 @@ markers = [
     "e2e: full route round-trips through the ASGI app",
     "smoke: quick sanity checks (template parsing, import verification)",
     "regression: tests that guard against specific past bugs",
+    "browser: Playwright browser tests (run with --browser flag)",
 ]
 
 [tool.ruff]

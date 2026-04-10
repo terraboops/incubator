@@ -638,11 +638,24 @@ async def agent_detail(request: Request, agent_name: str):
     # Sort logs by timestamp descending
     agent_logs.sort(key=lambda x: x["timestamp"], reverse=True)
 
+    # Gather sandbox suggestions for this agent across all ideas
+    sandbox_suggestions = []
+    for idea_id in bb.list_ideas():
+        try:
+            st = bb.get_status(idea_id)
+            for s in st.get("sandbox_suggestions", []):
+                if s.get("agent") == agent_name:
+                    s["idea_id"] = idea_id
+                    sandbox_suggestions.append(s)
+        except Exception:
+            pass
+
     ctx = _template_ctx(agent)
     ctx["request"] = request
     ctx["agent_logs"] = agent_logs
     ctx["associated_ideas"] = associated_ideas
     ctx["deadline_count"] = deadline_count
+    ctx["sandbox_suggestions"] = sandbox_suggestions
     return templates.TemplateResponse("agent_detail.html", ctx)
 
 
@@ -732,3 +745,36 @@ async def agent_delete(agent_name: str):
         del registry.agents[agent_name]
         registry.save(settings.registry_path)
     return RedirectResponse(url="/agents/", status_code=303)
+
+
+class ApplySandboxSuggestion(BaseModel):
+    suggestion_type: (
+        str  # sandbox_extra_read_paths, sandbox_extra_write_paths, sandbox_allowed_hosts
+    )
+    value: str
+
+
+@router.post("/{agent_name}/apply-sandbox-suggestion")
+async def apply_sandbox_suggestion(agent_name: str, req: ApplySandboxSuggestion):
+    """Apply a sandbox suggestion to the agent's registry config."""
+    settings = get_settings()
+    registry = load_registry(settings.registry_path)
+    config = registry.get_agent(agent_name)
+    if not config:
+        return JSONResponse({"error": "Agent not found"}, status_code=404)
+
+    field = req.suggestion_type
+    if field not in (
+        "sandbox_extra_read_paths",
+        "sandbox_extra_write_paths",
+        "sandbox_allowed_hosts",
+    ):
+        return JSONResponse({"error": f"Invalid suggestion type: {field}"}, status_code=400)
+
+    current = getattr(config, field, []) or []
+    if req.value not in current:
+        current.append(req.value)
+        setattr(config, field, current)
+        registry.save(settings.registry_path)
+
+    return JSONResponse({"ok": True, "field": field, "value": req.value})

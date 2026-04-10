@@ -10,7 +10,7 @@ import asyncio
 import enum
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from trellis.core.agent_factory import AgentFactory
@@ -40,6 +40,7 @@ class RunResult:
     error: str | None = None
     sandbox_failure: bool = False
     session_id: str | None = None
+    sandbox_suggestions: list = field(default_factory=list)
 
     @property
     def is_deadline(self) -> bool:
@@ -129,6 +130,7 @@ class Worker:
                     cost_usd=result.cost_usd,
                     sandbox_failure=result.sandbox_failure,
                     session_id=result.session_id,
+                    sandbox_suggestions=result.sandbox_suggestions,
                 )
             except asyncio.TimeoutError:
                 elapsed = time.monotonic() - start_time

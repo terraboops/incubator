@@ -394,10 +394,16 @@ class PoolManager:
                     }
                 )
 
-            # Sandbox failure tracking
+            # Sandbox failure tracking + suggestions
             sandbox_failure_count = status.get("sandbox_failure_count", 0)
+            sandbox_suggestions = status.get("sandbox_suggestions", [])
             if result.sandbox_failure:
                 sandbox_failure_count += 1
+            if result.sandbox_suggestions:
+                for s in result.sandbox_suggestions:
+                    s["agent"] = result.role
+                    s["at"] = now.isoformat()
+                sandbox_suggestions.extend(result.sandbox_suggestions)
 
             self.blackboard.update_status(
                 result.idea_id,
@@ -408,6 +414,7 @@ class PoolManager:
                 iteration_count=sum(iter_counts.values()),  # backward compat
                 session_ids=session_ids,
                 sandbox_failure_count=sandbox_failure_count,
+                sandbox_suggestions=sandbox_suggestions,
             )
 
             # Apply gating inline
@@ -830,6 +837,11 @@ class PoolManager:
                     span.set_attribute("session.id", result.session_id)
                 if result.sandbox_failure:
                     span.add_event("sandbox.denied", {"stderr": result.error or ""})
+                for sg in result.sandbox_suggestions or []:
+                    span.add_event(
+                        "sandbox.suggestion",
+                        {"type": sg["type"], "value": sg["value"]},
+                    )
                 if result.error:
                     span.record_exception(RuntimeError(result.error))
             return result

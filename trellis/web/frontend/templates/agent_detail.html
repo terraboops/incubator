@@ -48,6 +48,54 @@
 </div>
 {% endif %}
 
+<!-- Sandbox suggestion banner -->
+{% if sandbox_suggestions is defined and sandbox_suggestions %}
+<div class="rounded-xl mb-5" style="background: #fef3eb; border: 1px solid #f0dcc8;">
+    <div class="px-4 py-3">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="text-[#b85f3e]">{{ icon('alert-triangle', 16) }}</span>
+            <span class="text-[0.8rem] font-semibold text-[#7a4a2e]">Sandbox denied access</span>
+        </div>
+        <div class="space-y-2">
+            {% for s in sandbox_suggestions %}
+            <div class="flex items-center gap-3 text-[0.75rem]" id="suggestion-{{ loop.index }}">
+                <code class="text-[0.68rem] text-[#7a4a2e] bg-white/60 px-2 py-0.5 rounded font-mono flex-1 truncate" title="{{ s.stderr_line }}">
+                    {{ s.type | replace('sandbox_', '') | replace('_', ' ') }}: {{ s.value }}
+                </code>
+                <button type="button" onclick="applySuggestion('{{ agent.name }}', '{{ s.type }}', '{{ s.value }}', {{ loop.index }})"
+                        class="text-[0.7rem] px-2.5 py-1 rounded-lg font-medium cursor-pointer transition-colors"
+                        style="background: #b85f3e; color: white;">
+                    Add to config
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<script>
+async function applySuggestion(agent, type, value, idx) {
+    var btn = document.querySelector('#suggestion-' + idx + ' button');
+    btn.disabled = true;
+    btn.textContent = 'Applying...';
+    try {
+        var resp = await fetch('/agents/' + encodeURIComponent(agent) + '/apply-sandbox-suggestion', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({suggestion_type: type, value: value})
+        });
+        if (resp.ok) {
+            btn.textContent = 'Applied';
+            btn.style.background = '#4a7c59';
+        } else {
+            btn.textContent = 'Failed';
+        }
+    } catch(e) {
+        btn.textContent = 'Error';
+    }
+}
+</script>
+{% endif %}
+
 <form method="post" action="{% if is_new %}/agents/new{% else %}/agents/{{ agent.name }}{% endif %}" class="space-y-5">
 
     {% if is_new %}
