@@ -12,7 +12,20 @@
         <span class="text-[0.72rem] text-[#8a8074] font-mono">{{ log.model }}</span>
         <span class="text-[0.72rem] text-[#b0a898]">{{ log.timestamp[:19] }}</span>
         <span class="text-[0.72rem] text-[#8a8074]">{{ log.transcript | length }} messages</span>
+        {% if log.get('session_id') %}
+        <span class="text-[0.62rem] text-[#b0a898] font-mono bg-[#f7f5f0] px-1.5 py-0.5 rounded" title="Claude session ID">{{ log.session_id[:12] }}…</span>
+        {% endif %}
+        {% if log.get('sandbox_failure') %}
+        <span class="text-[0.62rem] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">sandbox failure</span>
+        {% endif %}
     </div>
+    {% if log.get('process_stderr') and log.process_stderr | length > 0 %}
+    <details class="mt-2">
+        <summary class="text-[0.72rem] text-red-600 cursor-pointer">{{ log.process_stderr | length }} stderr line{{ 's' if log.process_stderr | length > 1 else '' }}</summary>
+        <pre class="text-[0.68rem] text-red-700 bg-red-50 rounded-lg p-3 mt-1 max-h-32 overflow-y-auto font-mono">{% for line in log.process_stderr %}{{ line }}
+{% endfor %}</pre>
+    </details>
+    {% endif %}
 </div>
 
 <!-- System Prompt -->

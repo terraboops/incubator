@@ -117,6 +117,8 @@ async def metrics():
     per_idea_cost: list[tuple] = []
     per_idea_iters: list[tuple] = []
 
+    sandbox_failure_total = 0
+
     try:
         idea_ids = bb.list_ideas()
         for idea_id in idea_ids:
@@ -130,6 +132,7 @@ async def metrics():
             total_cost += cost
             per_idea_cost.append(({"idea": idea_id}, cost))
             per_idea_iters.append(({"idea": idea_id}, st.get("iteration_count", 0)))
+            sandbox_failure_total += st.get("sandbox_failure_count", 0)
     except Exception:
         idea_ids = []
 
@@ -162,6 +165,12 @@ async def metrics():
         "Number of refinement iterations per idea.",
         "gauge",
         per_idea_iters,
+    )
+    all_lines += _prom_lines(
+        "trellis_sandbox_failure_total",
+        "Total sandbox failures across all agent runs.",
+        "counter",
+        [(None, sandbox_failure_total)],
     )
 
     # ── Pool state ──
