@@ -144,7 +144,8 @@ async def _drive_pool(settings, timeout=30.0):
             await asyncio.sleep(0.2)
             ideas = bb.list_ideas()
             if ideas and all(
-                bb.get_status(i).get("phase") in ("released", "killed", "paused") for i in ideas
+                bb.get_status(i).get("phase") in ("released", "ready", "killed", "paused")
+                for i in ideas
             ):
                 break
         pool.stop()
@@ -189,10 +190,12 @@ async def test_flow_submit_idea_and_watch_pipeline(page, live_server):
     with patch_sdk_with_twin():
         await _drive_pool(settings)
 
-    # Refresh and check released
+    # Refresh and check terminal phase (ready or released depending on refinement config)
     await page.reload()
     badge = await page.text_content(".badge")
-    assert "RELEASED" in badge.upper()
+    assert any(phase in badge.upper() for phase in ("RELEASED", "READY")), (
+        f"Expected terminal phase, got: {badge.strip()}"
+    )
 
 
 # ── Flow 2: Watch live activity ───────────────────────────────────────
