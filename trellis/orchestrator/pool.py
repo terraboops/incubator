@@ -508,13 +508,14 @@ class PoolManager:
         old_phase = status.get("phase", "submitted")
         history = status.get("phase_history", [])
         prior_releases = sum(1 for e in history if e.get("to") == "released")
-        history.append(
-            {
-                "from": old_phase,
-                "to": "released",
-                "at": now.isoformat(),
-            }
-        )
+        if old_phase != "released":
+            history.append(
+                {
+                    "from": old_phase,
+                    "to": "released",
+                    "at": now.isoformat(),
+                }
+            )
         max_refinement_cycles = status.get(
             "max_refinement_cycles",
             self.settings.max_refinement_cycles,
