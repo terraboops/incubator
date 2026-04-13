@@ -57,10 +57,31 @@
             }
         }
 
-        // Refresh home page cards on phase transitions
+        // Live DOM patch on idea updates (projection diff)
+        if (data.type === 'idea_update' && location.pathname === '/') {
+            const card = document.querySelector(`a[href="/ideas/${data.idea_id}"]`);
+            if (card) {
+                // Patch badge
+                const badge = card.querySelector('.badge');
+                if (badge && data.phase) {
+                    const label = data.phase.replace(/_/g, ' ');
+                    badge.textContent = label;
+                    badge.className = badge.className.replace(/badge-\w+/, 'badge-' + data.phase.replace('_review', ''));
+                }
+                // Patch cost
+                const costEl = card.querySelector('.font-mono');
+                if (costEl && data.total_cost_usd !== undefined) {
+                    costEl.textContent = '$' + data.total_cost_usd.toFixed(2);
+                }
+            } else {
+                // New idea — reload to show it
+                setTimeout(() => location.reload(), 600);
+            }
+        }
+
+        // Refresh home page on phase transitions or new ideas (fallback)
         if (data.type === 'phase_transition' || data.type === 'idea_created') {
-            const homeCards = document.querySelector('[data-page="home"]');
-            if (homeCards || location.pathname === '/') {
+            if (location.pathname === '/') {
                 setTimeout(() => location.reload(), 600);
             }
         }

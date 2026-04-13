@@ -98,13 +98,22 @@ class Blackboard:
             status.update(fields)
             status["updated_at"] = datetime.now(timezone.utc).isoformat()
             self.write_file(idea_id, "status.json", json.dumps(status, indent=2))
-            # Write-through to projection cache
+            # Write-through to projection cache + WebSocket broadcast
             if self.projection:
                 try:
                     self.projection.upsert_idea(idea_id, status)
                     self.projection.update_metrics()
                 except Exception:
                     pass  # projection is best-effort
+            try:
+                import asyncio
+
+                loop = asyncio.get_running_loop()
+                from trellis.web.api.websocket import broadcast_idea_update
+
+                loop.create_task(broadcast_idea_update(idea_id, status))
+            except RuntimeError:
+                pass  # no event loop running (CLI, tests)
 
     def read_file(self, idea_id: str, filename: str) -> str:
         path = self.base_dir / idea_id / filename

@@ -67,6 +67,22 @@ async def broadcast_activity(idea_id: str, message: str, kind: str = "info") -> 
     )
 
 
+async def broadcast_idea_update(idea_id: str, status: dict) -> None:
+    """Broadcast a projection update so browsers can patch the DOM."""
+    await broadcast_event(
+        "idea_update",
+        {
+            "idea_id": idea_id,
+            "phase": status.get("phase", ""),
+            "title": status.get("title", ""),
+            "total_cost_usd": status.get("total_cost_usd", 0),
+            "priority_score": status.get("priority_score", 0),
+            "iteration_count": status.get("iteration_count", 0),
+            "needs_human_review": status.get("needs_human_review", False),
+        },
+    )
+
+
 @router.websocket("/ws/events")
 async def events_websocket(websocket: WebSocket):
     await websocket.accept()
