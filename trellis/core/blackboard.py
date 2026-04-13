@@ -32,6 +32,7 @@ class Blackboard:
     def __init__(self, base_dir: Path) -> None:
         self.base_dir = base_dir
         self.template_dir = base_dir / "_template"
+        self.projection = None  # Set by app.py lifespan if projection is available
 
     def _tracer(self):
         from trellis.otel import get_tracer
@@ -97,6 +98,13 @@ class Blackboard:
             status.update(fields)
             status["updated_at"] = datetime.now(timezone.utc).isoformat()
             self.write_file(idea_id, "status.json", json.dumps(status, indent=2))
+            # Write-through to projection cache
+            if self.projection:
+                try:
+                    self.projection.upsert_idea(idea_id, status)
+                    self.projection.update_metrics()
+                except Exception:
+                    pass  # projection is best-effort
 
     def read_file(self, idea_id: str, filename: str) -> str:
         path = self.base_dir / idea_id / filename

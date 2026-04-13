@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     # Quality gate (0 = disabled)
     min_quality_score: float = 0.0
 
+    # Projection cache
+    projection_url: str = (
+        "mem://"  # "mem://" local, "file://trellis.db" persistent, "ws://host:port" k8s
+    )
+
     # Web
     web_host: str = "0.0.0.0"
     web_port: int = 8000

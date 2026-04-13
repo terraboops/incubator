@@ -137,13 +137,30 @@ async def _resilient_pool(app: "FastAPI", pool_manager, settings) -> None:
 def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Initialize projection cache
+        from trellis.core.blackboard import Blackboard
+        from trellis.core.projection import ProjectionStore
+
+        settings = get_settings()
+        projection = ProjectionStore()
+        try:
+            projection.connect(settings.projection_url)
+            bb = Blackboard(settings.blackboard_dir)
+            bb.projection = projection
+            projection.rebuild(bb)
+            app.state.projection = projection
+        except Exception as e:
+            logger.warning("Projection store failed to initialize: %s — running without cache", e)
+            app.state.projection = ProjectionStore()  # no-op store (not connected)
+
         pool_task = None
         pool_manager = None
         if _pool_enabled:
             from trellis.orchestrator.pool import PoolManager
 
-            settings = get_settings()
             pool_manager = PoolManager(settings)
+            # Give pool's blackboard access to projection for write-through
+            pool_manager.blackboard.projection = projection
             pool_task = asyncio.create_task(
                 _resilient_pool(app, pool_manager, settings),
                 name="pool-supervisor",
@@ -161,6 +178,7 @@ def create_app() -> FastAPI:
                 except asyncio.CancelledError:
                     pass
             logger.info("Worker pool stopped")
+        projection.close()
 
     app = FastAPI(title="Trellis Dashboard", lifespan=lifespan)
 
