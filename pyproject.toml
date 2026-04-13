@@ -23,6 +23,7 @@ dependencies = [
     "websockets",
     "markdown",
     "anthropic",
+    "surrealdb",
 ]
 
 [project.optional-dependencies]
