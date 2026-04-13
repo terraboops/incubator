@@ -129,11 +129,11 @@ class EvolutionManager:
             agent_dir = self.agents_dir / agent / "knowledge"
             to_delete: set[str] = set()
 
-            # Pass 1: delete stubs (no justification, insight is just a slug-like title)
+            # Pass 1: delete entries with no justification AND no predicates
             for obj in objects:
-                insight = (obj.get("insight") or "").strip()
                 justification = (obj.get("justification") or "").strip()
-                if not justification and len(insight) < 120 and insight.count(" ") < 3:
+                predicates = obj.get("predicates") or []
+                if not justification and not predicates:
                     to_delete.add(obj.get("id", ""))
 
             # Pass 2: NCD deduplication among remaining
