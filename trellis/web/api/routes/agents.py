@@ -604,51 +604,82 @@ async def agent_detail(request: Request, agent_name: str):
         except (json.JSONDecodeError, OSError):
             pass
 
-    # Gather logs for this agent across all ideas
+    # Gather logs for this agent — projection (instant) or filesystem (slow)
     bb = Blackboard(settings.blackboard_dir)
+    projection = getattr(request.app.state, "projection", None)
     agent_logs = []
     associated_ideas = {}
-    for idea_id in bb.list_ideas():
-        log_dir = bb.idea_dir(idea_id) / "agent-logs"
-        if not log_dir.is_dir():
-            continue
-        idea_status = bb.get_status(idea_id)
-        for f in sorted(log_dir.iterdir(), reverse=True):
-            if f.suffix != ".json":
-                continue
-            try:
-                data = json.loads(f.read_text())
-            except Exception:
-                continue
-            if data.get("agent") != agent_name:
-                continue
-            associated_ideas[idea_id] = idea_status.get("title", idea_id)
+
+    if projection and projection._db:
+        # Fast path: indexed query
+        raw_logs = projection.get_agent_logs(agent_name)
+        for log in raw_logs:
+            idea_id = log.get("idea_id", "")
+            idea_proj = projection.get_idea(idea_id)
+            title = idea_proj.get("title", idea_id) if idea_proj else idea_id
+            associated_ideas[idea_id] = title
             agent_logs.append(
                 {
-                    "filename": f.name,
+                    "filename": log.get("filename", ""),
                     "idea_id": idea_id,
-                    "idea_title": idea_status.get("title", idea_id),
-                    "timestamp": data.get("timestamp", ""),
-                    "model": data.get("model", ""),
-                    "transcript_len": len(data.get("transcript", [])),
-                    "run_status": data.get("run_status", ""),
+                    "idea_title": title,
+                    "timestamp": log.get("timestamp", ""),
+                    "model": log.get("model", ""),
+                    "transcript_len": log.get("transcript_len", 0),
+                    "run_status": log.get("run_status", ""),
                 }
             )
+    else:
+        # Slow path: scan all idea directories
+        for idea_id in bb.list_ideas():
+            log_dir = bb.idea_dir(idea_id) / "agent-logs"
+            if not log_dir.is_dir():
+                continue
+            idea_status = bb.get_status(idea_id)
+            for f in sorted(log_dir.iterdir(), reverse=True):
+                if f.suffix != ".json":
+                    continue
+                try:
+                    data = json.loads(f.read_text())
+                except Exception:
+                    continue
+                if data.get("agent") != agent_name:
+                    continue
+                associated_ideas[idea_id] = idea_status.get("title", idea_id)
+                agent_logs.append(
+                    {
+                        "filename": f.name,
+                        "idea_id": idea_id,
+                        "idea_title": idea_status.get("title", idea_id),
+                        "timestamp": data.get("timestamp", ""),
+                        "model": data.get("model", ""),
+                        "transcript_len": len(data.get("transcript", [])),
+                        "run_status": data.get("run_status", ""),
+                    }
+                )
 
     # Sort logs by timestamp descending
     agent_logs.sort(key=lambda x: x["timestamp"], reverse=True)
 
-    # Gather sandbox suggestions for this agent across all ideas
+    # Gather sandbox suggestions — projection or filesystem
     sandbox_suggestions = []
-    for idea_id in bb.list_ideas():
-        try:
-            st = bb.get_status(idea_id)
-            for s in st.get("sandbox_suggestions", []):
+    if projection and projection._db:
+        all_ideas = projection.get_ideas_for_home()
+        for idea in all_ideas:
+            for s in idea.get("sandbox_suggestions", []):
                 if s.get("agent") == agent_name:
-                    s["idea_id"] = idea_id
+                    s["idea_id"] = idea.get("id", "")
                     sandbox_suggestions.append(s)
-        except Exception:
-            pass
+    else:
+        for idea_id in bb.list_ideas():
+            try:
+                st = bb.get_status(idea_id)
+                for s in st.get("sandbox_suggestions", []):
+                    if s.get("agent") == agent_name:
+                        s["idea_id"] = idea_id
+                        sandbox_suggestions.append(s)
+            except Exception:
+                pass
 
     ctx = _template_ctx(agent)
     ctx["request"] = request

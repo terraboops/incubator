@@ -112,6 +112,7 @@ def _compute_scheduling(
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
+    projection = getattr(request.app.state, "projection", None)
     bb = _get_blackboard()
     registry = load_registry(get_settings().registry_path)
     roles = [a.name for a in registry.agents.values() if a.status == "active"]
@@ -120,34 +121,37 @@ async def home(request: Request):
     pipeline_stages = {"ideation", "implementation", "validation", "release"}
     auxiliary_roles = [r for r in roles if r not in pipeline_stages]
 
+    # Try projection first (instant), fall back to filesystem
+    if projection and projection._db:
+        raw_ideas = projection.get_ideas_for_home()
+    else:
+        raw_ideas = []
+        for idea_id in bb.list_ideas():
+            status = bb.get_status(idea_id)
+            status["id"] = idea_id
+            raw_ideas.append(status)
+
     ideas = []
-    for idea_id in bb.list_ideas():
-        status = bb.get_status(idea_id)
+    for status in raw_ideas:
+        idea_id = status.get("id", "")
         status["idea_id"] = idea_id
         status["_scheduling"] = _compute_scheduling(bb, status, roles, pool_running)
-        # Mark idea as running if any worker is active on it
         if any(idea_id == rid for _, rid in pool_running):
             status["running"] = True
-        # Compute auxiliary agent status — idea's post_ready + global background agents
+        # Compute auxiliary agent status
         aux_status = []
-        idea_dir = bb.base_dir / idea_id
-        pipeline = bb.get_pipeline(idea_id)
+        pipeline = status.get("pipeline", bb.get_pipeline(idea_id))
         post_ready_set = set(pipeline.get("post_ready", []))
         background_set = {
             a.name for a in registry.agents.values() if a.status == "active" and a.phase == "*"
         }
         idea_aux_roles = [r for r in auxiliary_roles if r in post_ready_set or r in background_set]
         for role in idea_aux_roles:
-            role_file = idea_dir / f"{role}.md"
-            role_dir = idea_dir / role
-            has_run = role_file.exists() or (role_dir.exists() and any(role_dir.iterdir()))
             is_running = (role, idea_id) in pool_running
+            # For projection, we don't have filesystem checks — approximate from last_serviced_by
+            has_run = role in status.get("last_serviced_by", {})
             aux_status.append(
-                {
-                    "role": role,
-                    "done": has_run and not is_running,
-                    "pending": is_running,
-                }
+                {"role": role, "done": has_run and not is_running, "pending": is_running}
             )
         status["_auxiliary"] = aux_status
         status["_pipeline_agents"] = pipeline.get("agents", [])
