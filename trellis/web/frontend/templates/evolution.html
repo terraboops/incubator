@@ -11,9 +11,12 @@
         </div>
     </div>
     {% if agents %}
-    <button onclick="curateAll()" id="curate-btn" class="btn btn-soft text-[0.78rem]">
-        {{ icon('sparkles', 14) }} Curate with AI
-    </button>
+    <div class="flex items-center gap-3">
+        <button onclick="curateAll()" id="curate-btn" class="btn btn-soft text-[0.78rem]">
+            {{ icon('sparkles', 14) }} Curate with AI
+        </button>
+        <span id="curate-status" class="text-[0.75rem] text-[#8a8074] hidden"></span>
+    </div>
     {% endif %}
 </div>
 
@@ -163,8 +166,12 @@ var _curateAgent = null;
 
 async function curateAll() {
     var btn = document.getElementById('curate-btn');
+    var status = document.getElementById('curate-status');
     btn.disabled = true;
-    btn.textContent = 'Curating...';
+    btn.textContent = 'Analyzing...';
+    status.classList.remove('hidden');
+    status.textContent = 'This may take a few minutes — the AI is reviewing all knowledge entries.';
+    status.className = 'text-[0.75rem] text-[#8a8074]';
 
     try {
         var body = {};
@@ -176,32 +183,53 @@ async function curateAll() {
             body: JSON.stringify(body)
         });
 
-        if (resp.ok) {
-            var data = await resp.json();
-            var preview = document.getElementById('curation-preview');
-            var content = document.getElementById('curation-content');
-
-            var html = '';
-            for (var agent in data.actions) {
-                var actions = data.actions[agent];
-                var keeps = actions.filter(function(a) { return a.action === 'keep'; });
-                var merges = actions.filter(function(a) { return a.action === 'merge'; });
-                var drops = actions.filter(function(a) { return a.action === 'drop'; });
-
-                html += '<h3>' + agent + '</h3>';
-                html += '<p>Keep: ' + keeps.length + ', Merge: ' + merges.length + ', Drop: ' + drops.length + '</p>';
-
-                drops.forEach(function(d) {
-                    html += '<div class="p-2 bg-[#f3e3e3] rounded-lg text-[0.8rem] mb-1">DROP [' + d.id + ']: ' + (d.reason || 'no reason') + '</div>';
-                });
-                merges.forEach(function(m) {
-                    html += '<div class="p-2 bg-[#eee8f6] rounded-lg text-[0.8rem] mb-1">MERGE ' + JSON.stringify(m.ids) + '</div>';
-                });
-            }
-
-            content.innerHTML = html || '<p>No changes proposed.</p>';
-            preview.classList.remove('hidden');
+        if (!resp.ok) {
+            status.textContent = 'Error: ' + (resp.status === 500 ? 'Server error — check logs' : resp.statusText);
+            status.className = 'text-[0.75rem] text-red-600';
+            return;
         }
+
+        var data = await resp.json();
+        var preview = document.getElementById('curation-preview');
+        var content = document.getElementById('curation-content');
+        content.textContent = '';
+
+        var totalActions = 0;
+        for (var agent in data.actions) {
+            var actions = data.actions[agent];
+            totalActions += actions.length;
+            var keeps = actions.filter(function(a) { return a.action === 'keep'; });
+            var merges = actions.filter(function(a) { return a.action === 'merge'; });
+            var drops = actions.filter(function(a) { return a.action === 'drop'; });
+
+            var heading = document.createElement('h3');
+            heading.textContent = agent;
+            content.appendChild(heading);
+
+            var summary = document.createElement('p');
+            summary.textContent = 'Keep: ' + keeps.length + ', Merge: ' + merges.length + ', Drop: ' + drops.length;
+            content.appendChild(summary);
+
+            drops.forEach(function(d) {
+                var el = document.createElement('div');
+                el.className = 'p-2 bg-[#f3e3e3] rounded-lg text-[0.8rem] mb-1';
+                el.textContent = 'DROP [' + d.id + ']: ' + (d.reason || 'no reason');
+                content.appendChild(el);
+            });
+            merges.forEach(function(m) {
+                var el = document.createElement('div');
+                el.className = 'p-2 bg-[#eee8f6] rounded-lg text-[0.8rem] mb-1';
+                el.textContent = 'MERGE ' + JSON.stringify(m.ids);
+                content.appendChild(el);
+            });
+        }
+
+        preview.classList.remove('hidden');
+        status.textContent = totalActions + ' actions proposed.';
+        status.className = 'text-[0.75rem] text-emerald-600';
+    } catch (e) {
+        status.textContent = 'Failed: ' + e.message;
+        status.className = 'text-[0.75rem] text-red-600';
     } finally {
         btn.disabled = false;
         btn.textContent = 'Curate with AI';
