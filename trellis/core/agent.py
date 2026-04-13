@@ -607,6 +607,17 @@ class BaseAgent(ABC):
         if not self.config.sandbox_enabled:
             return None
 
+        # Check if nono is actually installed
+        import shutil
+
+        if not shutil.which("nono"):
+            logger.warning(
+                "Sandbox enabled for agent '%s' but nono is not installed. "
+                "Running without sandbox. Install nono to enable sandboxing.",
+                self.config.name,
+            )
+            return None
+
         try:
             from trellis.core.sandbox import build_nono_flags
 
