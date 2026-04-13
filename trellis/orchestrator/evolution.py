@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import zlib
 from pathlib import Path
 
 import yaml
@@ -45,13 +46,16 @@ actions:
     id: "x9y0z1w2"
     reason: "too idea-specific, belongs on blackboard"
 
-Guidelines:
-- Quality over quantity. 10 sharp entries beat 50 noisy ones.
-- Entries with empty justification should be dropped unless the insight is clearly valuable.
-- Entries with empty predicates should be dropped or edited to add predicates.
-- Merge entries that express the same underlying knowledge in different words.
+Guidelines — be AGGRESSIVE:
+- Quality over quantity. 5 sharp entries beat 50 noisy ones.
+- DEFAULT ACTION IS DROP. Only keep entries that would genuinely change agent behavior.
+- Drop everything with empty justification. No exceptions.
+- Drop everything with empty predicates unless the insight is exceptional.
+- Drop anything idea-specific — knowledge should be general principles, not project notes.
+- Drop anything that's just a title or slug with no real content.
+- Merge aggressively — if two entries express similar ideas, merge them.
 - Prefer concise, actionable insights over verbose reports.
-- Preserve the original entry ids where possible."""
+- After curation, there should be 80-90% fewer entries than before."""
 
 
 class EvolutionManager:
@@ -96,6 +100,68 @@ class EvolutionManager:
             }
         return stats
 
+    @staticmethod
+    def _ncd(a: str, b: str) -> float:
+        """Normalized compression distance — cheap similarity metric."""
+        if not a or not b:
+            return 1.0
+        ab = a.encode() + b.encode()
+        ca = len(zlib.compress(a.encode()))
+        cb = len(zlib.compress(b.encode()))
+        cab = len(zlib.compress(ab))
+        return (cab - min(ca, cb)) / max(ca, cb)
+
+    def pre_cleanup(self, agent_filter: str | None = None) -> dict[str, int]:
+        """Aggressive pre-LLM cleanup: remove stubs and near-duplicates.
+
+        Deletes entries that are:
+        - Stubs: no justification AND insight is just a title (< 100 chars, no spaces beyond hyphens)
+        - Near-duplicates: NCD < 0.3 with an earlier entry (keeps the first)
+
+        Returns {agent: count_deleted}.
+        """
+        all_knowledge = self._get_agent_knowledge()
+        if agent_filter:
+            all_knowledge = {k: v for k, v in all_knowledge.items() if k == agent_filter}
+
+        deleted: dict[str, int] = {}
+        for agent, objects in all_knowledge.items():
+            agent_dir = self.agents_dir / agent / "knowledge"
+            to_delete: set[str] = set()
+
+            # Pass 1: delete stubs (no justification, insight is just a slug-like title)
+            for obj in objects:
+                insight = (obj.get("insight") or "").strip()
+                justification = (obj.get("justification") or "").strip()
+                if not justification and len(insight) < 120 and insight.count(" ") < 3:
+                    to_delete.add(obj.get("id", ""))
+
+            # Pass 2: NCD deduplication among remaining
+            remaining = [o for o in objects if o.get("id", "") not in to_delete]
+            for i, a in enumerate(remaining):
+                if a.get("id", "") in to_delete:
+                    continue
+                for b in remaining[i + 1 :]:
+                    if b.get("id", "") in to_delete:
+                        continue
+                    a_text = (a.get("insight") or "") + " " + (a.get("justification") or "")
+                    b_text = (b.get("insight") or "") + " " + (b.get("justification") or "")
+                    if self._ncd(a_text, b_text) < 0.3:
+                        to_delete.add(b.get("id", ""))
+
+            # Execute deletions
+            count = 0
+            for obj_id in to_delete:
+                if obj_id:
+                    delete_object(agent_dir, obj_id)
+                    count += 1
+
+            if count:
+                deleted[agent] = count
+                logger.info("Pre-cleanup: deleted %d entries from %s", count, agent)
+
+        return deleted
+
     async def run_retrospective(
         self,
         agent_filter: str | None = None,
@@ -104,8 +170,16 @@ class EvolutionManager:
     ) -> dict[str, list[dict]]:
         """Analyze and curate knowledge using LLM, with human approval.
 
-        Returns dict of {agent: [actions]} that were applied (or would be, if dry_run).
+        Runs aggressive pre-cleanup first (stubs + NCD dedup), then LLM curation
+        on the survivors. Returns dict of {agent: [actions]} that were applied.
         """
+        # Pre-cleanup: remove stubs and near-duplicates before wasting LLM tokens
+        if not dry_run:
+            pre_deleted = self.pre_cleanup(agent_filter)
+            if pre_deleted:
+                total = sum(pre_deleted.values())
+                logger.info("Pre-cleanup removed %d entries: %s", total, pre_deleted)
+
         all_knowledge = self._get_agent_knowledge()
         if agent_filter:
             all_knowledge = {k: v for k, v in all_knowledge.items() if k == agent_filter}

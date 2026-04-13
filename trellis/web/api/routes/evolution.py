@@ -133,6 +133,21 @@ async def delete_entry(agent: str, entry_id: str):
     )
 
 
+@router.post("/cleanup", response_class=JSONResponse)
+async def trigger_cleanup(request: Request):
+    """Run aggressive pre-cleanup (stubs + NCD dedup) without LLM."""
+    settings = get_settings()
+    body = await request.json()
+    agent_filter = body.get("agent")
+
+    from trellis.orchestrator.evolution import EvolutionManager
+
+    evo = EvolutionManager(settings.project_root, dispatcher=None)
+    deleted = evo.pre_cleanup(agent_filter=agent_filter)
+    total = sum(deleted.values())
+    return JSONResponse({"deleted": deleted, "total": total})
+
+
 @router.post("/curate", response_class=JSONResponse)
 async def trigger_curation(request: Request):
     """Trigger LLM curation (dry run) and return the proposed actions."""

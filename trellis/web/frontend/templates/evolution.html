@@ -12,6 +12,9 @@
     </div>
     {% if agents %}
     <div class="flex items-center gap-3">
+        <button onclick="quickClean()" id="clean-btn" class="btn btn-soft text-[0.78rem]">
+            {{ icon('trash', 14) }} Quick Clean
+        </button>
         <button onclick="curateAll()" id="curate-btn" class="btn btn-soft text-[0.78rem]">
             {{ icon('sparkles', 14) }} Curate with AI
         </button>
@@ -163,6 +166,41 @@ async function deleteEntry(agent, entryId) {
 }
 
 var _curateAgent = null;
+
+async function quickClean() {
+    var btn = document.getElementById('clean-btn');
+    var status = document.getElementById('curate-status');
+    btn.disabled = true;
+    btn.textContent = 'Cleaning...';
+    status.classList.remove('hidden');
+    status.textContent = 'Removing stubs and near-duplicates (NCD < 0.3)...';
+    status.className = 'text-[0.75rem] text-[#8a8074]';
+
+    try {
+        var body = {};
+        if (_curateAgent) body.agent = _curateAgent;
+        var resp = await fetch('/evolution/cleanup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        if (!resp.ok) {
+            status.textContent = 'Error: ' + resp.statusText;
+            status.className = 'text-[0.75rem] text-red-600';
+            return;
+        }
+        var data = await resp.json();
+        status.textContent = 'Deleted ' + data.total + ' entries. Reloading...';
+        status.className = 'text-[0.75rem] text-emerald-600';
+        setTimeout(function() { location.reload(); }, 1500);
+    } catch (e) {
+        status.textContent = 'Failed: ' + e.message;
+        status.className = 'text-[0.75rem] text-red-600';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Quick Clean';
+    }
+}
 
 async function curateAll() {
     var btn = document.getElementById('curate-btn');
