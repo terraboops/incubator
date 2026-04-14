@@ -105,8 +105,8 @@ class ProjectionStore:
         """Add/update an agent log entry in the index."""
         if not self._db:
             return
-        # Use agent+idea+filename as unique key
-        safe_key = filename.replace(".", "_").replace("-", "_")
+        # Key must include idea_id to avoid collisions across ideas
+        safe_key = f"{idea_id}_{filename}".replace(".", "_").replace("-", "_")
         record = {
             "agent": agent,
             "idea_id": idea_id,

@@ -481,6 +481,15 @@ class BaseAgent(ABC):
         log_file.write_text(json.dumps(log_data, indent=2, default=str))
         logger.info("Saved transcript to %s", log_file)
 
+        # Update projection index so agent logs are immediately queryable
+        if self.blackboard.projection:
+            try:
+                self.blackboard.projection.index_agent_log(
+                    self.config.name, idea_id, log_file.name, log_data
+                )
+            except Exception:
+                pass
+
     async def run(
         self, idea_id: str, max_turns_override: int | None = None, deadline: datetime | None = None
     ) -> AgentResult:

@@ -11,7 +11,7 @@ import json
 import time
 from datetime import datetime
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
 from trellis.config import get_settings
@@ -87,7 +87,7 @@ def _prom_lines(name: str, help_text: str, type_: str, samples: list[tuple]) -> 
 
 
 @router.get("/metrics", response_class=Response)
-async def metrics():
+async def metrics(request: Request):
     """Prometheus text exposition format metrics."""
     settings = get_settings()
 
@@ -111,28 +111,41 @@ async def metrics():
         [(None, _START_TIME)],
     )
 
-    # ── Ideas by phase ──
+    # ── Ideas by phase (projection-accelerated) ──
+    projection = getattr(request.app.state, "projection", None)
     phase_counts: dict[str, int] = {}
     total_cost = 0.0
     per_idea_cost: list[tuple] = []
     per_idea_iters: list[tuple] = []
-
     sandbox_failure_total = 0
 
     try:
-        idea_ids = bb.list_ideas()
-        for idea_id in idea_ids:
-            try:
-                st = bb.get_status(idea_id)
-            except Exception:
-                continue
-            phase = st.get("phase", "unknown")
-            phase_counts[phase] = phase_counts.get(phase, 0) + 1
-            cost = st.get("total_cost_usd", 0.0) or 0.0
-            total_cost += cost
-            per_idea_cost.append(({"idea": idea_id}, cost))
-            per_idea_iters.append(({"idea": idea_id}, st.get("iteration_count", 0)))
-            sandbox_failure_total += st.get("sandbox_failure_count", 0)
+        if projection and projection._db:
+            metrics = projection.get_metrics()
+            if metrics:
+                phase_counts = metrics.get("ideas_by_phase", {})
+                total_cost = metrics.get("total_cost", 0)
+                sandbox_failure_total = metrics.get("sandbox_failure_total", 0)
+            # Per-idea breakdown still needs individual data
+            for idea in projection.get_ideas_for_home():
+                iid = idea.get("id", "")
+                per_idea_cost.append(({"idea": iid}, idea.get("total_cost_usd", 0) or 0))
+                per_idea_iters.append(({"idea": iid}, idea.get("iteration_count", 0)))
+            idea_ids = [i.get("id", "") for i in projection.get_ideas_for_home()]
+        else:
+            idea_ids = bb.list_ideas()
+            for idea_id in idea_ids:
+                try:
+                    st = bb.get_status(idea_id)
+                except Exception:
+                    continue
+                phase = st.get("phase", "unknown")
+                phase_counts[phase] = phase_counts.get(phase, 0) + 1
+                cost = st.get("total_cost_usd", 0.0) or 0.0
+                total_cost += cost
+                per_idea_cost.append(({"idea": idea_id}, cost))
+                per_idea_iters.append(({"idea": idea_id}, st.get("iteration_count", 0)))
+                sandbox_failure_total += st.get("sandbox_failure_count", 0)
     except Exception:
         idea_ids = []
 

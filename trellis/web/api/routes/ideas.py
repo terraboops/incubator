@@ -478,6 +478,9 @@ async def idea_agent_log_detail(request: Request, idea_id: str, log_filename: st
     bb = _get_blackboard()
     status = bb.get_status(idea_id)
     log_file = bb.idea_dir(idea_id) / "agent-logs" / log_filename
+    # Prevent path traversal
+    if not str(log_file.resolve()).startswith(str(bb.idea_dir(idea_id).resolve())):
+        return HTMLResponse("Invalid path", status_code=400)
     if not log_file.exists():
         return HTMLResponse("Log not found", status_code=404)
     log_data = json.loads(log_file.read_text())

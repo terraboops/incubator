@@ -91,6 +91,8 @@ class Blackboard:
             "phase_history": [],
         }
         self.write_file(slug, "status.json", json.dumps(status, indent=2))
+        if self.projection:
+            self._projection_write(slug, status)
         return slug
 
     def list_ideas(self) -> list[str]:
@@ -117,6 +119,8 @@ class Blackboard:
             }
         )
         self.write_file(idea_id, "status.json", json.dumps(status, indent=2))
+        if self.projection:
+            self._projection_write(idea_id, status)
 
     def update_status(self, idea_id: str, **fields: object) -> None:
         with self._tracer().start_as_current_span("blackboard.update_status") as span:
@@ -166,7 +170,6 @@ class Blackboard:
 
     def delete_idea(self, idea_id: str) -> None:
         """Permanently delete an idea and all its artifacts."""
-        import shutil
 
         idea_path = self.base_dir / idea_id
         if idea_path.exists() and idea_path.is_dir() and idea_id != "_template":

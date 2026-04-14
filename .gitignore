@@ -14,6 +14,7 @@ blackboard/ideas/*/
 .claude/settings.local.json
 .superpowers/
 blackboard/.activity.json
+pool/state.json
 
 # TLA+ model checker artifacts
 specs/states/

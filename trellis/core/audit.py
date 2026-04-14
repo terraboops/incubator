@@ -118,10 +118,7 @@ def _build_webhook_hooks(agent_role: str, project_root: Path) -> dict | None:
         return None
 
     def _make_hook(url: str, event_name: str):
-        async def fire_webhook(hook_input, tool_use_id, context):
-            tool_name = hook_input.get("tool_name", "")
-            session_id = hook_input.get("session_id", "")
-            payload = json.dumps({"text": f"{event_name}|{session_id}|{tool_name}"}).encode()
+        def _blocking_post(payload: bytes):
             req = urllib.request.Request(
                 url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
             )
@@ -129,6 +126,16 @@ def _build_webhook_hooks(agent_role: str, project_root: Path) -> dict | None:
                 urllib.request.urlopen(req, timeout=2)
             except Exception:
                 pass
+
+        async def fire_webhook(hook_input, tool_use_id, context):
+            import asyncio
+
+            tool_name = hook_input.get("tool_name", "")
+            session_id = hook_input.get("session_id", "")
+            payload = json.dumps({"text": f"{event_name}|{session_id}|{tool_name}"}).encode()
+            # Run blocking HTTP call off the event loop
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, _blocking_post, payload)
             return {}
 
         return fire_webhook

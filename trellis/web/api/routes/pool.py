@@ -32,7 +32,7 @@ def _read_pool_state() -> dict:
     }
 
 
-def _compute_idle_reasons(state: dict) -> None:
+def _compute_idle_reasons(state: dict, request=None) -> None:
     """Set an 'idle_reason' field on each idle worker explaining why it's idle."""
     workers = state.get("workers", [])
     if not workers:
@@ -45,15 +45,23 @@ def _compute_idle_reasons(state: dict) -> None:
     bb = Blackboard(settings.blackboard_dir)
     terminal = {"killed", "paused"}
 
+    projection = getattr(request.app.state, "projection", None) if hasattr(request, "app") else None
     total_ideas = 0
-    for idea_id in bb.list_ideas():
-        status = bb.get_status(idea_id)
-        phase = status.get("phase", "submitted")
-        if phase in terminal:
-            continue
-        if phase == "released" and not bb.pending_post_ready(idea_id):
-            continue
-        total_ideas += 1
+    if projection and projection._db:
+        metrics = projection.get_metrics()
+        if metrics:
+            for phase, count in metrics.get("ideas_by_phase", {}).items():
+                if phase not in terminal and phase != "released":
+                    total_ideas += count
+    else:
+        for idea_id in bb.list_ideas():
+            status = bb.get_status(idea_id)
+            phase = status.get("phase", "submitted")
+            if phase in terminal:
+                continue
+            if phase == "released" and not bb.pending_post_ready(idea_id):
+                continue
+            total_ideas += 1
 
     busy_ideas = len(active_ideas)
 
@@ -184,7 +192,7 @@ def _enrich_cadence_trackers(state: dict) -> None:
 async def pool_status(request: Request):
     state = _read_pool_state()
     _normalize_workers(state)
-    _compute_idle_reasons(state)
+    _compute_idle_reasons(state, request)
     _enrich_cadence_trackers(state)
 
     return templates.TemplateResponse(
