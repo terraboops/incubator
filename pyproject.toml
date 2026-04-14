@@ -71,6 +71,8 @@ markers = [
     "smoke: quick sanity checks (template parsing, import verification)",
     "regression: tests that guard against specific past bugs",
     "browser: Playwright browser tests (run with --browser flag)",
+    "slow: stress/soak tests that take >30 seconds",
+    "chaos: tests requiring kind cluster + Docker",
 ]
 
 [tool.ruff]

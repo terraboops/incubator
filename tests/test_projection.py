@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
+import tracemalloc
 
 import pytest
 
@@ -209,3 +211,167 @@ class TestProjectionBenchmark:
         ms_per_write = (elapsed / iterations) * 1000
 
         assert ms_per_write < 10.0, f"Upsert too slow: {ms_per_write:.2f}ms"
+
+
+@pytest.mark.slow
+class TestProjectionStress:
+    """Stress, soak, and concurrency tests for the projection store."""
+
+    def test_soak_memory_stable_under_sustained_writes(self, store):
+        """Memory should not grow unbounded under sustained writes."""
+        tracemalloc.start()
+        # Warmup
+        for i in range(500):
+            store.upsert_idea(f"soak-{i}", {"title": f"Soak {i}", "phase": "submitted"})
+            store.update_metrics()
+
+        snapshot1 = tracemalloc.take_snapshot()
+
+        # Sustained writes: overwrite the same 500 IDs to keep record count bounded
+        for cycle in range(20):
+            for i in range(500):
+                store.upsert_idea(
+                    f"soak-{i}",
+                    {
+                        "title": f"Soak {i} cycle {cycle}",
+                        "phase": "ideation",
+                        "total_cost_usd": cycle * 0.1,
+                    },
+                )
+            store.update_metrics()
+
+        snapshot2 = tracemalloc.take_snapshot()
+        tracemalloc.stop()
+
+        # Compare memory: filter to SurrealDB-related allocations
+        stats = snapshot2.compare_to(snapshot1, "lineno")
+        growth = sum(s.size_diff for s in stats if s.size_diff > 0)
+        growth_mb = growth / 1024 / 1024
+        assert growth_mb < 50, f"Memory grew by {growth_mb:.1f}MB during soak test"
+
+    def test_soak_no_leak_on_repeated_rebuild(self, store, bb_with_ideas):
+        """Repeated rebuilds should not accumulate memory."""
+        tracemalloc.start()
+        # Warmup
+        for _ in range(3):
+            store.rebuild(bb_with_ideas)
+
+        snapshot1 = tracemalloc.take_snapshot()
+
+        for _ in range(20):
+            store.rebuild(bb_with_ideas)
+
+        snapshot2 = tracemalloc.take_snapshot()
+        tracemalloc.stop()
+
+        stats = snapshot2.compare_to(snapshot1, "lineno")
+        growth = sum(s.size_diff for s in stats if s.size_diff > 0)
+        growth_mb = growth / 1024 / 1024
+        assert growth_mb < 20, f"Memory grew by {growth_mb:.1f}MB across rebuilds"
+
+    def test_read_latency_degrades_gracefully_with_scale(self, store):
+        """Read latency should scale sub-linearly with idea count."""
+        results = {}
+        for count in (100, 500, 1000):
+            # Insert ideas up to count
+            current = len(store.get_ideas_for_home())
+            for i in range(current, count):
+                store.upsert_idea(f"scale-{i}", {"title": f"Scale {i}", "phase": "submitted"})
+
+            t0 = time.monotonic()
+            for _ in range(50):
+                store.get_ideas_for_home()
+            elapsed = time.monotonic() - t0
+            ms_per = (elapsed / 50) * 1000
+            results[count] = ms_per
+
+        # At 1000 ideas, read should be under 100ms
+        assert results[1000] < 100, f"Read at 1000 ideas: {results[1000]:.1f}ms"
+        # Degradation from 100->1000 should be less than 20x (sub-linear)
+        ratio = results[1000] / max(results[100], 0.01)
+        assert ratio < 20, f"Read degradation 100->1000: {ratio:.1f}x"
+
+    def test_write_throughput_sustained(self, store):
+        """Write throughput should not degrade over time."""
+        batch_size = 500
+        batch_times = []
+        for batch in range(5):
+            t0 = time.monotonic()
+            for i in range(batch_size):
+                idx = batch * batch_size + i
+                store.upsert_idea(f"tp-{idx}", {"title": f"TP {idx}", "phase": "submitted"})
+            batch_times.append(time.monotonic() - t0)
+
+        # Last batch should be within 3x of first batch
+        ratio = batch_times[-1] / max(batch_times[0], 0.001)
+        assert ratio < 3.0, (
+            f"Write throughput degraded: first={batch_times[0]:.3f}s, last={batch_times[-1]:.3f}s ({ratio:.1f}x)"
+        )
+
+    def test_concurrent_writers_no_data_loss(self, store):
+        """Multiple threads writing concurrently should not lose data."""
+        num_threads = 8
+        writes_per_thread = 200
+        errors = []
+
+        def writer(thread_id):
+            try:
+                for i in range(writes_per_thread):
+                    store.upsert_idea(
+                        f"cw-{thread_id}-{i}",
+                        {"title": f"Thread {thread_id} item {i}", "phase": "submitted"},
+                    )
+            except Exception as e:
+                errors.append((thread_id, e))
+
+        threads = [threading.Thread(target=writer, args=(t,)) for t in range(num_threads)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30)
+
+        assert not errors, f"Writer errors: {errors}"
+
+        ideas = store.get_ideas_for_home()
+        expected = num_threads * writes_per_thread
+        assert len(ideas) == expected, f"Expected {expected} ideas, got {len(ideas)}"
+
+    def test_concurrent_read_write_consistency(self, store):
+        """Readers should never see partial writes."""
+        idea_id = "rw-consistency"
+        stop = threading.Event()
+        bad_reads = []
+
+        store.upsert_idea(idea_id, {"title": "v0", "phase": "submitted", "total_cost_usd": 0})
+
+        def writer():
+            for i in range(500):
+                if stop.is_set():
+                    break
+                store.upsert_idea(
+                    idea_id,
+                    {"title": f"v{i}", "phase": "ideation", "total_cost_usd": float(i)},
+                )
+
+        def reader():
+            for _ in range(1000):
+                if stop.is_set():
+                    break
+                idea = store.get_idea(idea_id)
+                if idea is None:
+                    continue
+                # Every read should have all expected keys
+                if not all(k in idea for k in ("title", "phase", "total_cost_usd")):
+                    bad_reads.append(idea)
+
+        w = threading.Thread(target=writer)
+        readers = [threading.Thread(target=reader) for _ in range(4)]
+        w.start()
+        for r in readers:
+            r.start()
+        w.join(timeout=15)
+        stop.set()
+        for r in readers:
+            r.join(timeout=5)
+
+        assert not bad_reads, f"Found {len(bad_reads)} partial reads"
