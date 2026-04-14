@@ -84,4 +84,62 @@ def make_audit_hooks(
         logger.info(json.dumps(entry))
         return {}
 
-    return {"PostToolUse": [HookMatcher(hooks=[log_tool])]}
+    hooks_dict: dict = {"PostToolUse": [HookMatcher(hooks=[log_tool])]}
+
+    # Merge webhook hooks from boopifier.json if present
+    webhook_hooks = _build_webhook_hooks(agent_role, project_root)
+    if webhook_hooks:
+        for event, matchers in webhook_hooks.items():
+            hooks_dict.setdefault(event, []).extend(matchers)
+
+    return hooks_dict
+
+
+def _build_webhook_hooks(agent_role: str, project_root: Path) -> dict | None:
+    """Build SDK hooks that fire webhook calls from agent's boopifier.json.
+
+    The CLI's hook system (settings.json) doesn't apply to SDK-spawned agents,
+    so we read the agent's boopifier.json and call webhooks directly via HTTP.
+    """
+    import urllib.request
+
+    # Find boopifier.json in the agent's claude_home
+    boopifier_path = project_root / "agents" / agent_role / ".claude" / "boopifier.json"
+    if not boopifier_path.exists():
+        return None
+
+    try:
+        config = json.loads(boopifier_path.read_text())
+    except Exception:
+        return None
+
+    webhook_handlers = [h for h in config.get("handlers", []) if h.get("type") == "webhook"]
+    if not webhook_handlers:
+        return None
+
+    def _make_hook(url: str, event_name: str):
+        async def fire_webhook(hook_input, tool_use_id, context):
+            tool_name = hook_input.get("tool_name", "")
+            session_id = hook_input.get("session_id", "")
+            payload = json.dumps({"text": f"{event_name}|{session_id}|{tool_name}"}).encode()
+            req = urllib.request.Request(
+                url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
+            )
+            try:
+                urllib.request.urlopen(req, timeout=2)
+            except Exception:
+                pass
+            return {}
+
+        return fire_webhook
+
+    hooks_dict: dict = {}
+    for handler in webhook_handlers:
+        url = handler.get("config", {}).get("url", "")
+        if not url:
+            continue
+        for event in ("PreToolUse", "PostToolUse", "Stop", "Notification"):
+            hook_fn = _make_hook(url, event)
+            hooks_dict.setdefault(event, []).append(HookMatcher(hooks=[hook_fn]))
+
+    return hooks_dict

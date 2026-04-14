@@ -48,6 +48,31 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _fire_agent_webhook(agent_role: str, project_root: Path, event: str) -> None:
+    """Fire boopifier webhook for an agent event (best-effort, non-blocking)."""
+    import json as _json
+    import urllib.request
+
+    boopifier_path = project_root / "agents" / agent_role / ".claude" / "boopifier.json"
+    if not boopifier_path.exists():
+        return
+    try:
+        config = _json.loads(boopifier_path.read_text())
+        for handler in config.get("handlers", []):
+            if handler.get("type") != "webhook":
+                continue
+            url = handler.get("config", {}).get("url", "")
+            if not url:
+                continue
+            payload = _json.dumps({"text": f"{event}|{agent_role}|"}).encode()
+            req = urllib.request.Request(
+                url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
+            )
+            urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass
+
+
 def _keychain_service_hashed(config_dir: str) -> str:
     """Legacy hashed service name: Claude Code-credentials-<hash>."""
     h = hashlib.sha256(config_dir.encode()).hexdigest()[:8]
@@ -923,6 +948,9 @@ class BaseAgent(ABC):
 
         options.stderr = _on_stderr
 
+        # Fire webhook for session start (SDK hooks don't cover SessionStart)
+        _fire_agent_webhook(self.config.name, self.project_root, "SessionStart")
+
         try:
             async with ClaudeSDKClient(options=options) as client:
                 await client.query(prompt)
@@ -952,6 +980,7 @@ class BaseAgent(ABC):
                         )
                         self._clear_live_log(idea_id)
                         suggestions = self.parse_sandbox_suggestions(process_stderr)
+                        _fire_agent_webhook(self.config.name, self.project_root, "SessionEnd")
                         return AgentResult(
                             success=True,
                             output="\n".join(output_parts),
@@ -963,6 +992,7 @@ class BaseAgent(ABC):
                             sandbox_suggestions=suggestions,
                         )
         except Exception as e:
+            _fire_agent_webhook(self.config.name, self.project_root, "SessionEnd")
             logger.exception("Agent '%s' failed on '%s'", self.config.name, idea_id)
             self._save_transcript(
                 idea_id,
