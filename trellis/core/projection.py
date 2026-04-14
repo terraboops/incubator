@@ -122,25 +122,44 @@ class ProjectionStore:
         self._db.upsert(f"agent_log:`{safe_key}`", record)
 
     def update_metrics(self) -> None:
-        """Recompute aggregate metrics from idea projections."""
+        """Recompute aggregate metrics from idea projections.
+
+        Uses server-side aggregation to avoid pulling all ideas into Python.
+        Falls back to client-side if aggregation fails (SurrealDB version compat).
+        """
         if not self._db:
             return
-        ideas = self._db.query("SELECT phase, total_cost_usd, sandbox_failure_count FROM idea")
-        phase_counts: dict[str, int] = {}
-        total_cost = 0.0
-        sandbox_total = 0
-        for idea in ideas:
-            phase = idea.get("phase", "unknown")
-            phase_counts[phase] = phase_counts.get(phase, 0) + 1
-            total_cost += idea.get("total_cost_usd", 0) or 0
-            sandbox_total += idea.get("sandbox_failure_count", 0) or 0
+        try:
+            # Try server-side aggregation first
+            cost_result = self._db.query(
+                "SELECT math::sum(total_cost_usd) AS total, count() AS cnt, "
+                "math::sum(sandbox_failure_count) AS sb FROM idea GROUP ALL"
+            )
+            phase_result = self._db.query("SELECT phase, count() AS cnt FROM idea GROUP BY phase")
+            phase_counts = {r["phase"]: r["cnt"] for r in phase_result if r.get("phase")}
+            agg = cost_result[0] if cost_result else {}
+            total_cost = agg.get("total", 0) or 0
+            total_ideas = agg.get("cnt", 0) or 0
+            sandbox_total = agg.get("sb", 0) or 0
+        except Exception:
+            # Fallback: client-side aggregation
+            ideas = self._db.query("SELECT phase, total_cost_usd, sandbox_failure_count FROM idea")
+            phase_counts = {}
+            total_cost = 0.0
+            sandbox_total = 0
+            for idea in ideas:
+                phase = idea.get("phase", "unknown")
+                phase_counts[phase] = phase_counts.get(phase, 0) + 1
+                total_cost += idea.get("total_cost_usd", 0) or 0
+                sandbox_total += idea.get("sandbox_failure_count", 0) or 0
+            total_ideas = len(ideas)
 
         self._db.upsert(
             "metrics:current",
             {
                 "ideas_by_phase": phase_counts,
                 "total_cost": total_cost,
-                "total_ideas": len(ideas),
+                "total_ideas": total_ideas,
                 "sandbox_failure_total": sandbox_total,
                 "computed_at": datetime.now(timezone.utc).isoformat(),
             },

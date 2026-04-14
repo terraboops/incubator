@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,6 +35,32 @@ class Blackboard:
         self.base_dir = base_dir
         self.template_dir = base_dir / "_template"
         self.projection = None  # Set by app.py lifespan if projection is available
+
+    _PROJECTION_TIMEOUT = 5  # seconds — prevents blocking on hung WS connections
+
+    def _projection_write(self, idea_id: str, status: dict) -> None:
+        """Write-through to projection cache with a timeout guard.
+
+        If the projection store (especially ws:// mode) hangs due to a network
+        partition, this ensures the calling thread is not blocked indefinitely.
+        """
+
+        def _do_write():
+            try:
+                self.projection.upsert_idea(idea_id, status)
+                self.projection.update_metrics()
+            except Exception:
+                pass  # projection is best-effort
+
+        t = threading.Thread(target=_do_write, daemon=True)
+        t.start()
+        t.join(timeout=self._PROJECTION_TIMEOUT)
+        if t.is_alive():
+            logging.getLogger(__name__).warning(
+                "Projection write timed out after %ds for idea '%s'",
+                self._PROJECTION_TIMEOUT,
+                idea_id,
+            )
 
     def _tracer(self):
         from trellis.otel import get_tracer
@@ -99,12 +127,9 @@ class Blackboard:
             status["updated_at"] = datetime.now(timezone.utc).isoformat()
             self.write_file(idea_id, "status.json", json.dumps(status, indent=2))
             # Write-through to projection cache + WebSocket broadcast
+            # Uses a timeout thread to prevent blocking on hung WS connections
             if self.projection:
-                try:
-                    self.projection.upsert_idea(idea_id, status)
-                    self.projection.update_metrics()
-                except Exception:
-                    pass  # projection is best-effort
+                self._projection_write(idea_id, status)
             try:
                 import asyncio
 
