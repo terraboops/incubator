@@ -456,6 +456,57 @@ async function applySuggestion(agent, type, value, idx) {
 </div>
 {% endif %}
 
+<!-- Scheduling Debug Panel -->
+{% if debug_info %}
+<div class="mt-6 mb-6">
+    <h2 class="text-[0.95rem] font-medium text-[#3b3530] mb-3">Scheduling</h2>
+    <div class="card p-4 space-y-3">
+        <div class="flex items-center gap-3 flex-wrap">
+            {% if debug_info.currently_running %}
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.72rem] font-medium bg-[#eee8f6] text-[#7b5ea8]">
+                <span class="w-2 h-2 rounded-full bg-[#7b5ea8] animate-pulse"></span> Running on {{ debug_info.running_on }}
+            </span>
+            {% elif debug_info.rate_limit_hits > 0 %}
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.72rem] font-medium bg-[#fef3c7] text-[#92400e]">
+                Rate limited ({{ debug_info.rate_limit_hits }}x, backing off)
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.72rem] font-medium bg-[#f2efe8] text-[#8a8074]">
+                Idle
+            </span>
+            {% endif %}
+
+            {% if debug_info.is_post_ready %}
+            <span class="inline-flex px-2.5 py-1 rounded-full text-[0.72rem] font-medium bg-[#dbeafe] text-[#1e40af]">post_ready</span>
+            {% elif debug_info.is_background %}
+            <span class="inline-flex px-2.5 py-1 rounded-full text-[0.72rem] font-medium bg-[#f0fdf4] text-[#166534]">background</span>
+            {% else %}
+            <span class="inline-flex px-2.5 py-1 rounded-full text-[0.72rem] font-medium bg-[#fdf2f8] text-[#9d174d]">pipeline</span>
+            {% endif %}
+        </div>
+
+        {% if debug_info.ideas %}
+        <div class="mt-2">
+            <p class="text-[0.72rem] font-medium text-[#8a8074] mb-1.5">Per-idea eligibility</p>
+            <div class="space-y-1">
+                {% for idea in debug_info.ideas %}
+                <div class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[#faf9f6] text-[0.75rem]">
+                    <div class="flex items-center gap-2">
+                        <a href="/ideas/{{ idea.idea_id }}" class="text-[#3b3530] hover:underline font-medium">{{ idea.title }}</a>
+                        <span class="badge badge-{{ idea.phase }} text-[0.65rem]">{{ idea.phase }}</span>
+                    </div>
+                    <span class="text-[#b0a898] text-[0.7rem]">{{ idea.reason }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <p class="text-[0.75rem] text-[#b0a898]">No ideas currently eligible for this agent.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Agent Run Logs -->
 <div class="mt-6 mb-6">
     <h2 class="text-[0.95rem] font-medium text-[#3b3530] mb-3">Run History</h2>

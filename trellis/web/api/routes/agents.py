@@ -52,6 +52,94 @@ MODELS = ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"]
 PERMISSION_MODES = ["bypassPermissions", "acceptEdits", "default", "plan", "dontAsk"]
 
 
+def _build_agent_debug(agent_name: str, config, settings, request) -> dict:
+    """Build scheduling/debug info for the agent detail page."""
+    from trellis.core.blackboard import Blackboard
+
+    bb = Blackboard(settings.blackboard_dir)
+    info = {
+        "is_pipeline": config.phase not in ("*", None),
+        "is_post_ready": False,
+        "is_background": config.phase == "*",
+        "ideas": [],
+        "pool_status": "unknown",
+        "rate_limit_hits": 0,
+        "currently_running": False,
+        "queued": False,
+    }
+
+    # Check pool state
+    pool_state_path = settings.project_root / "pool" / "state.json"
+    if pool_state_path.exists():
+        try:
+            pool_state = json.loads(pool_state_path.read_text())
+            for w in pool_state.get("workers", []):
+                if w.get("role") == agent_name and w.get("status") == "active":
+                    info["currently_running"] = True
+                    info["running_on"] = w.get("idea", "")
+                    info["running_since"] = w.get("started_at", "")
+        except Exception:
+            pass
+
+    # Check pool manager for rate limit state (if accessible via app.state)
+    pool_mgr = getattr(request.app.state, "pool_manager", None)
+    if pool_mgr:
+        for (role, idea_id), hits in getattr(pool_mgr, "_rate_limit_hits", {}).items():
+            if role == agent_name and hits > 0:
+                info["rate_limit_hits"] = max(info["rate_limit_hits"], hits)
+
+    # Per-idea scheduling eligibility
+    for idea_id in bb.list_ideas():
+        try:
+            status = bb.get_status(idea_id)
+        except Exception:
+            continue
+        phase = status.get("phase", "submitted")
+        pipeline = status.get("pipeline", bb.get_pipeline(idea_id))
+        post_ready = pipeline.get("post_ready", [])
+        pipeline_agents = pipeline.get("agents", [])
+
+        # Is this agent relevant to this idea?
+        relevant = False
+        reason = ""
+
+        if config.phase == "*":
+            relevant = True
+            reason = "background agent (phase=*)"
+        elif agent_name in post_ready:
+            relevant = True
+            info["is_post_ready"] = True
+            serviced = status.get("last_serviced_by", {})
+            last_run = serviced.get(agent_name)
+            if phase != "released":
+                reason = f"post_ready, waiting for release (current: {phase})"
+            elif last_run:
+                reason = f"post_ready, last ran {last_run}"
+            else:
+                reason = "post_ready, never ran on this idea"
+        elif agent_name in pipeline_agents:
+            relevant = True
+            if phase == config.phase or agent_name == phase:
+                reason = f"pipeline stage, current phase={phase}"
+            else:
+                reason = (
+                    f"pipeline stage, not current (phase={phase}, agent handles={config.phase})"
+                )
+
+        if relevant:
+            info["ideas"].append(
+                {
+                    "idea_id": idea_id,
+                    "title": status.get("title", idea_id),
+                    "phase": phase,
+                    "reason": reason,
+                    "last_serviced": status.get("last_serviced_by", {}).get(agent_name, ""),
+                }
+            )
+
+    return info
+
+
 def _agent_view_data(agent: AgentConfig, settings) -> dict:
     data = vars(agent).copy()
     knowledge_dir = settings.project_root / "agents" / (agent.phase or agent.name) / "knowledge"
@@ -681,12 +769,16 @@ async def agent_detail(request: Request, agent_name: str):
             except Exception:
                 pass
 
+    # Build debug/scheduling info
+    debug_info = _build_agent_debug(agent_name, config, settings, request)
+
     ctx = _template_ctx(agent)
     ctx["request"] = request
     ctx["agent_logs"] = agent_logs
     ctx["associated_ideas"] = associated_ideas
     ctx["deadline_count"] = deadline_count
     ctx["sandbox_suggestions"] = sandbox_suggestions
+    ctx["debug_info"] = debug_info
     return templates.TemplateResponse("agent_detail.html", ctx)
 
 
