@@ -263,6 +263,7 @@ def _make_pool(tmp_path):
     pm.pool_dir.mkdir(exist_ok=True)
     pm.workers = []
     pm._job_kinds = {}
+    pm._rate_limit_hits = {}
     return pm
 
 

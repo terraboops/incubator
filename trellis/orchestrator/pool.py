@@ -88,6 +88,7 @@ class PoolManager:
         self.workers: list[Worker] = []
         self._running = False
         self._job_kinds: dict[tuple[str, str], str] = {}  # (role, idea_id) -> job kind
+        self._rate_limit_hits: dict[tuple[str, str], int] = {}  # backoff tracking
 
         # Pool dir for snapshots
         self.pool_dir = settings.project_root / "pool"
@@ -338,6 +339,30 @@ class PoolManager:
 
         now = datetime.now(timezone.utc)
 
+        if result.status == RunStatus.RATE_LIMITED:
+            # Exponential backoff: track consecutive rate-limits per role
+            key = (result.role, result.idea_id)
+            self._rate_limit_hits[key] = self._rate_limit_hits.get(key, 0) + 1
+            hits = self._rate_limit_hits[key]
+            backoff = min(300, 30 * (2 ** (hits - 1)))  # 30s, 60s, 120s, 300s cap
+            logger.warning(
+                "Rate-limited: %s on %s (hit #%d, backing off %ds)",
+                result.role,
+                result.idea_id,
+                hits,
+                backoff,
+            )
+            self._broadcast_sync(
+                "activity",
+                {
+                    "idea_id": result.idea_id,
+                    "message": f"{result.role} rate-limited, backing off {backoff}s",
+                    "kind": "warning",
+                },
+            )
+            await asyncio.sleep(backoff)
+            return
+
         if result.status == RunStatus.ERROR:
             self._job_kinds.pop((result.role, result.idea_id), None)
             self.blackboard.update_status(
@@ -364,6 +389,8 @@ class PoolManager:
             self.blackboard.update_status(result.idea_id, deadline_hits=hits)
 
         if result.status in (RunStatus.OK, RunStatus.DEADLINE):
+            # Clear rate-limit backoff on successful run
+            self._rate_limit_hits.pop((result.role, result.idea_id), None)
             # Read agent's recommendation
             status = self.blackboard.get_status(result.idea_id)
             recommendation = status.get("phase_recommendation", "proceed")

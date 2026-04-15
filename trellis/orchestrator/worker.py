@@ -28,6 +28,7 @@ class RunStatus(enum.Enum):
     DEADLINE = "deadline"
     ERROR = "error"
     SKIPPED = "skipped"
+    RATE_LIMITED = "rate_limited"
 
 
 @dataclass
@@ -122,6 +123,30 @@ class Worker:
                     timeout=timeout_seconds,
                 )
                 elapsed = time.monotonic() - start_time
+
+                # Detect rate-limited runs: $0 cost + fast completion + no output
+                if (
+                    result.cost_usd == 0
+                    and elapsed < 30
+                    and not result.output
+                    and result.stop_reason in ("stop_sequence", "end_turn", None)
+                ):
+                    logger.warning(
+                        "Worker %d: %s on %s appears rate-limited "
+                        "(cost=$0, elapsed=%.0fs, stop=%s)",
+                        self.worker_id,
+                        role,
+                        idea_id,
+                        elapsed,
+                        result.stop_reason,
+                    )
+                    return RunResult(
+                        status=RunStatus.RATE_LIMITED,
+                        role=role,
+                        idea_id=idea_id,
+                        duration_seconds=elapsed,
+                    )
+
                 return RunResult(
                     status=RunStatus.OK,
                     role=role,

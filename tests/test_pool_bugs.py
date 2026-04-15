@@ -36,6 +36,7 @@ def _make_pool(tmp_path):
     pm.lock_manager = MagicMock()
     pm.roles = ["ideation", "implementation", "validation", "release"]
     pm._job_kinds = {}
+    pm._rate_limit_hits = {}
 
     def _get_agent(name):
         m = MagicMock()
