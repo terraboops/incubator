@@ -14,6 +14,29 @@
     </div>
 </div>
 
+{% if is_new %}
+<div class="card p-5 mb-5" style="background: linear-gradient(135deg, #faf9f6 0%, #f0ebf8 100%); border-color: #d8cceb;">
+    <div class="flex items-start gap-4">
+        <div class="flex-shrink-0 w-9 h-9 rounded-full bg-[#eee8f6] flex items-center justify-center text-[#7b5ea8]">
+            {{ icon('sparkles', 18) }}
+        </div>
+        <div class="flex-1">
+            <h3 class="text-[0.88rem] font-medium text-[#3b3530] mb-1">Populate with AI</h3>
+            <p class="text-[0.75rem] text-[#8a8074] mb-3">Describe what you want and Claude will design the pipeline for you.</p>
+            <div class="flex gap-2">
+                <input type="text" id="ai-description" placeholder="e.g. A research-heavy pipeline for agricultural grants with human approval on release"
+                    class="flex-1 text-[0.84rem] bg-white border border-[#d8cceb] rounded-xl px-4 py-2.5 text-[#3b3530] placeholder-[#c5bfb3] focus:outline-none focus:border-[#a690cc]">
+                <button type="button" onclick="generatePipeline()" id="ai-gen-btn"
+                    class="btn btn-soft text-[0.78rem] px-4 whitespace-nowrap" style="border-color: #d8cceb; color: #7b5ea8;">
+                    Generate
+                </button>
+            </div>
+            <div id="ai-status" class="hidden mt-2 text-[0.75rem]"></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <form method="POST" action="/pipelines/{{ 'new' if is_new else pipeline.name }}" id="pipeline-form">
     <div class="space-y-5">
 
@@ -200,6 +223,71 @@
         </div>
     </div>
 </form>
+
+<script>
+async function generatePipeline() {
+    var btn = document.getElementById('ai-gen-btn');
+    var status = document.getElementById('ai-status');
+    var desc = document.getElementById('ai-description').value.trim();
+    if (!desc) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    status.classList.remove('hidden');
+    status.textContent = 'Claude is designing your pipeline...';
+    status.className = 'mt-2 text-[0.75rem] text-[#8a8074]';
+
+    try {
+        var resp = await fetch('/pipelines/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({description: desc})
+        });
+
+        if (!resp.ok) {
+            var err = await resp.json();
+            status.textContent = 'Error: ' + (err.error || resp.statusText);
+            status.className = 'mt-2 text-[0.75rem] text-red-600';
+            return;
+        }
+
+        var data = await resp.json();
+        if (data.error) {
+            status.textContent = 'Error: ' + data.error;
+            status.className = 'mt-2 text-[0.75rem] text-red-600';
+            return;
+        }
+
+        var p = data.pipeline;
+
+        // Fill in the form fields
+        var nameInput = document.querySelector('input[name="name"]');
+        if (nameInput && !nameInput.readOnly) nameInput.value = p.name || '';
+        var descInput = document.querySelector('textarea[name="description"]');
+        if (descInput) descInput.value = p.description || desc;
+
+        // Trigger the pipeline composer to update
+        // Set hidden inputs and rebuild the visual composer
+        if (window._setStages) window._setStages(p.agents || []);
+        if (window._setWatchers) window._setWatchers(p.post_ready || []);
+
+        // Also set the raw hidden inputs as fallback
+        var agentsInput = document.querySelector('input[name="agents"]');
+        if (agentsInput) agentsInput.value = (p.agents || []).join(', ');
+        var postReadyInput = document.querySelector('input[name="post_ready"]');
+        if (postReadyInput) postReadyInput.value = (p.post_ready || []).join(', ');
+
+        status.textContent = 'Pipeline generated! Review and save below.';
+        status.className = 'mt-2 text-[0.75rem] text-emerald-600';
+    } catch (e) {
+        status.textContent = 'Failed: ' + e.message;
+        status.className = 'mt-2 text-[0.75rem] text-red-600';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate';
+    }
+}
+</script>
 
 <script>
 (function() {
@@ -635,6 +723,18 @@
     renderWatchers();
     renderParallelGroups();
     renderGatingOverrides();
+
+    // Expose setters for AI generator
+    window._setStages = function(newStages) {
+        stages.length = 0;
+        newStages.forEach(function(s) { stages.push(s); });
+        renderStages();
+    };
+    window._setWatchers = function(newWatchers) {
+        watchers.length = 0;
+        newWatchers.forEach(function(w) { watchers.push(w); });
+        renderWatchers();
+    };
 })();
 </script>
 {% endblock %}

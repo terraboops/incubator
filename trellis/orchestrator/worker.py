@@ -124,13 +124,9 @@ class Worker:
                 )
                 elapsed = time.monotonic() - start_time
 
-                # Detect rate-limited runs: $0 cost + fast completion + no output
-                if (
-                    result.cost_usd == 0
-                    and elapsed < 30
-                    and not result.output
-                    and result.stop_reason in ("stop_sequence", "end_turn", None)
-                ):
+                # Detect rate-limited runs: $0 cost + fast completion
+                # Rate-limited agents may still produce brief output text
+                if result.cost_usd == 0 and elapsed < 30:
                     logger.warning(
                         "Worker %d: %s on %s appears rate-limited "
                         "(cost=$0, elapsed=%.0fs, stop=%s)",

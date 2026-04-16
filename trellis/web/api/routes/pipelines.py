@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import yaml
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from trellis.config import get_settings
 from trellis.core.blackboard import Blackboard, DEFAULT_PIPELINE
 from trellis.core.registry import load_registry
 from trellis.web.api.paths import TEMPLATES_DIR
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -28,13 +31,10 @@ def _templates_dir() -> Path:
     return d
 
 
-def _seed_default_if_empty(d: Path) -> None:
-    """Seed a default template from DEFAULT_PIPELINE if directory is empty."""
-    if any(d.glob("*.yaml")) or any(d.glob("*.yml")):
-        return
-    default = {
+_BUILTIN_TEMPLATES = [
+    {
         "name": "default",
-        "description": "Standard 4-stage pipeline with watchers (from DEFAULT_PIPELINE)",
+        "description": "Standard 4-stage pipeline: ideation, implementation, validation, release.",
         "agents": list(DEFAULT_PIPELINE["agents"]),
         "post_ready": list(DEFAULT_PIPELINE.get("post_ready", [])),
         "parallel_groups": [list(g) for g in DEFAULT_PIPELINE.get("parallel_groups", [])],
@@ -42,8 +42,39 @@ def _seed_default_if_empty(d: Path) -> None:
             "default": DEFAULT_PIPELINE.get("gating", {}).get("default", "auto"),
             "overrides": dict(DEFAULT_PIPELINE.get("gating", {}).get("overrides", {})),
         },
-    }
-    (d / "default.yaml").write_text(yaml.dump(default, default_flow_style=False, sort_keys=False))
+    },
+    {
+        "name": "research-heavy",
+        "description": "Research-first pipeline with competitive analysis and grant research before implementation.",
+        "agents": ["ideation", "implementation", "validation", "release"],
+        "post_ready": [
+            "research",
+            "competitive-watcher",
+            "canadian-grants-researcher",
+            "research-watcher",
+        ],
+        "parallel_groups": [["ideation"], ["implementation", "validation"], ["release"]],
+        "gating": {"default": "auto", "overrides": {"release": "human"}},
+    },
+    {
+        "name": "quick-mvp",
+        "description": "Fast 2-stage pipeline for quick prototypes: ideate then implement. No validation gate.",
+        "agents": ["ideation", "implementation"],
+        "post_ready": [],
+        "parallel_groups": [["ideation"], ["implementation"]],
+        "gating": {"default": "auto", "overrides": {}},
+    },
+]
+
+
+def _seed_default_if_empty(d: Path) -> None:
+    """Seed builtin templates if directory is empty."""
+    if any(d.glob("*.yaml")) or any(d.glob("*.yml")):
+        return
+    for tpl in _BUILTIN_TEMPLATES:
+        (d / f"{tpl['name']}.yaml").write_text(
+            yaml.dump(tpl, default_flow_style=False, sort_keys=False)
+        )
 
 
 def _load_template(path: Path) -> dict[str, Any]:
@@ -313,3 +344,90 @@ async def pipeline_apply(name: str, idea_id: str):
     }
     bb.set_pipeline(idea_id, pipeline)
     return RedirectResponse(url=f"/pipelines/{name}", status_code=303)
+
+
+_PIPELINE_GENERATOR_PROMPT = """\
+You are a pipeline designer for Trellis, an AI agent orchestrator.
+Given a description of what the user wants, generate a pipeline template as YAML.
+
+Available agents in this project:
+{agents_yaml}
+
+The YAML must have this exact structure (no markdown fences, just raw YAML):
+
+name: my-pipeline-name
+description: One sentence description
+agents:
+  - agent1
+  - agent2
+post_ready:
+  - optional-agent
+parallel_groups:
+  - [agent1]
+  - [agent2]
+gating:
+  default: auto
+  overrides:
+    release: human
+
+Rules:
+- agents: ordered list of pipeline stages (run sequentially)
+- post_ready: agents that run AFTER the pipeline completes (optional)
+- parallel_groups: which agents can run at the same time
+- gating.default: "auto" (no human approval) or "human" (require approval)
+- gating.overrides: per-agent gating overrides
+- Use only agents from the available agents list above
+- Keep it practical and focused on the user's description
+"""
+
+
+@router.post("/generate", response_class=JSONResponse)
+async def pipeline_generate(request: Request):
+    """Generate a pipeline template from a natural language description using AI."""
+    body = await request.json()
+    description = body.get("description", "").strip()
+    if not description:
+        return JSONResponse({"error": "Description is required"}, status_code=400)
+
+    available = _get_available_agents()
+    agents_yaml = yaml.dump(available, default_flow_style=False)
+
+    prompt = _PIPELINE_GENERATOR_PROMPT.format(agents_yaml=agents_yaml)
+    user_msg = f"Create a pipeline for: {description}"
+
+    try:
+        from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, ResultMessage
+
+        options = ClaudeAgentOptions(
+            system_prompt=prompt,
+            model="claude-haiku-4-5",
+            max_turns=1,
+            allowed_tools=[],
+        )
+
+        result_text = ""
+        async with ClaudeSDKClient(options=options) as client:
+            await client.query(user_msg)
+            async for message in client.receive_response():
+                if isinstance(message, ResultMessage):
+                    result_text = message.result or ""
+
+        # Parse the YAML response
+        generated = yaml.safe_load(result_text)
+        if not isinstance(generated, dict) or "agents" not in generated:
+            return JSONResponse(
+                {"error": "AI response was not valid pipeline YAML", "raw": result_text}
+            )
+
+        # Ensure required fields
+        generated.setdefault("name", "generated")
+        generated.setdefault("description", description)
+        generated.setdefault("post_ready", [])
+        generated.setdefault("parallel_groups", [])
+        generated.setdefault("gating", {"default": "auto", "overrides": {}})
+
+        return JSONResponse({"pipeline": generated})
+
+    except Exception as e:
+        logger.exception("Pipeline generation failed")
+        return JSONResponse({"error": str(e)}, status_code=500)

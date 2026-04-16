@@ -78,7 +78,7 @@ class Blackboard:
         # Write initial idea.md
         self.write_file(slug, "idea.md", f"# {title}\n\n{description}\n")
 
-        # Initialize status
+        # Initialize status with default pipeline
         status = {
             "id": slug,
             "title": title,
@@ -89,6 +89,7 @@ class Blackboard:
             "iteration_count": 0,
             "total_cost_usd": 0.0,
             "phase_history": [],
+            "pipeline": dict(DEFAULT_PIPELINE),
         }
         self.write_file(slug, "status.json", json.dumps(status, indent=2))
         if self.projection:
