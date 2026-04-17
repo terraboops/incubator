@@ -105,7 +105,7 @@
             </span>
             {% endif %}
             <span class="font-mono">${{ "%.2f"|format(idea.get('total_cost_usd', 0)) }}</span>
-            <span>{{ idea.get('iteration_count', 0) }} iter</span>
+            <span>{{ idea.get('total_runs', idea.get('iteration_count', 0)) }} runs</span>
             {% if idea.get('updated_at') %}
             <span class="ml-auto font-mono">{{ idea.updated_at[:10] }}</span>
             {% endif %}

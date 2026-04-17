@@ -177,6 +177,16 @@ class ProjectionStore:
             rid = r.pop("id", None)
             if rid:
                 r["id"] = _clean_record_id(rid)
+        # Enrich with total agent run counts from the log index
+        try:
+            log_counts = self._db.query(
+                "SELECT idea_id, count() AS cnt FROM agent_log GROUP BY idea_id"
+            )
+            counts_map = {r["idea_id"]: r["cnt"] for r in log_counts if r.get("idea_id")}
+            for r in results:
+                r["total_runs"] = counts_map.get(r.get("id", ""), 0)
+        except Exception:
+            pass
         return results
 
     def get_idea(self, idea_id: str) -> dict | None:

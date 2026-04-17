@@ -129,6 +129,9 @@ async def home(request: Request):
         for idea_id in bb.list_ideas():
             status = bb.get_status(idea_id)
             status["id"] = idea_id
+            # Count agent log files for total_runs
+            log_dir = bb.base_dir / idea_id / "agent-logs"
+            status["total_runs"] = len(list(log_dir.glob("*.json"))) if log_dir.is_dir() else 0
             raw_ideas.append(status)
 
     ideas = []
