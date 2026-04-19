@@ -9,17 +9,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from trellis.core.phase import Phase
+from trellis.core.pipeline import (
+    DONE_STAGE,
+    apply_reactivation,
+    backfill_stage_fields,
+    compute_stage_advancement,
+    default_pipeline,
+    eligible_roles,
+    initial_stage_fields,
+    migrate_pipeline,
+    set_role_state,
+    stage_is_complete,
+    watcher_is_in_scope,
+)
 
-DEFAULT_PIPELINE = {
-    "agents": ["ideation", "implementation", "validation", "release"],
-    "post_ready": ["competitive-watcher", "research-watcher"],
-    "parallel_groups": [
-        ["ideation", "implementation", "validation", "release"],
-        ["competitive-watcher", "research-watcher"],
-    ],
-    "gating": {"default": "auto", "overrides": {}},
-    "preset": "full-pipeline",
-}
+# Legacy constant kept for imports; prefer `default_pipeline()` directly.
+DEFAULT_PIPELINE = default_pipeline()
 
 
 def slugify(text: str) -> str:
@@ -79,6 +84,7 @@ class Blackboard:
         self.write_file(slug, "idea.md", f"# {title}\n\n{description}\n")
 
         # Initialize status with default pipeline
+        pipeline = default_pipeline()
         status = {
             "id": slug,
             "title": title,
@@ -89,7 +95,8 @@ class Blackboard:
             "iteration_count": 0,
             "total_cost_usd": 0.0,
             "phase_history": [],
-            "pipeline": dict(DEFAULT_PIPELINE),
+            "pipeline": pipeline,
+            **initial_stage_fields(pipeline),
         }
         self.write_file(slug, "status.json", json.dumps(status, indent=2))
         if self.projection:
@@ -105,7 +112,10 @@ class Blackboard:
 
     def get_status(self, idea_id: str) -> dict:
         raw = self.read_file(idea_id, "status.json")
-        return json.loads(raw)
+        status = json.loads(raw)
+        # Backfill new stage fields so new readers see them even on pre-migration
+        # status files. Read-only — we don't write it back here.
+        return backfill_stage_fields(status)
 
     def set_phase(self, idea_id: str, phase: Phase) -> None:
         status = self.get_status(idea_id)
@@ -185,28 +195,16 @@ class Blackboard:
         """Get the pipeline config for an idea, returning default if not set."""
         status = self.get_status(idea_id)
         if "pipeline" in status:
-            return self._migrate_pipeline(status["pipeline"])
-        # Deep copy to prevent mutation of the module-level default
-        return json.loads(json.dumps(DEFAULT_PIPELINE))
+            return migrate_pipeline(status["pipeline"])
+        return default_pipeline()
 
     def set_pipeline(self, idea_id: str, pipeline: dict) -> None:
         """Set the full pipeline config for an idea."""
         self.update_status(idea_id, pipeline=pipeline)
 
     def _migrate_pipeline(self, pipeline: dict) -> dict:
-        """Migrate old pipeline configs to new format."""
-        # Rename stages → agents
-        if "stages" in pipeline and "agents" not in pipeline:
-            pipeline["agents"] = pipeline.pop("stages")
-        # Add parallel_groups if missing
-        if "parallel_groups" not in pipeline:
-            agents = pipeline.get("agents", [])
-            post_ready = pipeline.get("post_ready", [])
-            groups = [agents]
-            if post_ready:
-                groups.append(post_ready)
-            pipeline["parallel_groups"] = groups
-        return pipeline
+        """Migrate old pipeline configs to new format. Kept for back-compat."""
+        return migrate_pipeline(pipeline)
 
     def next_agent(self, idea_id: str) -> str | None:
         """Return the next uncompleted pipeline agent, or None if all done.
@@ -236,6 +234,116 @@ class Blackboard:
     def is_ready(self, idea_id: str) -> bool:
         """Check if all pipeline agents have been completed."""
         return self.next_agent(idea_id) is None
+
+    # ── Stage-aware scheduler primitives (new; see custom-stages spec) ─
+
+    def next_roles_in_current_stage(self, idea_id: str) -> list[str]:
+        """Return the roles eligible to run right now in the current stage.
+
+        All returned roles may run concurrently (they share a role_group).
+        Empty when the current stage is complete — the caller should then
+        call `advance_stage_if_complete`.
+        """
+        return eligible_roles(self.get_status(idea_id))
+
+    def is_done(self, idea_id: str) -> bool:
+        """True when the idea sits in the `done` sentinel stage."""
+        return self.get_status(idea_id).get("current_stage") == DONE_STAGE
+
+    def mark_role_state(
+        self,
+        idea_id: str,
+        role: str,
+        state: str,
+        *,
+        completed_at: str | None = None,
+    ) -> None:
+        """Flip a role's state in the current stage's `role_state` sub-tree.
+
+        This is the "role-level commit" — separate from stage advancement,
+        which is done by `advance_stage_if_complete`.
+        """
+        status = self.get_status(idea_id)
+        new_role_state = set_role_state(status, role, state, completed_at=completed_at)
+        self.update_status(idea_id, role_state=new_role_state)
+
+    def watcher_is_in_scope(self, idea_id: str, watcher_config: dict) -> bool:
+        """True when the watcher's `scope` matches the idea's current state."""
+        return watcher_is_in_scope(watcher_config, self.get_status(idea_id))
+
+    def reactivate_from_done(
+        self, idea_id: str, reactivate_payload: dict, *, watcher_name: str
+    ) -> str:
+        """Apply a watcher-driven reactivation to a done idea.
+
+        Returns the new `current_stage` on success. Raises ValueError if
+        the payload is malformed or the target stage isn't resolvable.
+        """
+        status = self.get_status(idea_id)
+        updates = apply_reactivation(status, reactivate_payload, watcher_name=watcher_name)
+        self.update_status(idea_id, **updates)
+        return updates["current_stage"]
+
+    def clear_failed_role(
+        self, idea_id: str, role: str, *, actor: str = "human", note: str | None = None
+    ) -> None:
+        """Reset a role's state from `failed` → `pending` so it can retry.
+
+        Appends a phase_history entry so the action is auditable. Raises
+        ValueError if the role isn't in `failed`, so human mistakes are
+        surfaced rather than silently no-oping.
+        """
+        status = self.get_status(idea_id)
+        current_stage = status.get("current_stage") or "default"
+        role_state = dict(status.get("role_state") or {})
+        stage_state = dict(role_state.get(current_stage) or {})
+        entry = stage_state.get(role)
+        if not entry or entry.get("state") != "failed":
+            raise ValueError(
+                f"Role {role!r} is not in 'failed' state (was: "
+                f"{entry.get('state') if entry else 'absent'})"
+            )
+
+        # Reset to pending — next scheduler tick will re-queue.
+        new_entry = dict(entry)
+        new_entry["state"] = "pending"
+        new_entry["iterations"] = 0
+        new_entry["retried_at"] = datetime.now(timezone.utc).isoformat()
+        new_entry["retried_by"] = actor
+        if note:
+            new_entry["retry_note"] = note
+        stage_state[role] = new_entry
+        role_state[current_stage] = stage_state
+
+        history = list(status.get("phase_history") or [])
+        history.append(
+            {
+                "from": "failed",
+                "to": "pending",
+                "role": role,
+                "stage": current_stage,
+                "actor": actor,
+                "note": note,
+                "at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+        self.update_status(idea_id, role_state=role_state, phase_history=history)
+
+    def advance_stage_if_complete(self, idea_id: str) -> str | None:
+        """If the current stage is complete, advance and return the new stage name.
+
+        Stage advancement is its own atomic status.json write per the spec —
+        the scheduler calls this after a role flips to `proceed`.
+        """
+        status = self.get_status(idea_id)
+        if not stage_is_complete(status):
+            return None
+        advancement = compute_stage_advancement(status)
+        if advancement is None:
+            return None
+        self.update_status(idea_id, **advancement)
+        return advancement["current_stage"]
 
     def pending_post_ready(self, idea_id: str) -> list[str]:
         """Return post_ready roles that haven't been serviced yet."""

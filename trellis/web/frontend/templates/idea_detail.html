@@ -13,6 +13,10 @@
                     {{ phase_icon(status.phase, 12) }}
                     {{ status.phase | phase_label }}
                 </span>
+                {% if status.get('current_stage') and status.current_stage != 'default' %}
+                <span class="text-[0.72rem] font-mono text-[#8a8074] bg-[#f2efe8] px-2 py-0.5 rounded-md"
+                      title="Pipeline stage (user-defined)">stage: {{ status.current_stage }}</span>
+                {% endif %}
                 <span class="text-[0.78rem] text-[#8a8074] font-mono cursor-default"
                       title="Total API cost spent on this idea across all agents and phases">
                     ${{ "%.2f"|format(status.get('total_cost_usd', 0)) }}
@@ -83,6 +87,39 @@
         <span class="text-[0.6rem] text-[#b0a898]">{{ info.files }} file{{ 's' if info.files != 1 else '' }}</span>
     </div>
     {% endfor %}
+</div>
+{% endif %}
+
+<!-- Failed roles panel — lets a human clear a role's failed state -->
+{% set failed_roles = [] %}
+{% for stage_name, roles in (status.get('role_state') or {}).items() %}
+  {% for role_name, entry in (roles or {}).items() %}
+    {% if entry and entry.get('state') == 'failed' %}
+      {% set _ = failed_roles.append((stage_name, role_name, entry)) %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+{% if failed_roles %}
+<div class="card-flat p-4 mb-6 border-l-4" style="border-left-color: #c44; background: #fef5f5;">
+    <div class="text-[0.82rem] font-medium text-[#922] mb-2">
+        {{ icon('alert-triangle', 14) }} Failed roles ({{ failed_roles | length }})
+    </div>
+    <div class="space-y-2">
+    {% for stage_name, role_name, entry in failed_roles %}
+        <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+                <span class="font-mono text-[0.78rem] text-[#544d43]">{{ stage_name }} / {{ role_name }}</span>
+                <span class="text-[0.68rem] text-[#8a8074] ml-2">{{ entry.get('iterations', 0) }} attempts</span>
+            </div>
+            <form method="post"
+                  action="/ideas/{{ idea_id }}/roles/{{ role_name }}/retry"
+                  data-retry-form
+                  class="flex-shrink-0">
+                <button type="submit" class="btn btn-soft text-[0.72rem]">Retry</button>
+            </form>
+        </div>
+    {% endfor %}
+    </div>
 </div>
 {% endif %}
 
@@ -229,6 +266,103 @@
 </details>
 {% endif %}
 
+<!-- Stage progress (nested: stages outer, role_groups inner) -->
+{% set sp = pipeline.get('stages') or [] %}
+{% if sp %}
+{% set curr = status.get('current_stage') or 'default' %}
+{% set role_state = status.get('role_state') or {} %}
+{% set handler_colors = {
+    'agent': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'script': 'bg-amber-50 text-amber-700 border-amber-200',
+    'webhook': 'bg-sky-50 text-sky-700 border-sky-200',
+    'human': 'bg-violet-50 text-violet-700 border-violet-200',
+    'k8s_job': 'bg-rose-50 text-rose-700 border-rose-200',
+} %}
+{% set state_styles = {
+    'proceed': 'bg-emerald-500 text-white border-emerald-600',
+    'iterate': 'bg-amber-100 text-amber-800 border-amber-400',
+    'needs_review': 'bg-violet-100 text-violet-800 border-violet-400',
+    'failed': 'bg-rose-500 text-white border-rose-600',
+    'pending': 'bg-white text-[#8a8074] border-[#ddd6ca]',
+} %}
+<div class="mb-6 rounded-xl bg-[#f7f5f0] border border-[#eae6df] p-4">
+  <div class="flex items-center gap-2 mb-3">
+    <span class="text-[0.8rem] font-medium text-[#544d43]">Progress</span>
+    <span class="text-[0.7rem] text-[#b0a898] font-mono">
+      {% if curr == 'done' %}
+        complete · {{ sp|length }} stage{{ 's' if sp|length != 1 else '' }}
+      {% elif curr in (sp|map(attribute='name')|list) %}
+        stage {{ (sp|map(attribute='name')|list).index(curr) + 1 }}/{{ sp|length }}
+      {% else %}
+        —/{{ sp|length }}
+      {% endif %}
+    </span>
+    <button type="button" id="add-custom-stage"
+            class="ml-auto text-[0.7rem] text-[#8a8074] hover:text-[#3b3530] bg-white border border-[#eae6df] rounded-md px-2 py-0.5 cursor-pointer"
+            title="Append a new stage to this idea's pipeline">+ Add stage</button>
+  </div>
+
+  <!-- Outer bar: stages -->
+  <div class="flex gap-1 mb-3">
+    {% for stage in sp %}
+      {% set name = stage.name %}
+      {% set sn = (sp|map(attribute='name')|list) %}
+      {% set i = sn.index(name) %}
+      {% set ci = sn.index(curr) if curr in sn else sn|length %}
+      {% set state_cls = 'bg-emerald-400' if i < ci else ('bg-[#c9a97a]' if i == ci else 'bg-[#eae6df]') %}
+      <div class="flex-1 h-1.5 rounded-full {{ state_cls }} relative" title="{{ name }}"></div>
+    {% endfor %}
+  </div>
+
+  <!-- Stage labels -->
+  <div class="flex gap-1 mb-4 text-[0.68rem] font-mono">
+    {% for stage in sp %}
+      {% set name = stage.name %}
+      {% set sn = (sp|map(attribute='name')|list) %}
+      {% set i = sn.index(name) %}
+      {% set ci = sn.index(curr) if curr in sn else sn|length %}
+      {% set cls = 'text-emerald-700 font-medium' if i < ci else ('text-[#3b3530] font-medium' if i == ci else 'text-[#b0a898]') %}
+      <div class="flex-1 truncate {{ cls }}" title="{{ name }}">{{ name }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Inner: role_groups of the current stage (or the last one if done) -->
+  {% set shown_stage = namespace(v=None) %}
+  {% for stage in sp %}
+    {% if stage.name == curr %}{% set shown_stage.v = stage %}{% endif %}
+  {% endfor %}
+  {% if shown_stage.v is none and sp %}
+    {% set shown_stage.v = sp[-1] %}
+  {% endif %}
+  {% if shown_stage.v %}
+    {% set stage_name = shown_stage.v.name %}
+    {% set stage_roles = role_state.get(stage_name) or {} %}
+    <div class="space-y-1.5">
+      {% for group in shown_stage.v.role_groups or [] %}
+      <div class="flex flex-wrap items-center gap-1.5">
+        {% if group|length > 1 %}
+        <span class="text-[0.62rem] text-[#b0a898] uppercase tracking-wide font-medium pr-1"
+              title="These roles run in parallel">parallel</span>
+        {% endif %}
+        {% for role in group %}
+          {% set rname = role.name if role is mapping else role %}
+          {% set htype = (role.handler if role is mapping else 'agent') or 'agent' %}
+          {% set entry = stage_roles.get(rname) or {} %}
+          {% set rstate = entry.get('state') or 'pending' %}
+          {% set style = state_styles.get(rstate) or state_styles['pending'] %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[0.72rem] font-mono {{ style }}"
+                title="{{ rname }} · handler:{{ htype }} · state:{{ rstate }}">
+            {{ rname }}
+            <span class="text-[0.6rem] opacity-75 uppercase">{{ htype[0] }}</span>
+          </span>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <!-- Pipeline editor -->
 <details class="mb-6" id="pipeline-editor">
     <summary class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-[#f7f5f0] border border-[#eae6df] cursor-pointer select-none hover:border-[#ddd6ca] transition-colors" style="list-style: none;">
@@ -260,7 +394,19 @@
                     </div>
                 </div>
                 <div id="stage-list" class="space-y-1.5">
+                    {# Build role → handler map from pipeline.stages for badge rendering #}
+                    {% set role_handlers = {} %}
+                    {% for _stage in pipeline.get('stages') or [] %}
+                      {% for _group in _stage.role_groups or [] %}
+                        {% for _role in _group %}
+                          {% if _role is mapping and _role.get('name') %}
+                            {% set _ = role_handlers.update({_role.name: _role.get('handler', 'agent')}) %}
+                          {% endif %}
+                        {% endfor %}
+                      {% endfor %}
+                    {% endfor %}
                     {% for stage in pipeline.get('agents', []) %}
+                    {% set htype = role_handlers.get(stage, 'agent') %}
                     <div class="stage-item flex items-center gap-2 px-3 py-2 rounded-lg bg-[#f7f5f0] border border-[#eae6df] group" draggable="true" data-stage="{{ stage }}">
                         <span class="cursor-grab text-[#b0a898] hover:text-[#8a8074] select-none" title="Drag to reorder">&#x2261;</span>
                         <span class="inline-block px-1.5 py-0.5 rounded text-[0.68rem] font-medium
@@ -269,6 +415,14 @@
                             {% elif stage == 'validation' %}bg-amber-50 text-amber-700
                             {% elif stage == 'release' %}bg-violet-50 text-violet-700
                             {% else %}bg-stone-100 text-stone-600{% endif %}">{{ stage }}</span>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6rem] font-mono border
+                            {% if htype == 'agent' %}bg-emerald-50 text-emerald-700 border-emerald-200
+                            {% elif htype == 'script' %}bg-amber-50 text-amber-700 border-amber-200
+                            {% elif htype == 'webhook' %}bg-sky-50 text-sky-700 border-sky-200
+                            {% elif htype == 'human' %}bg-violet-50 text-violet-700 border-violet-200
+                            {% elif htype == 'k8s_job' %}bg-rose-50 text-rose-700 border-rose-200
+                            {% else %}bg-stone-100 text-stone-500 border-stone-200{% endif %}"
+                              title="handler: {{ htype }}">{{ htype }}</span>
                         <select class="gating-select ml-auto text-[0.68rem] text-[#8a8074] bg-white border border-[#eae6df] rounded px-1.5 py-0.5 cursor-pointer"
                                 data-stage="{{ stage }}" onchange="updateGating()">
                             {% set stage_gating = pipeline.get('gating', {}).get('overrides', {}).get(stage, '') %}
