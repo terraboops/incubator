@@ -57,6 +57,32 @@
                         class="w-full text-[0.84rem] bg-[#faf9f6] border border-[#eae6df] rounded-xl px-4 py-2.5 text-[#3b3530] placeholder-[#c5bfb3] resize-y"
                         placeholder="Brief description of this pipeline...">{{ pipeline.description }}</textarea>
                 </div>
+                {% if is_new %}
+                <div>
+                    <label class="block text-[0.75rem] font-medium text-[#544d43] mb-1.5">File Format</label>
+                    <div class="flex gap-2" id="format-radios">
+                        {% for fmt in ['yaml', 'prose'] %}
+                        <label class="flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all text-[0.8rem]
+                            {{ 'bg-[#3b3530] text-[#faf9f6] border-[#3b3530]' if (pipeline.get('format', 'yaml') == fmt) else 'bg-white border-[#eae6df] text-[#544d43] hover:border-[#ddd6ca]' }}">
+                            <input type="radio" name="template_format" value="{{ fmt }}"
+                                {{ 'checked' if (pipeline.get('format', 'yaml') == fmt) else '' }}
+                                class="hidden">
+                            {% if fmt == 'yaml' %}YAML{% else %}Prose{% endif %}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <p class="text-[0.68rem] text-[#b0a898] mt-1.5">Both formats produce identical pipelines. Choose whichever you prefer.</p>
+                </div>
+                {% else %}
+                <div class="flex items-center gap-2">
+                    <span class="text-[0.75rem] font-medium text-[#544d43]">Format:</span>
+                    {% if pipeline.get('format') == 'prose' %}
+                    <span class="inline-flex items-center px-2 py-[2px] rounded text-[0.68rem] font-medium bg-[#eee8f6] text-[#7b5ea8]">PROSE</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-[2px] rounded text-[0.68rem] font-medium bg-[#e3edf7] text-[#4a7aaa]">YAML</span>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -672,6 +698,26 @@ async function generatePipeline() {
     document.getElementById('btn-add-group').addEventListener('click', function() {
         parallelGroups.push([]);
         renderParallelGroups();
+    });
+
+    // Format radio labels
+    document.querySelectorAll('#format-radios input[type=radio]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('#format-radios label').forEach(function(label) {
+                var r = label.querySelector('input');
+                if (r.checked) {
+                    label.className = label.className
+                        .replace('bg-white border-[#eae6df] text-[#544d43] hover:border-[#ddd6ca]', '')
+                        .replace('bg-[#3b3530] text-[#faf9f6] border-[#3b3530]', '');
+                    label.className += ' bg-[#3b3530] text-[#faf9f6] border-[#3b3530]';
+                } else {
+                    label.className = label.className
+                        .replace('bg-[#3b3530] text-[#faf9f6] border-[#3b3530]', '')
+                        .replace('bg-white border-[#eae6df] text-[#544d43] hover:border-[#ddd6ca]', '');
+                    label.className += ' bg-white border-[#eae6df] text-[#544d43] hover:border-[#ddd6ca]';
+                }
+            });
+        });
     });
 
     // Gating radio labels

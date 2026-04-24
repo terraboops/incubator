@@ -31,7 +31,14 @@
                     {% endif %}
                 </div>
             </div>
-            <span class="badge badge-ideation flex-shrink-0 mt-0.5">{{ tpl.agents|length }} agent{{ 's' if tpl.agents|length != 1 else '' }}</span>
+            <div class="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+                {% if tpl.format == 'prose' %}
+                <span class="inline-flex items-center px-1.5 py-[1px] rounded text-[0.56rem] font-medium bg-[#eee8f6] text-[#7b5ea8]">PROSE</span>
+                {% else %}
+                <span class="inline-flex items-center px-1.5 py-[1px] rounded text-[0.56rem] font-medium bg-[#e3edf7] text-[#4a7aaa]">YAML</span>
+                {% endif %}
+                <span class="badge badge-ideation">{{ tpl.agents|length }} agent{{ 's' if tpl.agents|length != 1 else '' }}</span>
+            </div>
         </div>
 
         {# Pipeline flow visualization #}

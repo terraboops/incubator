@@ -598,6 +598,51 @@ def upgrade(
     console.print("\n[green]Agent upgrade complete.[/green]")
 
 
+@app.command(name="pipelines-to-prose")
+def pipelines_to_prose(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show generated .prose without writing"),
+) -> None:
+    """Convert YAML pipeline templates to Prose format."""
+    from pathlib import Path
+
+    from trellis.config import find_project_root
+    from trellis.core.pipeline_format import load_pipeline, save_pipeline
+    from trellis.core.prose_parser import emit_pipeline_prose
+
+    try:
+        project_root = find_project_root()
+    except FileNotFoundError:
+        console.print("[red]Not a Trellis project. Run 'trellis init' first.[/red]")
+        raise typer.Exit(1)
+
+    templates_dir = project_root / "pipeline-templates"
+    if not templates_dir.exists():
+        console.print("[dim]No pipeline-templates/ directory found.[/dim]")
+        return
+
+    yaml_files = sorted(list(templates_dir.glob("*.yaml")) + list(templates_dir.glob("*.yml")))
+    if not yaml_files:
+        console.print("[dim]No YAML pipeline templates found.[/dim]")
+        return
+
+    for yaml_path in yaml_files:
+        data = load_pipeline(yaml_path)
+        prose_text = emit_pipeline_prose(data)
+        prose_path = templates_dir / f"{yaml_path.stem}.prose"
+
+        if dry_run:
+            console.print(f"\n[bold]{yaml_path.name}[/bold] → {prose_path.name}:")
+            console.print(f"[dim]{prose_text}[/dim]")
+        else:
+            save_pipeline(prose_path, data, fmt="prose")
+            bak_path = yaml_path.with_suffix(yaml_path.suffix + ".bak")
+            yaml_path.rename(bak_path)
+            console.print(f"  [green]✓[/green] {yaml_path.name} → {prose_path.name} (original → {bak_path.name})")
+
+    if not dry_run:
+        console.print(f"\n[bold green]{len(yaml_files)} template(s) converted.[/bold green]")
+
+
 @app.command()
 def migrate(
     registry: str = typer.Option(

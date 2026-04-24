@@ -44,9 +44,9 @@ class AgentConfig:
     sandbox_verify_attestations: bool = False  # Require signed instruction files
 
     # Identity federation (per-agent forge access)
-    forge_repos: list[str] = field(default_factory=list)           # repos agent can access
+    forge_repos: list[str] = field(default_factory=list)  # repos agent can access
     forge_permissions: dict[str, str] = field(default_factory=dict)  # e.g. {"contents": "write"}
-    forge_branch_pattern: str = ""                                 # branch restriction regex
+    forge_branch_pattern: str = ""  # branch restriction regex
 
 
 @dataclass

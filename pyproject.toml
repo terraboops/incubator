@@ -12,6 +12,7 @@ dependencies = [
     "croniter",
     "typer[all]",
     "pyyaml",
+    "lark>=1.1",
     "rich",
     "watchfiles",
     "gitpython",
@@ -60,6 +61,7 @@ include = ["trellis*"]
 [tool.setuptools.package-data]
 trellis = [
     "defaults/**/*",
+    "defaults/**/*.prose",
     "defaults/**/.*",
     "web/frontend/templates/**/*",
     "web/frontend/static/**/*",

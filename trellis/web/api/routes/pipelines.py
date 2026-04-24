@@ -14,6 +14,12 @@ from fastapi.templating import Jinja2Templates
 
 from trellis.config import get_settings
 from trellis.core.blackboard import Blackboard, DEFAULT_PIPELINE
+from trellis.core.pipeline_format import (
+    detect_format,
+    find_template,
+    load_pipeline,
+    save_pipeline,
+)
 from trellis.core.registry import load_registry
 from trellis.web.api.paths import TEMPLATES_DIR
 
@@ -68,18 +74,16 @@ _BUILTIN_TEMPLATES = [
 
 
 def _seed_default_if_empty(d: Path) -> None:
-    """Seed builtin templates if directory is empty."""
-    if any(d.glob("*.yaml")) or any(d.glob("*.yml")):
+    """Seed builtin templates if directory is empty (YAML or Prose)."""
+    if any(d.glob("*.yaml")) or any(d.glob("*.yml")) or any(d.glob("*.prose")):
         return
     for tpl in _BUILTIN_TEMPLATES:
-        (d / f"{tpl['name']}.yaml").write_text(
-            yaml.dump(tpl, default_flow_style=False, sort_keys=False)
-        )
+        save_pipeline(d / f"{tpl['name']}.yaml", tpl, fmt="yaml")
 
 
 def _load_template(path: Path) -> dict[str, Any]:
-    """Load a single template YAML file."""
-    data = yaml.safe_load(path.read_text()) or {}
+    """Load a single pipeline template file (``.prose``, ``.yaml``, or ``.yml``)."""
+    data = load_pipeline(path)
     # Ensure name matches filename
     data.setdefault("name", path.stem)
     data.setdefault("description", "")
@@ -87,32 +91,30 @@ def _load_template(path: Path) -> dict[str, Any]:
     data.setdefault("post_ready", [])
     data.setdefault("parallel_groups", [])
     data.setdefault("gating", {"default": "auto", "overrides": {}})
+    data["format"] = detect_format(path)
     return data
 
 
 def _list_templates() -> list[dict[str, Any]]:
-    """Load all pipeline templates."""
+    """Load all pipeline templates (Prose, YAML, and YML)."""
     d = _templates_dir()
     _seed_default_if_empty(d)
     result = []
-    for f in sorted(d.glob("*.yaml")):
-        try:
-            result.append(_load_template(f))
-        except Exception:
-            continue
-    for f in sorted(d.glob("*.yml")):
-        try:
-            result.append(_load_template(f))
-        except Exception:
-            continue
+    for pattern in ("*.prose", "*.yaml", "*.yml"):
+        for f in sorted(d.glob(pattern)):
+            try:
+                result.append(_load_template(f))
+            except Exception:
+                continue
     return result
 
 
-def _save_template(name: str, data: dict) -> None:
-    """Save a template to YAML."""
+def _save_template(name: str, data: dict, fmt: str = "yaml") -> None:
+    """Save a template in the specified format (``'yaml'`` or ``'prose'``)."""
     d = _templates_dir()
     data["name"] = name
-    (d / f"{name}.yaml").write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+    ext = ".prose" if fmt == "prose" else ".yaml"
+    save_pipeline(d / f"{name}{ext}", data, fmt=fmt)
 
 
 def _get_ideas() -> list[dict]:
@@ -193,6 +195,7 @@ async def pipeline_create(
     parallel_groups_json: str = Form("[]"),
     gating_default: str = Form("auto"),
     gating_overrides_json: str = Form("{}"),
+    template_format: str = Form("yaml"),
 ):
     slug = name.strip().lower().replace(" ", "-")
     if not slug:
@@ -219,6 +222,7 @@ async def pipeline_create(
         if post_ready_list:
             parallel_groups.append(post_ready_list)
 
+    fmt = "prose" if template_format == "prose" else "yaml"
     data = {
         "name": slug,
         "description": description,
@@ -230,7 +234,7 @@ async def pipeline_create(
             "overrides": gating_overrides,
         },
     }
-    _save_template(slug, data)
+    _save_template(slug, data, fmt=fmt)
     return RedirectResponse(url=f"/pipelines/{slug}", status_code=303)
 
 
@@ -238,10 +242,8 @@ async def pipeline_create(
 async def pipeline_detail(request: Request, name: str):
     d = _templates_dir()
     _seed_default_if_empty(d)
-    path = d / f"{name}.yaml"
-    if not path.exists():
-        path = d / f"{name}.yml"
-    if not path.exists():
+    path = find_template(d, name)
+    if path is None:
         return HTMLResponse("Pipeline template not found", status_code=404)
 
     pipeline = _load_template(path)
@@ -269,11 +271,12 @@ async def pipeline_update(
     gating_overrides_json: str = Form("{}"),
 ):
     d = _templates_dir()
-    path = d / f"{name}.yaml"
-    if not path.exists():
-        path = d / f"{name}.yml"
-    if not path.exists():
+    path = find_template(d, name)
+    if path is None:
         return HTMLResponse("Pipeline template not found", status_code=404)
+
+    # Preserve the existing file's format on update
+    fmt = detect_format(path)
 
     try:
         parallel_groups = json.loads(parallel_groups_json)
@@ -306,17 +309,15 @@ async def pipeline_update(
             "overrides": gating_overrides,
         },
     }
-    _save_template(name, data)
+    _save_template(name, data, fmt=fmt)
     return RedirectResponse(url=f"/pipelines/{name}", status_code=303)
 
 
 @router.post("/{name}/delete")
 async def pipeline_delete(name: str):
     d = _templates_dir()
-    path = d / f"{name}.yaml"
-    if not path.exists():
-        path = d / f"{name}.yml"
-    if path.exists():
+    path = find_template(d, name)
+    if path is not None:
         path.unlink()
     return RedirectResponse(url="/pipelines/", status_code=303)
 
@@ -325,10 +326,8 @@ async def pipeline_delete(name: str):
 async def pipeline_apply(name: str, idea_id: str):
     d = _templates_dir()
     _seed_default_if_empty(d)
-    path = d / f"{name}.yaml"
-    if not path.exists():
-        path = d / f"{name}.yml"
-    if not path.exists():
+    path = find_template(d, name)
+    if path is None:
         return HTMLResponse("Pipeline template not found", status_code=404)
 
     tpl = _load_template(path)

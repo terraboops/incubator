@@ -64,7 +64,8 @@ pipeline ships with four stages, but you can build your own:
 
 The default pipeline (ideation → implementation → validation → release) is just
 one template. Create your own in `pipeline-templates/` or via the dashboard at
-`/pipelines/`:
+`/pipelines/`. Templates can be **YAML** or **Prose** — both formats are
+first-class and produce identical pipelines:
 
 ```yaml
 # pipeline-templates/research-only.yaml
@@ -76,6 +77,23 @@ gating:
   default: auto
   overrides:
     ideation: human-review
+```
+
+Or the same pipeline in Prose — a declarative orchestration format:
+
+```prose
+# pipeline-templates/research-only.prose
+pipeline research-only:
+  description: "Deep research without building anything"
+
+  parallel:
+    session: research-watcher
+
+  session: ideation
+  gate: human-review
+
+  session: competitive-watcher
+  gate: auto
 ```
 
 Each idea gets its own pipeline config. You can assign different pipelines to
@@ -144,6 +162,7 @@ trellis run                     Worker pool only (no web UI)
 trellis evolve                  Run knowledge curation
 trellis migrate                 Apply registry migrations
 trellis migrate-knowledge       Convert learnings.md to Knowledge Objects
+trellis pipelines-to-prose      Convert YAML pipeline templates to Prose
 trellis migrate-project [DIR]   Migrate an incubator project to Trellis
 trellis agent upgrade           Update agents from package defaults
 ```
@@ -178,7 +197,7 @@ myproject/
   .trellis                # project marker
   .env                    # config
   registry.yaml           # agent definitions
-  pipeline-templates/     # reusable pipeline configs (YAML)
+  pipeline-templates/     # reusable pipeline configs (.yaml or .prose)
   agents/                 # prompts and knowledge per agent
     ideation/
     implementation/

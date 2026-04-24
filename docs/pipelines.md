@@ -18,7 +18,12 @@ agents, then continue monitoring on a cron cadence.
 This is just one configuration. You can create pipelines with any agents in
 any order.
 
-## Pipeline config format
+## Pipeline formats
+
+Pipeline templates can be written in **YAML** or **Prose**. Both formats
+produce the same internal pipeline config and are fully interchangeable.
+
+### YAML format
 
 ```yaml
 name: my-pipeline
@@ -33,6 +38,31 @@ gating:
   overrides:
     stage-2: human-review
 ```
+
+### Prose format
+
+Prose is a declarative orchestration language. The same pipeline as above:
+
+```prose
+pipeline my-pipeline:
+  description: "What this pipeline does"
+
+  parallel:
+    session: watcher-1
+
+  session: stage-1
+  gate: auto
+
+  session: stage-2
+  gate: human-review
+
+  session: stage-3
+  gate: auto
+```
+
+Prose maps to the same fields: `pipeline NAME:` sets the name, `session:`
+entries become agents (in order), `parallel:` blocks become `post_ready` and
+`parallel_groups`, and `gate:` entries become `gating.overrides`.
 
 ### Fields
 
@@ -65,7 +95,7 @@ Go to `/pipelines/` and click "New Template". The visual composer lets you:
 
 ### Via the filesystem
 
-Add a YAML file to `pipeline-templates/`:
+Add a `.yaml` or `.prose` file to `pipeline-templates/`:
 
 ```yaml
 # pipeline-templates/content.yaml
@@ -79,7 +109,27 @@ gating:
     editor: human-review
 ```
 
-Templates are loaded automatically by the dashboard.
+Or in Prose:
+
+```prose
+# pipeline-templates/content.prose
+pipeline content:
+  description: "Research, write, and edit content"
+
+  parallel:
+    session: fact-checker
+
+  session: researcher
+  gate: auto
+
+  session: writer
+  gate: auto
+
+  session: editor
+  gate: human-review
+```
+
+Templates in either format are loaded automatically by the dashboard.
 
 ## Applying pipelines to ideas
 
@@ -121,7 +171,20 @@ Once all post-ready agents have been serviced, the idea transitions to
 Post-ready agents with a `cadence` in the registry continue running
 indefinitely on all non-killed ideas — even after release.
 
+## Converting YAML templates to Prose
+
+To convert existing YAML pipeline templates to Prose:
+
+```bash
+trellis pipelines-to-prose           # convert all, back up originals as .yaml.bak
+trellis pipelines-to-prose --dry-run # preview without writing
+```
+
+Both formats coexist — you don't need to convert everything at once.
+
 ## Examples
+
+Each example is shown in both formats.
 
 ### Research-only pipeline
 
@@ -135,6 +198,18 @@ gating:
   default: human-review
 ```
 
+```prose
+pipeline research-only:
+  description: "Deep research without building anything"
+
+  parallel:
+    session: competitive-watcher
+    session: research-watcher
+
+  session: ideation
+  gate: human-review
+```
+
 ### Fast prototype
 
 Skip validation, auto-approve everything:
@@ -146,6 +221,17 @@ gating:
   default: auto
 ```
 
+```prose
+pipeline fast-prototype:
+  description: "Skip validation, auto-approve everything"
+
+  session: ideation
+  gate: auto
+
+  session: implementation
+  gate: auto
+```
+
 ### Reviewed pipeline
 
 Human approval at every stage:
@@ -155,6 +241,23 @@ name: reviewed
 agents: [ideation, implementation, validation, release]
 gating:
   default: human-review
+```
+
+```prose
+pipeline reviewed:
+  description: "Human approval at every stage"
+
+  session: ideation
+  gate: human-review
+
+  session: implementation
+  gate: human-review
+
+  session: validation
+  gate: human-review
+
+  session: release
+  gate: human-review
 ```
 
 ### Content pipeline
@@ -172,4 +275,24 @@ gating:
   default: auto
   overrides:
     publisher: human-review
+```
+
+```prose
+pipeline content:
+  description: "Custom agents for content creation"
+
+  parallel:
+    session: seo-checker
+
+  session: researcher
+  gate: auto
+
+  session: writer
+  gate: auto
+
+  session: editor
+  gate: auto
+
+  session: publisher
+  gate: human-review
 ```

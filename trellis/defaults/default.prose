@@ -1,0 +1,23 @@
+# Default Trellis pipeline in Prose format.
+# This is a reference file — YAML templates remain the default.
+# To use Prose instead, copy this to pipeline-templates/default.prose
+# or run: trellis pipelines-to-prose
+
+pipeline default:
+  description: "Standard 4-stage pipeline with watchers"
+
+  parallel:
+    session: competitive-watcher
+    session: research-watcher
+
+  session: ideation
+  gate: auto
+
+  session: implementation
+  gate: auto
+
+  session: validation
+  gate: auto
+
+  session: release
+  gate: auto

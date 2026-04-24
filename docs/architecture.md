@@ -48,8 +48,9 @@ gating:
 
 ### Pipeline templates
 
-Reusable pipeline configs live in `pipeline-templates/` as YAML files. Create
-them via the dashboard at `/pipelines/` or by adding files directly:
+Reusable pipeline configs live in `pipeline-templates/` as `.yaml` or `.prose`
+files. Both formats produce the same internal dict. Create them via the
+dashboard at `/pipelines/` or by adding files directly:
 
 ```yaml
 # pipeline-templates/research-only.yaml
@@ -61,9 +62,26 @@ gating:
   default: human-review
 ```
 
+Or in Prose format:
+
+```prose
+# pipeline-templates/research-only.prose
+pipeline research-only:
+  description: "Deep research without building anything"
+
+  parallel:
+    session: competitive-watcher
+    session: research-watcher
+
+  session: ideation
+  gate: human-review
+```
+
 Templates can be applied to new ideas at creation time or to existing ideas
 via the dashboard. Each idea gets its own copy of the pipeline config, so
-modifying a template doesn't affect ideas already using it.
+modifying a template doesn't affect ideas already using it. The file format
+is resolved at load time — the pool and blackboard only see the canonical
+pipeline dict, regardless of whether it originated from YAML or Prose.
 
 ### Per-idea customization
 
