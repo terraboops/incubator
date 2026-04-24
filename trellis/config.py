@@ -93,6 +93,20 @@ class Settings(BaseSettings):
     web_host: str = "0.0.0.0"
     web_port: int = 8000
 
+    # Identity Federation (SPIFFE/SPIRE → Git forge)
+    identity_provider: str = "auto"  # "auto", "spiffe", "none"
+    spiffe_endpoint_socket: str = "/tmp/spire-agent/public/api.sock"
+    spiffe_trust_domain: str = "trellis.local"
+
+    # Forge federation
+    forge_type: str = ""  # "github", "gitlab", "forgejo", or empty to disable
+    forge_url: str = ""  # e.g. "https://github.com" or self-hosted URL
+    github_app_id: str = ""
+    github_app_installation_id: str = ""
+    github_app_private_key_path: str = ""  # path to PEM file
+    gitlab_token_exchange_url: str = ""
+    forge_token_audience: str = ""  # OIDC audience for token requests
+
 
 PROJECT_SETTINGS_FILE = "project_settings.json"
 

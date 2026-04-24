@@ -687,6 +687,74 @@ class BaseAgent(ABC):
             )
             return None
 
+    async def _setup_forge_identity(self, env: dict) -> None:
+        """Resolve OIDC identity and obtain a forge token, injecting into env.
+
+        This is a no-op if forge federation is not configured.  Failures are
+        logged but never prevent the agent from running — forge access is
+        best-effort.  Mutates *env* in-place.
+        """
+        try:
+            from trellis.config import get_settings
+            from trellis.core.identity import (
+                create_token_manager,
+                resolve_forge_exchanger,
+                resolve_identity_provider,
+            )
+
+            settings = get_settings()
+            if not settings.forge_type:
+                return
+
+            provider = resolve_identity_provider(
+                provider_type=settings.identity_provider,
+                spiffe_endpoint_socket=settings.spiffe_endpoint_socket,
+                spiffe_trust_domain=settings.spiffe_trust_domain,
+            )
+            exchanger = resolve_forge_exchanger(
+                forge_type=settings.forge_type,
+                forge_url=settings.forge_url,
+                github_app_id=settings.github_app_id,
+                github_app_installation_id=settings.github_app_installation_id,
+                github_app_private_key_path=settings.github_app_private_key_path,
+                gitlab_token_exchange_url=settings.gitlab_token_exchange_url,
+            )
+            manager = await create_token_manager(
+                provider=provider,
+                exchanger=exchanger,
+                audience=settings.forge_token_audience,
+            )
+            if manager is None:
+                return
+
+            cred = await manager.get_forge_token(
+                repos=self.config.forge_repos or None,
+                permissions=self.config.forge_permissions or None,
+            )
+            if cred is None:
+                logger.warning(
+                    "Forge token exchange returned None for agent '%s'",
+                    self.config.name,
+                )
+                return
+
+            env["FORGE_TOKEN"] = cred.token
+            env["FORGE_TYPE"] = settings.forge_type
+            env["FORGE_URL"] = settings.forge_url
+            logger.info(
+                "Forge token injected for agent '%s': type=%s, fingerprint=%s",
+                self.config.name,
+                settings.forge_type,
+                cred.fingerprint,
+            )
+        except Exception as e:
+            logger.warning(
+                "Forge identity setup failed for agent '%s': %s. "
+                "Agent will run without forge access.",
+                self.config.name,
+                e,
+            )
+
     async def _run_global(
         self, max_turns_override: int | None = None, deadline: datetime | None = None
     ) -> AgentResult:
@@ -713,6 +781,7 @@ class BaseAgent(ABC):
         if self.config.env:
             env.update(self.config.env)
 
+        await self._setup_forge_identity(env)
         cli_path = self._setup_sandbox_env(env, "__all__")
 
         options = ClaudeAgentOptions(
@@ -907,6 +976,7 @@ class BaseAgent(ABC):
             # which account to look up in the keychain.
             _ensure_agent_auth(agent_config, self.project_root)
 
+        await self._setup_forge_identity(env)
         cli_path = self._setup_sandbox_env(env, idea_id)
         if cli_path:
             logger.info("Using nono wrapper at: %s (exists: %s)", cli_path, cli_path.exists())
