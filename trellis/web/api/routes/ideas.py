@@ -409,6 +409,139 @@ async def idea_action(
     return RedirectResponse(url=f"/ideas/{idea_id}", status_code=303)
 
 
+@router.post("/ideas/{idea_id}/roles/{role}/retry")
+async def retry_failed_role(idea_id: str, role: str, request: Request):
+    """Reset a failed role back to pending so the scheduler re-queues it.
+
+    Returns 404 if the idea is missing, 409 if the role isn't in `failed`.
+    """
+    bb = _get_blackboard()
+    try:
+        bb.get_status(idea_id)
+    except FileNotFoundError:
+        return JSONResponse({"error": "idea not found"}, status_code=404)
+
+    payload: dict = {}
+    if request.headers.get("content-type", "").startswith("application/json"):
+        try:
+            payload = await request.json() or {}
+        except Exception:
+            payload = {}
+    note = payload.get("note")
+    actor = payload.get("actor", "human:web")
+
+    try:
+        bb.clear_failed_role(idea_id, role, actor=actor, note=note)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=409)
+
+    return JSONResponse({"ok": True, "idea_id": idea_id, "role": role})
+
+
+@router.post("/ideas/{idea_id}/stages")
+async def add_stage(idea_id: str, request: Request):
+    """Append a new named stage to this idea's inline pipeline.
+
+    Body JSON: ``{"name": "v2", "role_groups": [...]}`` — role_groups optional.
+    Rejects duplicate names. The new stage is appended AFTER the current
+    one; users can re-order via pipeline YAML if needed.
+    """
+    bb = _get_blackboard()
+    try:
+        bb.get_status(idea_id)
+    except FileNotFoundError:
+        return JSONResponse({"error": "idea not found"}, status_code=404)
+
+    payload = (
+        await request.json()
+        if request.headers.get("content-type", "").startswith("application/json")
+        else {}
+    )
+    name = (payload.get("name") or "").strip()
+    if not name or not re.match(r"^[a-z0-9_-]{1,40}$", name):
+        return JSONResponse({"error": "stage name must match ^[a-z0-9_-]{1,40}$"}, status_code=400)
+    if name == "done":
+        return JSONResponse(
+            {"error": "`done` is reserved as the terminal sentinel"}, status_code=400
+        )
+
+    pipeline = bb.get_pipeline(idea_id)
+    stages = list(pipeline.get("stages") or [])
+    if any(s.get("name") == name for s in stages):
+        return JSONResponse({"error": f"stage {name!r} already exists"}, status_code=409)
+
+    role_groups = payload.get("role_groups") or []
+    new_stage = {
+        "name": name,
+        "role_groups": role_groups,
+        "watchers": payload.get("watchers") or [],
+        "added_by": f"human:{payload.get('actor', 'web')}",
+        "added_at": datetime.now(timezone.utc).isoformat(),
+    }
+    stages.append(new_stage)
+    pipeline["stages"] = stages
+    # Drop legacy keys so migrate_pipeline re-derives them from the new stages.
+    pipeline.pop("agents", None)
+    pipeline.pop("post_ready", None)
+    pipeline.pop("parallel_groups", None)
+    bb.set_pipeline(idea_id, pipeline)
+
+    return JSONResponse({"ok": True, "idea_id": idea_id, "stage": name})
+
+
+@router.post("/ideas/{idea_id}/stages/{stage_name}/rename")
+async def rename_stage(idea_id: str, stage_name: str, request: Request):
+    """Rename a stage. Current_stage and stage_history refs are updated."""
+    bb = _get_blackboard()
+    try:
+        status = bb.get_status(idea_id)
+    except FileNotFoundError:
+        return JSONResponse({"error": "idea not found"}, status_code=404)
+
+    payload = (
+        await request.json()
+        if request.headers.get("content-type", "").startswith("application/json")
+        else {}
+    )
+    new_name = (payload.get("name") or "").strip()
+    if not new_name or not re.match(r"^[a-z0-9_-]{1,40}$", new_name):
+        return JSONResponse({"error": "stage name must match ^[a-z0-9_-]{1,40}$"}, status_code=400)
+    if new_name == "done" or stage_name == "done":
+        return JSONResponse({"error": "`done` is reserved and cannot be renamed"}, status_code=400)
+
+    pipeline = bb.get_pipeline(idea_id)
+    stages = list(pipeline.get("stages") or [])
+    matches = [s for s in stages if s.get("name") == stage_name]
+    if not matches:
+        return JSONResponse({"error": f"stage {stage_name!r} not found"}, status_code=404)
+    if any(s.get("name") == new_name for s in stages):
+        return JSONResponse({"error": f"stage {new_name!r} already exists"}, status_code=409)
+
+    for s in stages:
+        if s.get("name") == stage_name:
+            s["name"] = new_name
+    pipeline["stages"] = stages
+    pipeline.pop("agents", None)
+    pipeline.pop("post_ready", None)
+    pipeline.pop("parallel_groups", None)
+
+    updates: dict = {"pipeline": pipeline}
+    if status.get("current_stage") == stage_name:
+        updates["current_stage"] = new_name
+    role_state = dict(status.get("role_state") or {})
+    if stage_name in role_state:
+        role_state[new_name] = role_state.pop(stage_name)
+        updates["role_state"] = role_state
+    history = list(status.get("stage_history") or [])
+    for entry in history:
+        if entry.get("stage") == stage_name:
+            entry["stage"] = new_name
+    updates["stage_history"] = history
+
+    bb.update_status(idea_id, **updates)
+    return JSONResponse({"ok": True, "idea_id": idea_id, "from": stage_name, "to": new_name})
+
+
 @router.post("/ideas/{idea_id}/pipeline")
 async def update_pipeline(
     idea_id: str,
