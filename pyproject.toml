@@ -44,9 +44,12 @@ dev = [
     "pre-commit",
     "playwright",
 ]
-spiffe = [
-    "pyspiffe>=0.8",
-]
+# [spiffe] extra removed: pyspiffe is not published on PyPI under that name.
+# The optional pyspiffe code path in trellis/core/identity/provider.py is
+# guarded by try/except ImportError and falls back to a direct HTTP call
+# against the Workload API, so removing the extra does not change runtime
+# behaviour. Users who want the gRPC client can install pyspiffe from
+# https://github.com/HewlettPackard/py-spiffe directly.
 
 [project.scripts]
 trellis = "trellis.cli:app"

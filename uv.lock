@@ -920,6 +920,15 @@ wheels = [
 ]
 
 [[package]]
+name = "lark"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/34/28fff3ab31ccff1fd4f6c7c7b0ceb2b6968d8ea4950663eadcb5720591a0/lark-1.3.1.tar.gz", hash = "sha256:b426a7a6d6d53189d318f2b6236ab5d6429eaf09259f1ca33eb716eed10d2905", size = 382732, upload-time = "2025-10-27T18:25:56.653Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/3d/14ce75ef66813643812f3093ab17e46d3a206942ce7376d31ec2d36229e7/lark-1.3.1-py3-none-any.whl", hash = "sha256:c629b661023a014c37da873b4ff58a817398d12635d3bbb2c5a03be7fe5d1e12", size = 113151, upload-time = "2025-10-27T18:25:54.882Z" },
+]
+
+[[package]]
 name = "markdown"
 version = "3.10.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2026,9 +2035,12 @@ dependencies = [
     { name = "anthropic" },
     { name = "claude-agent-sdk" },
     { name = "croniter" },
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "gitpython" },
+    { name = "httpx" },
     { name = "jinja2" },
+    { name = "lark" },
     { name = "markdown" },
     { name = "nono-py" },
     { name = "pydantic-settings" },
@@ -2065,10 +2077,13 @@ requires-dist = [
     { name = "anthropic" },
     { name = "claude-agent-sdk" },
     { name = "croniter" },
+    { name = "cryptography", specifier = ">=41.0" },
     { name = "fastapi", specifier = "<1.0" },
     { name = "gitpython" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "httpx", marker = "extra == 'dev'" },
     { name = "jinja2" },
+    { name = "lark", specifier = ">=1.1" },
     { name = "markdown" },
     { name = "nono-py" },
     { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.20" },
