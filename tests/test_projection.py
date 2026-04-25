@@ -104,6 +104,48 @@ class TestProjectionStore:
     def test_get_nonexistent_idea(self, store):
         assert store.get_idea("nope") is None
 
+    def test_delete_idea_removes_record_and_logs(self, store):
+        store.upsert_idea("doomed", {"title": "Doomed", "phase": "ideation"})
+        store.upsert_idea("survivor", {"title": "Survivor", "phase": "ideation"})
+        store.index_agent_log(
+            "ideation",
+            "doomed",
+            "ideation-001.json",
+            {"timestamp": "2026-01-01T00:00:00Z", "transcript": []},
+        )
+        store.index_agent_log(
+            "ideation",
+            "survivor",
+            "ideation-002.json",
+            {"timestamp": "2026-01-01T00:00:00Z", "transcript": []},
+        )
+
+        store.delete_idea("doomed")
+
+        assert store.get_idea("doomed") is None
+        assert store.get_idea("survivor") is not None
+        # Doomed's logs should be gone, survivor's should remain
+        assert store.get_idea_agent_logs("doomed") == []
+        assert len(store.get_idea_agent_logs("survivor")) == 1
+        # Home query no longer returns the deleted idea
+        home_ids = {i["id"] for i in store.get_ideas_for_home()}
+        assert "doomed" not in home_ids
+        assert "survivor" in home_ids
+
+    def test_blackboard_delete_idea_invalidates_projection(self, store, bb_with_ideas):
+        bb_with_ideas.projection = store
+        # Seed the projection
+        for idea_id in bb_with_ideas.list_ideas():
+            store.upsert_idea(idea_id, bb_with_ideas.get_status(idea_id))
+        assert store.get_idea("test-idea-0") is not None
+
+        bb_with_ideas.delete_idea("test-idea-0")
+
+        # Filesystem gone
+        assert "test-idea-0" not in bb_with_ideas.list_ideas()
+        # Projection record also gone — home page won't crash
+        assert store.get_idea("test-idea-0") is None
+
     def test_index_and_query_agent_logs(self, store):
         store.index_agent_log(
             "ideation",

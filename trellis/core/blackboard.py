@@ -185,6 +185,18 @@ class Blackboard:
         idea_path = self.base_dir / idea_id
         if idea_path.exists() and idea_path.is_dir() and idea_id != "_template":
             shutil.rmtree(idea_path)
+        if self.projection:
+            # Best-effort: drop the projection record so the home page doesn't
+            # keep serving a deleted idea. Same timeout pattern as writes.
+            def _do_delete():
+                try:
+                    self.projection.delete_idea(idea_id)
+                except Exception:
+                    pass
+
+            t = threading.Thread(target=_do_delete, daemon=True)
+            t.start()
+            t.join(timeout=self._PROJECTION_TIMEOUT)
 
     def file_exists(self, idea_id: str, filename: str) -> bool:
         return (self.base_dir / idea_id / filename).exists()

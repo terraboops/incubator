@@ -277,3 +277,21 @@ class ProjectionStore:
             self.update_metrics()
         except Exception as e:
             logger.warning("Failed to invalidate idea '%s': %s", idea_id, e)
+
+    def delete_idea(self, idea_id: str) -> None:
+        """Drop an idea (and its agent_log entries) from the projection.
+
+        Called from Blackboard.delete_idea so the home page doesn't keep
+        serving a deleted record from cache.
+        """
+        if not self._db:
+            return
+        try:
+            self._db.delete(f"idea:`{idea_id}`")
+            self._db.query(
+                "DELETE agent_log WHERE idea_id = $idea",
+                {"idea": idea_id},
+            )
+            self.update_metrics()
+        except Exception as e:
+            logger.warning("Failed to delete idea '%s' from projection: %s", idea_id, e)

@@ -143,7 +143,12 @@ async def home(request: Request):
             status["running"] = True
         # Compute auxiliary agent status
         aux_status = []
-        pipeline = status.get("pipeline", bb.get_pipeline(idea_id))
+        # Tolerate a stale projection or a mid-delete race: if the idea has no
+        # status.json on disk, skip it instead of 500-ing the whole home page.
+        try:
+            pipeline = status["pipeline"] if "pipeline" in status else bb.get_pipeline(idea_id)
+        except FileNotFoundError:
+            continue
         post_ready_set = set(pipeline.get("post_ready", []))
         background_set = {
             a.name for a in registry.agents.values() if a.status == "active" and a.phase == "*"
