@@ -24,8 +24,11 @@ async def broadcast_event(event_type: str, data: dict) -> None:
             **data,
         }
     )
+    # Snapshot the set so a concurrent connect/disconnect that runs while
+    # `await client.send_text` yields the event loop doesn't trigger
+    # "Set changed size during iteration".
     disconnected = set()
-    for client in _clients:
+    for client in list(_clients):
         try:
             await client.send_text(message)
         except Exception:
