@@ -173,18 +173,28 @@ class PoolManager:
                     queue.enqueue(job)
                 continue
 
-            next_role = self.blackboard.next_agent(idea_id)
-            if not next_role:
+            # Stage-aware: dispatch every role in the current eligible
+            # role_group (role-group parallelism). Falls back to legacy
+            # next_agent if the idea's status isn't in the new shape yet.
+            try:
+                eligible = self.blackboard.next_roles_in_current_stage(idea_id)
+            except Exception:
+                eligible = []
+            if not isinstance(eligible, list) or not eligible:
+                legacy = self.blackboard.next_agent(idea_id)
+                eligible = [legacy] if legacy else []
+            if not eligible:
                 continue
 
             is_first = self._is_first_pipeline_agent(idea_id)
-            job = Job(
-                priority=compute_priority("pipeline", priority, is_first_agent=is_first),
-                kind="pipeline",
-                role=next_role,
-                idea_id=idea_id,
-            )
-            queue.enqueue(job)
+            for next_role in eligible:
+                job = Job(
+                    priority=compute_priority("pipeline", priority, is_first_agent=is_first),
+                    kind="pipeline",
+                    role=next_role,
+                    idea_id=idea_id,
+                )
+                queue.enqueue(job)
 
         # Global agents (phase="*") — one job per active idea
         # Only enqueued by pipeline_producer if they have no cadence;
@@ -391,9 +401,12 @@ class PoolManager:
         if result.status in (RunStatus.OK, RunStatus.DEADLINE):
             # Clear rate-limit backoff on successful run
             self._rate_limit_hits.pop((result.role, result.idea_id), None)
-            # Read agent's recommendation
+            # Read agent's recommendation. Default to "proceed" when missing
+            # OR when the stored value is None (create_idea initializes
+            # phase_recommendation=None, so dict.get(..., default) returns
+            # the None instead of the default).
             status = self.blackboard.get_status(result.idea_id)
-            recommendation = status.get("phase_recommendation", "proceed")
+            recommendation = status.get("phase_recommendation") or "proceed"
 
             # Determine job kind — feedback runs don't increment iter counts
             job_kind = self._job_kinds.pop((result.role, result.idea_id), "pipeline")
@@ -432,10 +445,24 @@ class PoolManager:
                     s["at"] = now.isoformat()
                 sandbox_suggestions.extend(result.sandbox_suggestions)
 
+            # Mirror the recommendation to the stage-aware role_state tree so
+            # new UI stays accurate alongside the legacy stage_results map.
+            # Fold into the same update batch so producers never observe a
+            # partial state (stage_results updated but role_state stale).
+            try:
+                from trellis.core.pipeline import set_role_state
+
+                merged_role_state = set_role_state(
+                    status, result.role, recommendation, completed_at=now.isoformat()
+                )
+            except Exception:
+                merged_role_state = status.get("role_state") or {}
+
             self.blackboard.update_status(
                 result.idea_id,
                 last_serviced_by=serviced,
                 stage_results=stage_results,
+                role_state=merged_role_state,
                 total_cost_usd=status.get("total_cost_usd", 0) + result.cost_usd,
                 iter_counts=iter_counts,
                 iteration_count=sum(iter_counts.values()),  # backward compat
@@ -512,6 +539,15 @@ class PoolManager:
                     )
             elif self.blackboard.is_ready(result.idea_id):
                 self._handle_release(result.idea_id)
+
+            # Stage-aware: if the current stage is complete, advance to the
+            # next stage (or to `done`). No-op when the stage still has work.
+            try:
+                advanced = self.blackboard.advance_stage_if_complete(result.idea_id)
+                if advanced:
+                    logger.info("Idea '%s' advanced stage -> %s", result.idea_id, advanced)
+            except Exception:
+                logger.debug("advance_stage_if_complete skipped", exc_info=True)
 
         # Broadcast completion
         self._broadcast_sync(

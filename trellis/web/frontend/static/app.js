@@ -103,10 +103,89 @@
         }
     }
 
+    // Wire failed-role retry forms: POST as JSON so the API returns proper
+    // status codes, then reload on success.
+    function wireRetryForms() {
+        document.querySelectorAll('form[data-retry-form]').forEach((form) => {
+            if (form.dataset.retryWired) return;
+            form.dataset.retryWired = '1';
+            form.addEventListener('submit', async (ev) => {
+                ev.preventDefault();
+                const btn = form.querySelector('button[type=submit]');
+                const original = btn ? btn.textContent : '';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Retrying…';
+                }
+                try {
+                    const resp = await fetch(form.action, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ actor: 'human:web' }),
+                    });
+                    if (resp.ok) {
+                        window.location.reload();
+                    } else {
+                        const body = await resp.json().catch(() => ({}));
+                        alert('Retry failed: ' + (body.error || resp.statusText));
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = original;
+                        }
+                    }
+                } catch (e) {
+                    alert('Retry failed: ' + e.message);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = original;
+                    }
+                }
+            });
+        });
+    }
+
+    // Add-stage affordance on the idea detail page.
+    function wireAddStageButton() {
+        const btn = document.getElementById('add-custom-stage');
+        if (!btn || btn.dataset.wired) return;
+        btn.dataset.wired = '1';
+        btn.addEventListener('click', async () => {
+            const ideaMatch = location.pathname.match(/^\/ideas\/([^/]+)/);
+            if (!ideaMatch) return;
+            const ideaId = ideaMatch[1];
+            const name = prompt(
+                'New stage name (lowercase, 1-40 chars, [a-z0-9_-]).\n'
+                + 'Example: hotfix, v1, v2, post-launch'
+            );
+            if (!name) return;
+            try {
+                const resp = await fetch(`/ideas/${ideaId}/stages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name.trim(), actor: 'web' }),
+                });
+                if (resp.ok) {
+                    window.location.reload();
+                } else {
+                    const body = await resp.json().catch(() => ({}));
+                    alert('Add stage failed: ' + (body.error || resp.statusText));
+                }
+            } catch (e) {
+                alert('Add stage failed: ' + e.message);
+            }
+        });
+    }
+
     // Connect on load
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', connect);
+        document.addEventListener('DOMContentLoaded', () => {
+            connect();
+            wireRetryForms();
+            wireAddStageButton();
+        });
     } else {
         connect();
+        wireRetryForms();
+        wireAddStageButton();
     }
 })();

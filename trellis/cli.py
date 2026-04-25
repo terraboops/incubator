@@ -193,6 +193,32 @@ def resume(idea_id: str = typer.Argument(help="Idea slug to resume")) -> None:
 
 
 @app.command()
+def retry(
+    idea_id: str = typer.Argument(help="Idea slug"),
+    role: str = typer.Argument(help="Role name whose `failed` state to clear"),
+    note: str = typer.Option("", "--note", "-n", help="Reason for retry (logged)"),
+) -> None:
+    """Reset a failed role to pending so the scheduler re-queues it."""
+    import os
+
+    from trellis.core.blackboard import Blackboard
+
+    settings = get_settings()
+    bb = Blackboard(settings.blackboard_dir)
+    try:
+        bb.clear_failed_role(
+            idea_id,
+            role,
+            actor=f"human:{os.environ.get('USER', 'cli')}",
+            note=note or None,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]Reset '{role}' on '{idea_id}' to pending.[/green]")
+
+
+@app.command()
 def kill(idea_id: str = typer.Argument(help="Idea slug to kill")) -> None:
     """Kill an idea."""
     settings = get_settings()

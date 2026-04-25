@@ -81,6 +81,9 @@ class ProjectionStore:
         record = {
             "title": status.get("title", idea_id),
             "phase": status.get("phase", "submitted"),
+            "current_stage": status.get("current_stage", ""),
+            "stage_history": status.get("stage_history", []),
+            "role_state": status.get("role_state", {}),
             "pipeline": status.get("pipeline", {}),
             "priority_score": status.get("priority_score", 0),
             "total_cost_usd": status.get("total_cost_usd", 0),
