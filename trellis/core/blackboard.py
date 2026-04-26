@@ -33,13 +33,32 @@ def slugify(text: str) -> str:
     return re.sub(r"[-\s]+", "-", text)[:80]
 
 
+# Process-wide default projection. Set by the web app's lifespan and the
+# orchestrator's bootstrap so that every Blackboard constructed downstream —
+# in routes, helpers, the pool, the orchestrator — auto-attaches the same
+# projection. Without this, helpers that build a fresh Blackboard would
+# silently bypass the projection cache and let it drift from disk.
+_default_projection = None
+
+
+def set_default_projection(projection) -> None:
+    """Install (or clear, with None) the process-wide default projection."""
+    global _default_projection
+    _default_projection = projection
+
+
+def get_default_projection():
+    return _default_projection
+
+
 class Blackboard:
     """Filesystem-based blackboard for idea state and artifacts."""
 
-    def __init__(self, base_dir: Path) -> None:
+    def __init__(self, base_dir: Path, projection=None) -> None:
         self.base_dir = base_dir
         self.template_dir = base_dir / "_template"
-        self.projection = None  # Set by app.py lifespan if projection is available
+        # Explicit projection wins; otherwise pick up the process default.
+        self.projection = projection if projection is not None else _default_projection
 
     _PROJECTION_TIMEOUT = 5  # seconds — prevents blocking on hung WS connections
 

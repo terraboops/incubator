@@ -138,20 +138,25 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         # Initialize projection cache
-        from trellis.core.blackboard import Blackboard
+        from trellis.core.blackboard import Blackboard, set_default_projection
         from trellis.core.projection import ProjectionStore
 
         settings = get_settings()
         projection = ProjectionStore()
         try:
             projection.connect(settings.projection_url)
+            # Install process-wide default BEFORE building any Blackboard so
+            # that the rebuild — and any later helpers — pick it up.
+            set_default_projection(projection)
             bb = Blackboard(settings.blackboard_dir)
-            bb.projection = projection
             projection.rebuild(bb)
             app.state.projection = projection
+            app.state.bb = bb
         except Exception as e:
             logger.warning("Projection store failed to initialize: %s — running without cache", e)
+            set_default_projection(None)
             app.state.projection = ProjectionStore()  # no-op store (not connected)
+            app.state.bb = Blackboard(settings.blackboard_dir)
 
         pool_task = None
         pool_manager = None
@@ -159,8 +164,8 @@ def create_app() -> FastAPI:
             from trellis.orchestrator.pool import PoolManager
 
             pool_manager = PoolManager(settings)
-            # Give pool's blackboard access to projection for write-through
-            pool_manager.blackboard.projection = projection
+            # PoolManager builds its own bb; the default-projection hook
+            # already attached the projection there too.
             pool_task = asyncio.create_task(
                 _resilient_pool(app, pool_manager, settings),
                 name="pool-supervisor",
@@ -179,6 +184,9 @@ def create_app() -> FastAPI:
                     pass
             logger.info("Worker pool stopped")
         projection.close()
+        # Clear the global so subsequent in-process tests/lifespans start
+        # with a clean slate rather than holding a closed projection.
+        set_default_projection(None)
 
     app = FastAPI(title="Trellis Dashboard", lifespan=lifespan)
 

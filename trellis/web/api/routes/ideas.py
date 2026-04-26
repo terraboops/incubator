@@ -349,12 +349,8 @@ async def idea_action(
 ):
     settings = get_settings()
     bb = _get_blackboard()
-    # Wire projection so write-actions (delete, status updates) invalidate
-    # the cache. Without this, the home page would still see deleted ideas
-    # in the projection until the next rebuild.
-    proj = getattr(request.app.state, "projection", None)
-    if proj is not None and proj._db:
-        bb.projection = proj
+    # bb.projection is auto-attached via the process-wide default set by
+    # the app lifespan (see trellis.core.blackboard.set_default_projection).
 
     if action == "kill":
         from trellis.orchestrator.orchestrator import Orchestrator
