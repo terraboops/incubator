@@ -42,6 +42,7 @@ class RunResult:
     sandbox_failure: bool = False
     session_id: str | None = None
     sandbox_suggestions: list = field(default_factory=list)
+    stop_reason: str | None = None
 
     @property
     def is_deadline(self) -> bool:
@@ -124,17 +125,19 @@ class Worker:
                 )
                 elapsed = time.monotonic() - start_time
 
-                # Detect rate-limited runs: $0 cost + fast completion
-                # Rate-limited agents may still produce brief output text
-                if result.cost_usd == 0 and elapsed < 30:
+                # Detect rate-limited runs. The SDK signals a clean completion
+                # via ResultMessage (stop_reason is set). When stop_reason is
+                # None we never received one — that's the rate-limit / dropped
+                # connection signature. cost==0 alone is too weak: a real run
+                # with cached responses can legitimately complete in <30s for $0.
+                if result.stop_reason is None and result.cost_usd == 0 and elapsed < 30:
                     logger.warning(
                         "Worker %d: %s on %s appears rate-limited "
-                        "(cost=$0, elapsed=%.0fs, stop=%s)",
+                        "(no stop_reason, cost=$0, elapsed=%.0fs)",
                         self.worker_id,
                         role,
                         idea_id,
                         elapsed,
-                        result.stop_reason,
                     )
                     return RunResult(
                         status=RunStatus.RATE_LIMITED,
@@ -152,6 +155,7 @@ class Worker:
                     sandbox_failure=result.sandbox_failure,
                     session_id=result.session_id,
                     sandbox_suggestions=result.sandbox_suggestions,
+                    stop_reason=result.stop_reason,
                 )
             except asyncio.TimeoutError:
                 elapsed = time.monotonic() - start_time

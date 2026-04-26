@@ -1089,6 +1089,20 @@ class BaseAgent(ABC):
                 sandbox_failure=sandbox_failure,
             )
 
+        # Stream ended without a ResultMessage — SDK closed the connection
+        # before completion. This is anomalous (rate limit, transport error,
+        # OAuth refresh, etc.). Surface it as a failure rather than silently
+        # claiming success with $0 cost; the worker uses stop_reason=None as
+        # the rate-limit signal and the pool will back off / retry.
+        logger.warning(
+            "Agent '%s' on '%s' stream ended without ResultMessage "
+            "(transcript_entries=%d, output_parts=%d)",
+            self.config.name,
+            idea_id,
+            len(transcript),
+            len(output_parts),
+        )
+        _fire_agent_webhook(self.config.name, self.project_root, "SessionEnd")
         self._save_transcript(
             idea_id,
             transcript,
@@ -1099,7 +1113,8 @@ class BaseAgent(ABC):
         )
         self._clear_live_log(idea_id)
         return AgentResult(
-            success=True,
+            success=False,
+            error="agent stream ended without ResultMessage",
             output="\n".join(output_parts),
             transcript=transcript,
             sandbox_failure=sandbox_failure,
