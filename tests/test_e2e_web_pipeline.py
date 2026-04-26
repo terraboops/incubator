@@ -276,3 +276,106 @@ async def test_kill_then_delete_keeps_home_alive(trellis_project):
             assert home3.status_code == 200
 
     _invalidate_settings_cache()
+
+
+@pytest.mark.asyncio
+async def test_all_surfaces_render_without_500(trellis_project):
+    """Smoke-sweep every public surface to lock in non-500 status codes.
+
+    Catches regressions where a route handler crashes due to a stale
+    template variable, missing import, broken projection lookup, etc.
+    Doesn't validate content semantics — just that nothing 500s.
+    """
+    settings = _settings_for_project(trellis_project)
+
+    pool_dir = trellis_project / "pool"
+    pool_dir.mkdir(exist_ok=True)
+    (pool_dir / "presets.json").write_text(
+        json.dumps(
+            {
+                "minimal": {
+                    "label": "Minimal",
+                    "description": "Just ideation",
+                    "stages": ["ideation"],
+                    "post_ready": [],
+                    "gating": {"default": "auto", "overrides": {}},
+                }
+            }
+        )
+    )
+
+    with (
+        patch("trellis.config.get_settings", return_value=settings),
+        patch("trellis.config._discover_project_root", return_value=trellis_project),
+        patch("trellis.web.api.routes.ideas.get_settings", return_value=settings),
+        patch("trellis.web.api.routes.settings.get_settings", return_value=settings),
+        patch("trellis.web.api.routes.health.get_settings", return_value=settings),
+    ):
+        _invalidate_settings_cache()
+        from trellis.web.api.app import create_app
+
+        app = create_app()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Force lifespan
+            await client.get("/healthz")
+
+            # Seed one idea so detail/logs/agent pages have something to render
+            resp = await client.post(
+                "/ideas",
+                data={
+                    "title": "Surface Sweep Idea",
+                    "description": "Used by the all-surfaces smoke.",
+                    "preset": "minimal",
+                },
+                follow_redirects=False,
+            )
+            idea_id = resp.headers["location"].split("/ideas/")[-1].rstrip("/")
+
+            # Every URL that should always render (200 OK after redirects).
+            # Ops, listings, forms, JSON APIs, idea + agent detail pages.
+            urls = [
+                # Ops
+                "/healthz",
+                "/readyz",
+                "/metrics",
+                # Listings
+                "/",
+                "/agents/",
+                "/pipelines/",
+                "/activity",
+                "/pool/",
+                "/evolution/",
+                "/costs/",
+                "/settings/",
+                # Forms
+                "/ideas/new",
+                "/agents/new",
+                "/agents/wizard",
+                "/pipelines/new",
+                # JSON APIs
+                "/api/ideas",
+                "/api/decisions/pending",
+                "/api/migrations/check",
+                "/pool/api/state",
+                "/api/activity",
+                # Idea-scoped
+                f"/ideas/{idea_id}",
+                f"/ideas/{idea_id}/logs",
+                # Agent detail (registry roles)
+                "/agents/ideation",
+                "/agents/ideation/plugins",
+            ]
+
+            failures = []
+            for u in urls:
+                r = await client.get(u, follow_redirects=True)
+                if r.status_code >= 500:
+                    failures.append(f"{u} -> {r.status_code}: {r.text[:200]}")
+                # 404 is also a regression for routes the plan says should exist
+                elif r.status_code == 404 and not u.endswith("/migrations/check"):
+                    failures.append(f"{u} -> 404 (route should exist)")
+
+            assert not failures, "Surface sweep regressions:\n  " + "\n  ".join(failures)
+
+    _invalidate_settings_cache()
