@@ -237,7 +237,10 @@ async def test_dismiss_review_resets_only_capped_agents(tmp_path):
         patch("trellis.web.api.routes.ideas._get_blackboard", return_value=bb),
         patch("trellis.web.api.routes.ideas.get_settings", return_value=mock_settings),
     ):
+        request = MagicMock()
+        request.app.state.projection = None
         await idea_action(
+            request=request,
             idea_id="test-idea",
             action="dismiss_review",
         )

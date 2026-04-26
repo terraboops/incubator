@@ -853,7 +853,9 @@ class TestIdeasRouteRegressions:
             patch("trellis.web.api.routes.ideas._get_blackboard", return_value=bb),
             patch("trellis.web.api.routes.ideas.get_settings", return_value=mock_settings),
         ):
-            await idea_action(idea_id="test", action="dismiss_review")
+            request = MagicMock()
+            request.app.state.projection = None
+            await idea_action(request=request, idea_id="test", action="dismiss_review")
 
         call_kwargs = bb.update_status.call_args.kwargs
         assert call_kwargs["iter_counts"]["ideation"] == 0, "5 >= 5 → reset"
@@ -874,7 +876,9 @@ class TestIdeasRouteRegressions:
             patch("trellis.web.api.routes.ideas._get_blackboard", return_value=bb),
             patch("trellis.web.api.routes.ideas.get_settings", return_value=mock_settings),
         ):
-            await idea_action(idea_id="test", action="dismiss_review")
+            request = MagicMock()
+            request.app.state.projection = None
+            await idea_action(request=request, idea_id="test", action="dismiss_review")
 
         call_kwargs = bb.update_status.call_args.kwargs
         assert call_kwargs["iter_counts"]["ideation"] == 5, "5 < 10 → keep"

@@ -185,3 +185,94 @@ async def test_idea_creation_through_pipeline(trellis_project):
             assert readyz.status_code == 200  # blackboard is accessible
 
     _invalidate_settings_cache()
+
+
+@pytest.mark.asyncio
+async def test_kill_then_delete_keeps_home_alive(trellis_project):
+    """Killing then deleting an idea must not 500 the homepage.
+
+    Regression for two distinct bugs that combined into one symptom:
+    - The home loop's _compute_scheduling called bb.pending_post_ready,
+      which read status.json and raised FileNotFoundError when the idea
+      had been deleted.
+    - The action handler created a Blackboard without a projection
+      reference, so bb.delete_idea couldn't invalidate the projection
+      cache. The next home() pulled the stale entry and tried to compute
+      scheduling on an idea whose disk state was gone.
+    """
+    settings = _settings_for_project(trellis_project)
+
+    pool_dir = trellis_project / "pool"
+    pool_dir.mkdir(exist_ok=True)
+    (pool_dir / "presets.json").write_text(
+        json.dumps(
+            {
+                "minimal": {
+                    "label": "Minimal",
+                    "description": "Just ideation",
+                    "stages": ["ideation"],
+                    "post_ready": [],
+                    "gating": {"default": "auto", "overrides": {}},
+                }
+            }
+        )
+    )
+
+    with (
+        patch("trellis.config.get_settings", return_value=settings),
+        patch("trellis.config._discover_project_root", return_value=trellis_project),
+        patch("trellis.web.api.routes.ideas.get_settings", return_value=settings),
+        patch("trellis.web.api.routes.settings.get_settings", return_value=settings),
+        patch("trellis.web.api.routes.health.get_settings", return_value=settings),
+    ):
+        _invalidate_settings_cache()
+        from trellis.web.api.app import create_app
+
+        app = create_app()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Drive the lifespan so app.state.projection is populated
+            await client.get("/healthz")
+
+            resp = await client.post(
+                "/ideas",
+                data={
+                    "title": "Doomed Idea",
+                    "description": "About to be killed and deleted.",
+                    "preset": "minimal",
+                },
+                follow_redirects=False,
+            )
+            assert resp.status_code in (302, 303, 307)
+            idea_id = resp.headers["location"].split("/ideas/")[-1].rstrip("/")
+
+            home1 = await client.get("/")
+            assert home1.status_code == 200
+
+            kill = await client.post(
+                f"/ideas/{idea_id}/action",
+                data={"action": "kill", "kill_reason": "regression test"},
+                follow_redirects=False,
+            )
+            assert kill.status_code in (302, 303, 307)
+
+            delete = await client.post(
+                f"/ideas/{idea_id}/action",
+                data={"action": "delete"},
+                follow_redirects=False,
+            )
+            assert delete.status_code in (302, 303, 307)
+
+            # The on-disk idea directory is gone
+            assert not (settings.blackboard_dir / idea_id).exists()
+
+            # Home must still render. Hit it twice to defeat any one-shot
+            # cache-warm masking the bug.
+            home2 = await client.get("/")
+            assert home2.status_code == 200, (
+                f"Home 500'd after kill+delete. Body: {home2.text[:500]}"
+            )
+            home3 = await client.get("/")
+            assert home3.status_code == 200
+
+    _invalidate_settings_cache()

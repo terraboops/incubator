@@ -138,13 +138,19 @@ async def home(request: Request):
     for status in raw_ideas:
         idea_id = status.get("id", "")
         status["idea_id"] = idea_id
-        status["_scheduling"] = _compute_scheduling(bb, status, roles, pool_running)
+        # Tolerate a stale projection or a mid-delete race: if the idea has no
+        # status.json on disk, skip it. Must run BEFORE _compute_scheduling,
+        # which calls back into the blackboard and would 500 on a missing file.
+        if not idea_id or not (bb.base_dir / idea_id / "status.json").exists():
+            continue
+        try:
+            status["_scheduling"] = _compute_scheduling(bb, status, roles, pool_running)
+        except FileNotFoundError:
+            continue
         if any(idea_id == rid for _, rid in pool_running):
             status["running"] = True
         # Compute auxiliary agent status
         aux_status = []
-        # Tolerate a stale projection or a mid-delete race: if the idea has no
-        # status.json on disk, skip it instead of 500-ing the whole home page.
         try:
             pipeline = status["pipeline"] if "pipeline" in status else bb.get_pipeline(idea_id)
         except FileNotFoundError:
@@ -334,6 +340,7 @@ async def idea_detail(request: Request, idea_id: str):
 
 @router.post("/ideas/{idea_id}/action")
 async def idea_action(
+    request: Request,
     idea_id: str,
     action: str = Form(...),
     kill_reason: str = Form(""),
@@ -342,6 +349,12 @@ async def idea_action(
 ):
     settings = get_settings()
     bb = _get_blackboard()
+    # Wire projection so write-actions (delete, status updates) invalidate
+    # the cache. Without this, the home page would still see deleted ideas
+    # in the projection until the next rebuild.
+    proj = getattr(request.app.state, "projection", None)
+    if proj is not None and proj._db:
+        bb.projection = proj
 
     if action == "kill":
         from trellis.orchestrator.orchestrator import Orchestrator
