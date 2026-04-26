@@ -244,3 +244,59 @@ async def test_release_cap_stage_results_behavior(tmp_path):
     assert "stage_results" not in phase_calls2[-1].kwargs, (
         "Terminal release must NOT clear stage_results — preserve the final record"
     )
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_cap_escalates_to_human_review(tmp_path):
+    """After MAX_RATE_LIMIT_HITS consecutive rate-limit results, the pool
+    must stop retrying and flip needs_human_review with a clear reason.
+    Prior to this fix the pool retried forever on hard transport errors —
+    a stuck OAuth token would loop the pipeline indefinitely.
+    """
+    from trellis.orchestrator.pool import MAX_RATE_LIMIT_HITS
+
+    pm = _make_pool_for_handle_result(tmp_path)
+    queue = JobQueue()
+
+    rl_result = RunResult(
+        status=RunStatus.RATE_LIMITED,
+        role="ideation",
+        idea_id="stuck-idea",
+        duration_seconds=1.0,
+        error="agent stream ended without ResultMessage",
+    )
+
+    with (
+        patch("trellis.orchestrator.pool.PoolManager._broadcast_sync"),
+        patch("trellis.orchestrator.pool.asyncio.sleep"),  # skip backoff
+    ):
+        # Fire MAX hits — each one is a normal backoff-and-retry
+        for _ in range(MAX_RATE_LIMIT_HITS):
+            await pm._handle_result(rl_result, queue)
+
+        # No update_status call yet — we're still in the retry zone
+        review_calls = [
+            c
+            for c in pm.blackboard.update_status.call_args_list
+            if c.kwargs.get("needs_human_review") is True
+        ]
+        assert review_calls == [], "Should not escalate within retry budget"
+
+        # The (MAX+1)-th hit pushes us over the cap
+        await pm._handle_result(rl_result, queue)
+
+    # Now we should have flipped needs_human_review with a clear reason
+    review_calls = [
+        c
+        for c in pm.blackboard.update_status.call_args_list
+        if c.kwargs.get("needs_human_review") is True
+    ]
+    assert len(review_calls) == 1, f"Expected exactly one escalation, got {len(review_calls)}"
+    kwargs = review_calls[0].kwargs
+    assert "ideation" in kwargs["review_reason"]
+    assert str(MAX_RATE_LIMIT_HITS) in kwargs["review_reason"]
+    assert kwargs["last_error"] == "agent stream ended without ResultMessage"
+    assert kwargs["last_error_agent"] == "ideation"
+
+    # Hit counter should be reset so a manual resume gets a fresh budget
+    assert ("ideation", "stuck-idea") not in pm._rate_limit_hits

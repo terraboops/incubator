@@ -36,6 +36,12 @@ POOL_LOCK_FILE = ".pool.lock"
 POOL_RESTART_DELAY_SECONDS = 5
 MAX_RAPID_RESTARTS = 5
 RAPID_RESTART_WINDOW_SECONDS = 60
+# Cap on consecutive rate-limit-style retries before escalating to
+# needs_human_review. Backoff is exponential (30s, 60s, 120s, 240s, 300s,
+# 300s, ...), so 6 hits ≈ 18 minutes of wall time before we give up and
+# ask a human to look. Without this cap a hard transport error or expired
+# OAuth token would have the pool retrying forever.
+MAX_RATE_LIMIT_HITS = 6
 
 
 def can_schedule(
@@ -354,19 +360,62 @@ class PoolManager:
             key = (result.role, result.idea_id)
             self._rate_limit_hits[key] = self._rate_limit_hits.get(key, 0) + 1
             hits = self._rate_limit_hits[key]
+
+            if hits > MAX_RATE_LIMIT_HITS:
+                # Persistent failure — could be a real rate limit, an expired
+                # OAuth token, a network partition, or an SDK transport bug.
+                # Stop retrying and escalate so a human can investigate.
+                detail = result.error or "no ResultMessage from SDK"
+                logger.error(
+                    "Rate-limit cap exceeded for %s on %s after %d hits: %s",
+                    result.role,
+                    result.idea_id,
+                    hits,
+                    detail,
+                )
+                self.blackboard.update_status(
+                    result.idea_id,
+                    needs_human_review=True,
+                    review_reason=(
+                        f"{result.role} hit the {MAX_RATE_LIMIT_HITS}-retry cap "
+                        f"for rate-limit / transport errors ({detail}). "
+                        f"Check API keys, network, and rate limits before resuming."
+                    ),
+                    last_error=detail,
+                    last_error_agent=result.role,
+                    last_error_at=now.isoformat(),
+                )
+                self._rate_limit_hits.pop(key, None)
+                self._broadcast_sync(
+                    "activity",
+                    {
+                        "idea_id": result.idea_id,
+                        "message": (
+                            f"{result.role} stopped after {MAX_RATE_LIMIT_HITS} "
+                            f"rate-limit retries — needs human review"
+                        ),
+                        "kind": "error",
+                    },
+                )
+                return
+
             backoff = min(300, 30 * (2 ** (hits - 1)))  # 30s, 60s, 120s, 300s cap
             logger.warning(
-                "Rate-limited: %s on %s (hit #%d, backing off %ds)",
+                "Rate-limited: %s on %s (hit #%d/%d, backing off %ds)",
                 result.role,
                 result.idea_id,
                 hits,
+                MAX_RATE_LIMIT_HITS,
                 backoff,
             )
             self._broadcast_sync(
                 "activity",
                 {
                     "idea_id": result.idea_id,
-                    "message": f"{result.role} rate-limited, backing off {backoff}s",
+                    "message": (
+                        f"{result.role} rate-limited (hit {hits}/{MAX_RATE_LIMIT_HITS}), "
+                        f"backing off {backoff}s"
+                    ),
                     "kind": "warning",
                 },
             )

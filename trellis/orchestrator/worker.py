@@ -131,12 +131,13 @@ class Worker:
                 # connection signature. cost==0 alone is too weak: a real run
                 # with cached responses can legitimately complete in <30s for $0.
                 if result.stop_reason is None and result.cost_usd == 0 and elapsed < 30:
+                    detail = result.error or "no stop_reason / cost=$0 / fast completion"
                     logger.warning(
-                        "Worker %d: %s on %s appears rate-limited "
-                        "(no stop_reason, cost=$0, elapsed=%.0fs)",
+                        "Worker %d: %s on %s appears rate-limited (%s, elapsed=%.0fs)",
                         self.worker_id,
                         role,
                         idea_id,
+                        detail,
                         elapsed,
                     )
                     return RunResult(
@@ -144,6 +145,7 @@ class Worker:
                         role=role,
                         idea_id=idea_id,
                         duration_seconds=elapsed,
+                        error=detail,
                     )
 
                 return RunResult(
