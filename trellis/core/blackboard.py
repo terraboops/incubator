@@ -23,6 +23,8 @@ from trellis.core.pipeline import (
     watcher_is_in_scope,
 )
 
+logger = logging.getLogger(__name__)
+
 # Legacy constant kept for imports; prefer `default_pipeline()` directly.
 DEFAULT_PIPELINE = default_pipeline()
 
@@ -199,23 +201,45 @@ class Blackboard:
         return self.base_dir / idea_id
 
     def delete_idea(self, idea_id: str) -> None:
-        """Permanently delete an idea and all its artifacts."""
+        """Permanently delete an idea and all its artifacts.
 
-        idea_path = self.base_dir / idea_id
-        if idea_path.exists() and idea_path.is_dir() and idea_id != "_template":
-            shutil.rmtree(idea_path)
+        Order matters: invalidate the projection cache BEFORE removing the
+        on-disk directory. If we did the rmtree first and the projection
+        invalidate hung (or hit its timeout), there would be a window where
+        callers reading the projection see a phantom idea whose status.json
+        is gone — which is exactly what blew up the home page in 023e712.
+        """
         if self.projection:
-            # Best-effort: drop the projection record so the home page doesn't
-            # keep serving a deleted idea. Same timeout pattern as writes.
+            # Bound the wait so a hung projection store can't deadlock the
+            # delete, but accept the trade-off that a slow projection delays
+            # the rmtree slightly. We'd rather be slow than serve phantoms.
+            done = threading.Event()
+
             def _do_delete():
                 try:
                     self.projection.delete_idea(idea_id)
                 except Exception:
                     pass
+                finally:
+                    done.set()
 
             t = threading.Thread(target=_do_delete, daemon=True)
             t.start()
             t.join(timeout=self._PROJECTION_TIMEOUT)
+            if not done.is_set():
+                # Projection didn't ack within the timeout. Log and proceed —
+                # the next rebuild will reconcile, and the home page already
+                # tolerates stale projection entries for deleted ideas.
+                logger.warning(
+                    "delete_idea: projection invalidate timed out after %ss for '%s'; "
+                    "home loop will skip the stale entry until next rebuild",
+                    self._PROJECTION_TIMEOUT,
+                    idea_id,
+                )
+
+        idea_path = self.base_dir / idea_id
+        if idea_path.exists() and idea_path.is_dir() and idea_id != "_template":
+            shutil.rmtree(idea_path)
 
     def file_exists(self, idea_id: str, filename: str) -> bool:
         return (self.base_dir / idea_id / filename).exists()

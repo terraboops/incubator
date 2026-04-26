@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 import time
 import tracemalloc
+from unittest.mock import patch
 
 import pytest
 
@@ -145,6 +147,46 @@ class TestProjectionStore:
         assert "test-idea-0" not in bb_with_ideas.list_ideas()
         # Projection record also gone — home page won't crash
         assert store.get_idea("test-idea-0") is None
+
+    def test_delete_idea_invalidates_projection_before_rmtree(self, store, bb_with_ideas):
+        """Projection must be invalidated BEFORE the on-disk directory is
+        removed. The reverse ordering opens a window where the projection
+        still serves the idea but its status.json is gone — and that window
+        is exactly what 500'd the home page in the kill+delete bug.
+        """
+        bb_with_ideas.projection = store
+        for idea_id in bb_with_ideas.list_ideas():
+            store.upsert_idea(idea_id, bb_with_ideas.get_status(idea_id))
+
+        observed: list[tuple[str, bool]] = []  # (op_name, idea_dir_exists)
+        idea_path = bb_with_ideas.base_dir / "test-idea-0"
+
+        original_delete = store.delete_idea
+        original_rmtree = shutil.rmtree
+
+        def tap_delete(*args, **kwargs):
+            observed.append(("projection.delete", idea_path.exists()))
+            return original_delete(*args, **kwargs)
+
+        def tap_rmtree(*args, **kwargs):
+            observed.append(("rmtree", store.get_idea("test-idea-0") is not None))
+            return original_rmtree(*args, **kwargs)
+
+        with (
+            patch.object(store, "delete_idea", side_effect=tap_delete),
+            patch("trellis.core.blackboard.shutil.rmtree", side_effect=tap_rmtree),
+        ):
+            bb_with_ideas.delete_idea("test-idea-0")
+
+        # 1) projection.delete fires first
+        assert [op for op, _ in observed] == ["projection.delete", "rmtree"], (
+            f"Expected projection.delete then rmtree, got {observed}"
+        )
+        # 2) at the moment projection.delete runs, the disk is still intact
+        assert observed[0] == ("projection.delete", True)
+        # 3) at the moment rmtree runs, the projection has already dropped
+        #    the idea — so no caller can observe a phantom.
+        assert observed[1] == ("rmtree", False)
 
     def test_index_and_query_agent_logs(self, store):
         store.index_agent_log(
